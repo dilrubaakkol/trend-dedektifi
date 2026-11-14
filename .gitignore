@@ -30,3 +30,8 @@ Thumbs.db
 
 # Yerel OPeNDAP ayarı (kişiye özel yollar)
 .dodsrc
+
+# Veritabanı yedekleri (kişisel veri içerebilir: kullanıcılar, e-postalar, şifre özetleri)
+*.bak
+*.mdf
+*.ldf
