@@ -80,7 +80,7 @@ def answer(question: str, run_analysis: Callable[[dict], dict] | None = None,
             except Exception as e:
                 warnings.append(f"LLM açıklayıcı çalışmadı ({type(e).__name__}); şablona geçildi.")
                 break
-            check = verify_text(text, results)
+            check = verify_text(text, results, ignore_phrases=kb.number_phrases())
             if check.ok:
                 out.update(explanation=text, verified=True, explainer="llm")
                 return out
@@ -89,7 +89,7 @@ def answer(question: str, run_analysis: Callable[[dict], dict] | None = None,
             warnings.append("LLM açıklaması doğrulamayı geçemedi; şablon açıklama gösteriliyor.")
 
     text = template_explanation(plan, results, kb, kitle)
-    check = verify_text(text, results)
+    check = verify_text(text, results, ignore_phrases=kb.number_phrases())
     out.update(explanation=text, verified=check.ok, explainer="sablon")
     if not check.ok:
         warnings.append("Şablon açıklama bile doğrulanamadı: " + check.feedback())
