@@ -84,7 +84,9 @@ def test_l1_secenekleri_sabit_alani_atlar(paket, tmp_path):
         tmp_path / "rakim__SRTM.nc")
     (tmp_path / "L1_kup").mkdir()
     (tmp_path / "rakim__SRTM.nc").rename(tmp_path / "L1_kup" / "rakim__SRTM.nc")
-    assert T.l1_secenekleri(tmp_path) == {}
+    xr.DataArray(np.ones((2, 2)), dims=("lat", "lon")).rename("tarim_orani").to_dataset().to_netcdf(
+        tmp_path / "L1_kup" / "tarim_orani__MCD12C1.nc")
+    assert T.l1_secenekleri(tmp_path) == {}                      # zamansız katmanlar listelenmez
     assert T.l1_secenekleri(paket)["yagis"] == ["GLDAS", "GPM"]
 
 

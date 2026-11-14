@@ -36,6 +36,7 @@ from physics.tablo import EK_SUTUNLAR, SUTUNLAR, bolge_listesi, cift_tablosu, cs
 OZEL = ("turkiye", "tum_iller", "tum_bolgeler")
 BUYUK_FARK = 0.3     # |ham r − trendsiz r| bundan büyükse ortak trend uyarısı
 UYARI_ATTRS = ("bilinen_sorunlar", "trend_uyarisi")
+SABIT_KATMANLAR = {"tarim_orani"}   # zamansız L1 katmanları (rakım KADEME_DISI'de); ilişki serisi kurulamaz
 
 
 class SecimHatasi(ValueError):
@@ -58,7 +59,7 @@ def l1_secenekleri(paket: Path) -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     for f in sorted((Path(paket) / "L1_kup").glob("*__*.nc")):
         d, u = f.stem.split("__", 1)
-        if d not in KADEME_DISI:
+        if d not in KADEME_DISI and d not in SABIT_KATMANLAR:
             out.setdefault(d, []).append(u)
     return out
 
