@@ -125,3 +125,24 @@ def test_uret_uctan_uca(tmp_path):
     ic = pd.read_csv(out / "ICINDEKILER.csv", encoding="utf-8-sig")
     assert len(ic) == 6 and set(ic["tur"]) == {"trend", "kaynak_uyumu"}
     assert (ic[ic["tur"] == "trend"]["l2_ozeti"] == "evet").all()
+
+
+def test_turkiye_satiri_ayri_duzey(tmp_path):
+    bolgeler = BOLGELER + [{"duzey": "ulke", "anahtar": "turkiye", "ad": "Türkiye", "kod": "turkiye", "ust": "",
+                            "sorgu": box(32.0, 38.0, 33.5, 39.0)}]
+    m = l3.bolge_maskeleri(LAT, LON, bolgeler)
+    df = l3.bolge_trendleri(_kup(), "sicaklik_2m", bolgeler, m)
+    tr = df[df["bolge_anahtari"] == "turkiye"]
+    assert (tr["duzey"] == "ulke").all() and len(tr) == 5
+    np.testing.assert_allclose(tr["p_fdr"], tr["p_mk"])                  # tek satırlık düzey: FDR yok
+    kok = _paket(tmp_path)
+    l2.uret("v0.1", kok=kok)
+    out = l3.uret("v0.1", kok=kok, bolgeler=bolgeler)
+    b = pd.read_csv(out / "yagis__GPM__bolge.csv", encoding="utf-8-sig")
+    assert set(b["duzey"]) == {"bolge", "ulke"} and (b["bolge_anahtari"] == "turkiye").sum() == 5
+    il = pd.read_csv(out / "yagis__GPM__il.csv", encoding="utf-8-sig")
+    assert "turkiye" not in set(il["bolge_anahtari"])
+    ku = pd.read_csv(out / "yagis__kaynak_uyumu__bolge.csv", encoding="utf-8-sig")
+    assert "turkiye" in set(ku["bolge_anahtari"])
+    from stats.trend_tests import anlamli_kural
+    np.testing.assert_array_equal(b["anlamli"], anlamli_kural(b["p_fdr"], b["ga_alt"], b["ga_ust"]))

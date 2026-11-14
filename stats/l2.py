@@ -2,7 +2,8 @@
 
     python -m stats.l2 --surum v0.1
     python -m stats.l2 --surum v0.1 --dosyalar sicaklik_2m__MERRA2,yagis__GPM   # yalnız bunlar
-    python -m stats.l2 --surum v0.1 --yalniz-isaretler   # uyarılar, kaynak uyumu, OZET (trend aynı)
+    python -m stats.l2 --surum v0.1 --yalniz-isaretler   # anlamli'yı yeniden türet, uyarılar, kaynak uyumu, OZET
+                                                         # (eğim/GA/p değişmez)
 
 Girdi : outputs/trend-dedektifi-turkiye-<surum>/L1_kup/ (ICINDEKILER.csv'deki dosyalar, rakım hariç)
 Çıktı : outputs/trend-dedektifi-turkiye-<surum>/L2_trend/
@@ -25,8 +26,9 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from stats.preprocessing import EKSIK_ORAN_ESIK, MEVSIMLER, SURUM, TOPLANANLAR, donem_serisi, paket_koku
-from stats.trend_tests import _trend_np, bh_fdr
+from stats.preprocessing import (EKSIK_ORAN_ESIK, MEVSIMLER, SURUM, TOPLANANLAR, donem_serisi, eksik_esigi,
+                                 paket_koku)
+from stats.trend_tests import _trend_np, anlamli_kural, bh_fdr
 
 ALFA_FDR = 0.10
 MIN_YIL = 12
@@ -59,7 +61,16 @@ YONTEM_ATTRS = {
     "alfa_fdr": ALFA_FDR,
     "gereken_yil_yontemi": "Weatherhead vd. 1998; yılda bir değerli seride σ_N × √12",
     "eksik_veri_kurali": f"yıl/mevsimde eksik ay oranı > {EKSIK_ORAN_ESIK} ise NaN; en az {MIN_YIL} geçerli yıl",
+    "anlamlilik_kurali": f"anlamli = 1 ⇔ p_fdr ≤ {ALFA_FDR} ve %95 genişletilmiş GA sıfırı dışlıyor",
 }
+ANLAMLI_ADI = f"p_fdr ≤ {ALFA_FDR} ve GA sıfırı dışlıyor"
+
+
+def _eksik_kurali(urun: str | None) -> str:
+    """``eksik_veri_kurali`` attr metni (ürüne göre eşik)."""
+    y, m = eksik_esigi(urun, "yillik"), eksik_esigi(urun, "kis")
+    return (f"eksik ay oranı yıllıkta > {y:.2f}, mevsimde > {m:.2f} ise NaN; en az {MIN_YIL} geçerli yıl"
+            + (" (ürüne özel eşik; bkz. stats/preprocessing.py)" if (y, m) != (EKSIK_ORAN_ESIK,) * 2 else ""))
 
 
 def _hucre(y, x, min_yil=MIN_YIL):
@@ -83,12 +94,15 @@ def hucre_trendleri(seri: xr.DataArray, min_yil: int = MIN_YIL) -> xr.Dataset:
     return ds
 
 
-def fdr_katmani(p: np.ndarray, maske: np.ndarray, alfa: float = ALFA_FDR):
-    """Maskeli hücrelerde BH-FDR. Döndürür (p_fdr, anlamli int8: 1/0, maske dışı ya da p NaN → −1)."""
+def fdr_katmani(p: np.ndarray, maske: np.ndarray, ga_alt: np.ndarray, ga_ust: np.ndarray,
+                alfa: float = ALFA_FDR):
+    """Maskeli hücrelerde BH-FDR ve anlamlılık kuralı (``trend_tests.anlamli_kural``).
+
+    Döndürür (p_fdr, anlamli int8: 1/0, maske dışı ya da p NaN → −1).
+    """
     pm = np.where(maske, p, np.nan)
-    q, anl = bh_fdr(pm, alfa)
-    anlamli = np.where(np.isfinite(pm), anl.astype("int8"), np.int8(-1)).astype("int8")
-    return q.astype("float32"), anlamli
+    q, _ = bh_fdr(pm, alfa)
+    return q.astype("float32"), anlamli_kural(q, ga_alt, ga_ust, alfa)
 
 
 def kara_maskesi(da: xr.DataArray) -> np.ndarray:
@@ -107,17 +121,23 @@ def egim_birimi(birim: str, degisken: str) -> tuple[str, dict]:
 
 
 def l2_dosya(da: xr.DataArray, degisken: str, maske: np.ndarray | None = None,
-             mevsimler: dict = MEVSIMLER, alfa: float = ALFA_FDR, min_yil: int = MIN_YIL) -> xr.Dataset:
-    """Bir L1 küpünden L2 Dataset'i (mevsim, lat, lon). attrs: L1 attrs + yöntem alanları."""
+             mevsimler: dict = MEVSIMLER, alfa: float = ALFA_FDR, min_yil: int = MIN_YIL,
+             urun: str | None = None) -> xr.Dataset:
+    """Bir L1 küpünden L2 Dataset'i (mevsim, lat, lon). attrs: L1 attrs + yöntem alanları.
+
+    urun: dosya kodu (ör. "GRACE"); verilmezse ``kaynak_dosya`` attr'ından okunur. Eksik ay eşiğini seçer.
+    """
     maske = kara_maskesi(da) if maske is None else np.asarray(maske, bool)
+    if urun is None and "__" in str(da.attrs.get("kaynak_dosya", "")):
+        urun = str(da.attrs["kaynak_dosya"]).rsplit(".", 1)[0].split("__")[1]
     toplama = degisken in TOPLANANLAR
     parcalar = []
     for ad, aylar in mevsimler.items():
-        seri = donem_serisi(da, aylar, toplama=toplama, kis=(ad == "kis"))
+        seri = donem_serisi(da, aylar, toplama=toplama, kis=(ad == "kis"), eksik_esik=eksik_esigi(urun, ad))
         ds = hucre_trendleri(seri, min_yil)
         yedek = int((ds["mk_yedek"].values == 1).sum())
         ds = ds.drop_vars("mk_yedek")
-        p_fdr, anlamli = fdr_katmani(ds["p_mk"].values, maske, alfa)
+        p_fdr, anlamli = fdr_katmani(ds["p_mk"].values, maske, ds["ga_alt"].values, ds["ga_ust"].values, alfa)
         ds["p_fdr"] = (("lat", "lon"), p_fdr)
         ds["anlamli"] = (("lat", "lon"), anlamli)
         gecerli_yil = seri["yil"].values[np.isfinite(seri.where(maske)).any(dim=("lat", "lon")).values]
@@ -136,7 +156,7 @@ def l2_dosya(da: xr.DataArray, degisken: str, maske: np.ndarray | None = None,
     out["ga_ust"].attrs["long_name"] = "Eğimin %95 genişletilmiş güven aralığı, üst"
     out["p_mk"].attrs.update(units="1", long_name="Hamed-Rao Mann-Kendall p")
     out["p_fdr"].attrs.update(units="1", long_name="Benjamini-Hochberg q değeri")
-    out["anlamli"].attrs.update(long_name=f"p_fdr ≤ {alfa}", flag_values="-1 0 1",
+    out["anlamli"].attrs.update(long_name=ANLAMLI_ADI, flag_values="-1 0 1",
                                 flag_meanings="maske_disi_ya_da_hesaplanamadi anlamli_degil anlamli")
     out["etkin_n"].attrs.update(units="yıl", long_name="Etkin örneklem büyüklüğü")
     out["gereken_yil"].attrs.update(units="yıl", long_name="Weatherhead gereken yıl sayısı")
@@ -154,6 +174,7 @@ def l2_dosya(da: xr.DataArray, degisken: str, maske: np.ndarray | None = None,
         seri_tanimi="; ".join(f"{m}: {SERI_TANIMI.get(m, '')}" for m in mevsimler),
         donem="; ".join(f"{m}: {p.attrs['_donem']}" for m, p in zip(mevsimler, parcalar)),
         min_yil=min_yil,
+        eksik_veri_kurali=_eksik_kurali(urun),
         mk_yedek_hucre="; ".join(f"{m}: {p.attrs['_yedek']}" for m, p in zip(mevsimler, parcalar)),
         olusturma_tarihi=date.today().isoformat(),
     )
@@ -274,7 +295,7 @@ def kaynak_uyumu(dalar: dict[str, xr.DataArray], degisken: str, maske: np.ndarra
         else:
             kesit = da.sel(time=slice(bas, son))
             kesit.attrs = da.attrs
-            sonuclar[u] = l2_dosya(kesit, degisken, maske, mevsimler, alfa, min_yil)
+            sonuclar[u] = l2_dosya(kesit, degisken, maske, mevsimler, alfa, min_yil, urun=u)
     anl = np.stack([sonuclar[u]["anlamli"].values for u in dalar])          # (ürün, mevsim, lat, lon)
     egim = np.stack([sonuclar[u]["sen_egimi"].values for u in dalar])
     m = (anl >= 0).sum(axis=0)
@@ -335,16 +356,34 @@ def uret(surum: str = SURUM, kok: Path | None = None, dosyalar: list[str] | None
         da.attrs = {**ds.attrs, **da.attrs, "kaynak_dosya": r["dosya"]}
         if maske is None:
             maske = kara_maskesi(da)
-        res = l2_dosya(da, degisken, maske, alfa=alfa, min_yil=min_yil)
+        res = l2_dosya(da, degisken, maske, alfa=alfa, min_yil=min_yil, urun=urun)
         _uyari_ekle(res, degisken, urun, maske)
         yaz_nc(res, out_dir / f"{stem}__trend.nc")
         ozet += ozet_satirlari(res, r["dosya"], maske)
         hazir[(degisken, urun)] = res
         dalar_hepsi[(degisken, urun)] = da
         print(f"  {stem}__trend.nc  ({time.time() - t1:.0f} sn)")
+    if dosyalar:
+        # Yalnız bazı dosyalar yeniden hesaplandı: OZET ve kaynak uyumu tüm dosyalardan yenilenir
+        print(f"L2: {len(tablo)} dosya yeniden hesaplandı ({time.time() - t0:.0f} sn); OZET ve kaynak uyumu "
+              "tüm dosyalar için yenileniyor")
+        return isaretle(surum, kok, alfa, min_yil)
     _kaynak_ve_ozet(out_dir, hazir, dalar_hepsi, maske, ozet, alfa, min_yil)
     print(f"L2 tamam: {len(tablo)} dosya, {time.time() - t0:.0f} sn → {out_dir}")
     return out_dir
+
+
+def anlamli_yeniden(res: xr.Dataset, alfa: float = ALFA_FDR) -> xr.Dataset:
+    """Var olan L2 Dataset'inde ``anlamli``'yı p_fdr ve GA'dan yeniden türetir (yerinde ve döndürür).
+
+    Eğim, GA, p ve p_fdr değişmez; yalnız ``anlamli`` ve kuralı anlatan attrs güncellenir.
+    """
+    res["anlamli"] = (res["anlamli"].dims,
+                      anlamli_kural(res["p_fdr"].values, res["ga_alt"].values, res["ga_ust"].values, alfa))
+    res["anlamli"].attrs.update(long_name=ANLAMLI_ADI, flag_values="-1 0 1",
+                                flag_meanings="maske_disi_ya_da_hesaplanamadi anlamli_degil anlamli")
+    res.attrs["anlamlilik_kurali"] = YONTEM_ATTRS["anlamlilik_kurali"]
+    return res
 
 
 def _uyari_ekle(res: xr.Dataset, degisken: str, urun: str, maske: np.ndarray) -> None:
@@ -376,9 +415,10 @@ def _kaynak_ve_ozet(out_dir: Path, hazir: dict, dalar_hepsi: dict, maske: np.nda
 
 def isaretle(surum: str = SURUM, kok: Path | None = None, alfa: float = ALFA_FDR,
              min_yil: int = MIN_YIL) -> Path:
-    """Var olan L2 dosyalarına güvenilirlik işaretlerini ekler; trend değerlerine dokunmaz.
+    """Var olan L2 dosyalarını trendleri yeniden hesaplamadan günceller.
 
-    Trend dosyalarında yalnız ``trend_uyarisi`` attr'ı güncellenir. Kaynak uyumu (L1'den, ortak
+    Trend dosyalarında ``anlamli`` p_fdr ve GA'dan yeniden türetilir (``anlamli_kural``) ve
+    ``trend_uyarisi`` attr'ı güncellenir; eğim, GA, p ve p_fdr değişmez. Kaynak uyumu (L1'den, ortak
     dönemde) ve OZET.csv yeniden yazılır. Sonuç, tam ``uret`` çalıştırmasıyla aynıdır.
     """
     paket = paket_koku(surum, kok)
@@ -394,6 +434,7 @@ def isaretle(surum: str = SURUM, kok: Path | None = None, alfa: float = ALFA_FDR
             res = ds.load()
         if maske is None:
             maske = kara_maskesi(res)
+        anlamli_yeniden(res, alfa)
         _uyari_ekle(res, degisken, urun, maske)
         yaz_nc(res, yol)
         ozet += ozet_satirlari(res, r["dosya"], maske)

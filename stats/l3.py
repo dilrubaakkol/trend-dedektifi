@@ -16,7 +16,9 @@ A) Alan ortalaması serisinin trendi:
      hücreler atlanır).
    - Sonra ``donem_serisi`` → ``trend_analizi``. ``gereken_yil``, ``trend_analizi`` içinde
      ``weatherhead_gereken_yil`` ile aynı formülden gelir.
-   - BH-FDR (α = 0,10) her dosya × mevsim × düzey (iller ayrı, bölgeler ayrı) içinde uygulanır.
+   - BH-FDR (α = 0,10) her dosya × mevsim × düzey içinde uygulanır: iller ayrı, bölgeler ayrı.
+     Türkiye satırı (``duzey = "ulke"``) tek başına ayrı bir düzeydir, yani FDR'ye girmez (p_fdr = p_mk).
+   - anlamli = 1 ⇔ p_fdr ≤ 0,10 ve GA sıfırı dışlıyor (``trend_tests.anlamli_kural``).
 B) L2 hücre özeti: bölgedeki L2 hücrelerinin anlamlı oranları ve medyan eğimi.
 
 Şema: docs/sozlesmeler.md bölüm 2.2.
@@ -35,10 +37,11 @@ import xarray as xr
 
 from stats.l2 import (ALFA_FDR, KAYNAK_UYUMU, MIN_YIL, _veri_donemi, egim_birimi, icindekiler, kara_maskesi,
                       mevsim_uyarisi, trend_uyarisi)
-from stats.preprocessing import MEVSIMLER, SURUM, TOPLANANLAR, donem_serisi, paket_koku
-from stats.trend_tests import bh_fdr, trend_analizi
+from stats.preprocessing import MEVSIMLER, SURUM, TOPLANANLAR, donem_serisi, eksik_esigi, paket_koku
+from stats.trend_tests import anlamli_kural, bh_fdr, trend_analizi
 
 AZ_HUCRE = 3
+DOSYA_DUZEYLERI = {"il": ["il"], "bolge": ["bolge", "ulke"]}  # Türkiye satırı bölge CSV'sinde
 ORTAK_ALANLAR = ("kademe", "dogrulanmadi", "urun_surumu", "veri_seti_doi", "lisans", "doi")
 L3_COLS = [
     "bolge_kodu", "bolge_anahtari", "bolge_adi", "duzey", "ust_bolge", "mevsim", "hucre_sayisi",
@@ -53,13 +56,18 @@ TREND_ALANLARI = ("sen_egimi", "ga_alt", "ga_ust", "p_mk", "etkin_n", "gereken_y
 # ---------------------------------------------------------------- bölgeler ve maskeler
 
 def bolge_listesi() -> list[dict]:
-    """81 il ve 7 bölge: {duzey, anahtar, ad, kod, ust, sorgu}. İl kodu iki haneli plakadır."""
+    """81 il, 7 bölge ve Türkiye: {duzey, anahtar, ad, kod, ust, sorgu}. İl kodu iki haneli plakadır.
+
+    Türkiye satırı ``duzey = "ulke"``dir (tüm kara hücreleri) ve bölge CSV'sine yazılır.
+    """
     from data.regions import _iller, bolge_of_il, list_regions  # yalnız okuma; data/ değişmez
     lr, il = list_regions(), _iller()
     out = [{"duzey": "il", "anahtar": k, "ad": ad, "kod": f"{int(il[k]['plaka']):02d}",
             "ust": bolge_of_il(k), "sorgu": f"il:{k}"} for k, ad in lr["il"]]
     out += [{"duzey": "bolge", "anahtar": k, "ad": ad, "kod": k, "ust": "", "sorgu": f"bolge:{k}"}
             for k, ad in lr["bolge"]]
+    out.append({"duzey": "ulke", "anahtar": "turkiye", "ad": "Türkiye", "kod": "turkiye", "ust": "",
+                "sorgu": "turkiye"})
     return out
 
 
@@ -87,13 +95,17 @@ def bolge_serileri(da: xr.DataArray, maskeler: dict) -> xr.DataArray:
 
 def bolge_trendleri(da: xr.DataArray, degisken: str, bolgeler: list[dict], maskeler: dict,
                     alfa: float = ALFA_FDR, min_yil: int = MIN_YIL,
-                    mevsimler: dict = MEVSIMLER) -> pd.DataFrame:
-    """Her bölge × mevsim için alan ortalaması serisinin trendi; FDR düzey × mevsim içinde."""
+                    mevsimler: dict = MEVSIMLER, urun: str | None = None) -> pd.DataFrame:
+    """Her bölge × mevsim için alan ortalaması serisinin trendi; FDR düzey × mevsim içinde.
+
+    anlamli, ``anlamli_kural`` ile belirlenir. urun (dosya kodu) eksik ay eşiğini seçer.
+    """
     seri_hepsi = bolge_serileri(da, maskeler)
     toplama = degisken in TOPLANANLAR
     satirlar = []
     for mevsim, aylar in mevsimler.items():
-        seri = donem_serisi(seri_hepsi, aylar, toplama=toplama, kis=(mevsim == "kis"))
+        seri = donem_serisi(seri_hepsi, aylar, toplama=toplama, kis=(mevsim == "kis"),
+                            eksik_esik=eksik_esigi(urun, mevsim))
         for b in bolgeler:
             s = seri.sel(bolge=b["anahtar"])
             r = trend_analizi(s, min_yil=min_yil, kontrol=False)
@@ -111,9 +123,10 @@ def bolge_trendleri(da: xr.DataArray, degisken: str, bolgeler: list[dict], maske
     df = pd.DataFrame(satirlar)
     df["p_fdr"], df["anlamli"] = np.nan, -1
     for (_, _), grup in df.groupby(["duzey", "mevsim"]):
-        q, anl = bh_fdr(grup["p_mk"].to_numpy(float), alfa)
+        q, _ = bh_fdr(grup["p_mk"].to_numpy(float), alfa)
         df.loc[grup.index, "p_fdr"] = q
-        df.loc[grup.index, "anlamli"] = np.where(np.isfinite(q), anl.astype(int), -1)
+        df.loc[grup.index, "anlamli"] = anlamli_kural(q, grup["ga_alt"].to_numpy(float),
+                                                      grup["ga_ust"].to_numpy(float), alfa)
     df["anlamli"] = df["anlamli"].astype(int)
     return df
 
@@ -148,7 +161,7 @@ def l3_dosya(da: xr.DataArray, degisken: str, urun: str, bolgeler: list[dict], m
              l2: xr.Dataset | None = None, alfa: float = ALFA_FDR, min_yil: int = MIN_YIL,
              mevsimler: dict = MEVSIMLER) -> pd.DataFrame:
     """Bir L1 dosyası için tüm il ve bölge satırları (L3_COLS sırasıyla)."""
-    a = bolge_trendleri(da, degisken, bolgeler, maskeler, alfa, min_yil, mevsimler)
+    a = bolge_trendleri(da, degisken, bolgeler, maskeler, alfa, min_yil, mevsimler, urun=urun)
     b = l2_hucre_ozeti(l2, bolgeler, maskeler, mevsimler)
     df = a.merge(b, on=["bolge_anahtari", "mevsim"], how="left")
     bilgi = {x["anahtar"]: x for x in bolgeler}
@@ -204,7 +217,7 @@ def kaynak_uyumu_l3(dalar: dict[str, xr.DataArray], degisken: str, bolgeler: lis
     tablolar = {}
     for u, da in dalar.items():
         kesit = da.sel(time=slice(bas, son))
-        tablolar[u] = bolge_trendleri(kesit, degisken, bolgeler, maskeler, alfa, min_yil, mevsimler) \
+        tablolar[u] = bolge_trendleri(kesit, degisken, bolgeler, maskeler, alfa, min_yil, mevsimler, urun=u) \
             .set_index(["bolge_anahtari", "mevsim"])
     ref = next(iter(tablolar.values()))
     out = ref[["duzey"]].copy()
@@ -266,7 +279,7 @@ def uret(surum: str = SURUM, kok: Path | None = None, dosyalar: list[str] | None
                 l2 = x.load()
         df = l3_dosya(da, degisken, urun, bolgeler, maskeler, l2, alfa, min_yil)
         for duzey in ("il", "bolge"):
-            parca = df[df["duzey"] == duzey]
+            parca = df[df["duzey"].isin(DOSYA_DUZEYLERI[duzey])]
             if parca.empty:
                 continue
             ad = f"{stem}__{duzey}.csv"
@@ -284,7 +297,7 @@ def uret(surum: str = SURUM, kok: Path | None = None, dosyalar: list[str] | None
             continue
         ku = kaynak_uyumu_l3(dalar, degisken, bolgeler, maskeler, kara, alfa, min_yil)
         for duzey in ("il", "bolge"):
-            parca = ku[ku["duzey"] == duzey]
+            parca = ku[ku["duzey"].isin(DOSYA_DUZEYLERI[duzey])]
             if parca.empty:
                 continue
             ad = f"{degisken}__kaynak_uyumu__{duzey}.csv"

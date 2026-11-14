@@ -14,6 +14,14 @@ yaz (Haz–Ağu), sonbahar (Eyl–Kas).
   - Örnekler: GPM 2025-09'da bittiği için 2025 yılı (3 ay eksik) ve 2025 sonbaharı düşer. GRACE
     2002-04'te başladığı için 2002 yılı düşer; GRACE/GRACE-FO arasındaki boşluk yılları da düşer.
     İlk kış (2001: Aralık 2000 yok) düşer.
+- **Ürüne göre eşik** (``EKSIK_ESIK_URUN``, ``eksik_esigi``): GRACE/GRACE-FO için yıllıkta en az 6
+  geçerli ay (eksik oran ≤ 0,50), mevsimde en az 2/3 ay (eksik oran ≤ 1/3). Gerekçe:
+  - GRACE'in son yıllarında (yaklaşık 2011–2017) uydu bataryası yönetimi yüzünden birkaç ayda bir
+    ay eksiktir.
+  - 2017-07 … 2018-05 arasında GRACE → GRACE-FO geçiş boşluğu vardır.
+  - Varsayılan 0,20 eşiğiyle 2011 ve 2013–2018 yılları düşüyor, yıllık seri 16 yıla iniyordu.
+  - Ayrıca GRACE ayrık "ay ortası" çözümlerdir ve su depolama yavaş değişir. Bu yüzden 6 aylık
+    ortalama yıllık düzeyi temsil eder.
 - Ortalama alınan değişkenlerde eksik aylar atlanarak ortalama alınır.
 - Toplanan değişkenlerde (``TOPLANANLAR``: yağış, buharlaşma, akışlar) toplam,
   "geçerli ayların ortalaması × dönemdeki ay sayısı" olur. Böylece bir ayı eksik yıl sistematik
@@ -47,6 +55,17 @@ MEVSIMLER = {
 }
 
 EKSIK_ORAN_ESIK = 0.20
+
+# Ürüne göre eksik ay eşiği (dosya kodu → {"yillik": eşik, "mevsim": eşik}); gerekçe modül açıklamasında
+EKSIK_ESIK_URUN = {"GRACE": {"yillik": 0.50, "mevsim": 1 / 3}}
+
+
+def eksik_esigi(urun: str | None, mevsim: str) -> float:
+    """Ürün ve mevsim için izin verilen en büyük eksik ay oranı (varsayılan ``EKSIK_ORAN_ESIK``)."""
+    e = EKSIK_ESIK_URUN.get(urun or "")
+    if not e:
+        return EKSIK_ORAN_ESIK
+    return e["yillik"] if mevsim == "yillik" else e["mevsim"]
 
 
 def paket_koku(surum: str = SURUM, kok: Path | None = None) -> Path:
@@ -113,8 +132,11 @@ def donem_serisi(da, aylar, toplama=False, kis=False, eksik_esik=EKSIK_ORAN_ESIK
     ).transpose("yil", ...)  # ızgarada (yil, lat, lon); bölge serisinde (yil, bolge)
 
 
-def l2_uret(da, degisken):
-    """Aylık klimatoloji, aylık anomali ve 5 dönem serisi (``MEVSIMLER``) üretir."""
+def l2_uret(da, degisken, urun=None):
+    """Aylık klimatoloji, aylık anomali ve 5 dönem serisi (``MEVSIMLER``) üretir.
+
+    urun: dosya kodu (ör. "GRACE"); eksik ay eşiği ``eksik_esigi(urun, mevsim)`` ile seçilir.
+    """
 
     toplama = degisken in TOPLANANLAR
 
@@ -134,7 +156,8 @@ def l2_uret(da, degisken):
             da,
             aylar,
             toplama=toplama,
-            kis=(ad == "kis")
+            kis=(ad == "kis"),
+            eksik_esik=eksik_esigi(urun, ad)
         )
         for ad, aylar in MEVSIMLER.items()
     })
@@ -143,7 +166,8 @@ def l2_uret(da, degisken):
     seriler.attrs["toplama_yontemi"] = (
         "toplam (geçerli ay ortalaması × ay sayısı)" if toplama else "ortalama"
     )
-    seriler.attrs["eksik_veri_kurali"] = f"eksik ay oranı > {EKSIK_ORAN_ESIK} ise NaN"
+    seriler.attrs["eksik_veri_kurali"] = (f"eksik ay oranı > {eksik_esigi(urun, 'yillik'):.2f} (yıllık) / "
+                                          f"{eksik_esigi(urun, 'kis'):.2f} (mevsim) ise NaN")
     for k in ("kaynak_dosya", "source_product", "urun_surumu", "kademe"):
         if k in da.attrs:
             seriler.attrs[k] = da.attrs[k]
