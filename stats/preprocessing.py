@@ -67,7 +67,10 @@ def l1_oku(degisken: str, urun: str, surum: str = SURUM, kok: Path | None = None
 
 
 def donem_serisi(da, aylar, toplama=False, kis=False, eksik_esik=EKSIK_ORAN_ESIK):
-    """Aylık küpten yıllık/mevsimlik seri (yil, lat, lon). Eksik veri kuralı: modül açıklaması."""
+    """Aylık seriden yıllık/mevsimlik seri: ilk boyut ``yil``, diğer boyutlar korunur (ör. lat, lon).
+
+    Eksik veri kuralı: modül açıklaması.
+    """
 
     # İstenen ayları seç
     secilen = da.where(
@@ -107,7 +110,7 @@ def donem_serisi(da, aylar, toplama=False, kis=False, eksik_esik=EKSIK_ORAN_ESIK
 
     return sonuc.sel(
         yil=slice(ilk_yil, son_yil)
-    ).transpose("yil", "lat", "lon")
+    ).transpose("yil", ...)  # ızgarada (yil, lat, lon); bölge serisinde (yil, bolge)
 
 
 def l2_uret(da, degisken):
