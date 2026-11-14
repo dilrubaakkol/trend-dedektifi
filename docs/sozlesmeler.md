@@ -78,7 +78,7 @@ Domain: `land` = Türkiye kara maskeli, `ocean` = deniz maskeli, `all` = kutunun
 | `yanan_alan` | % | land | MCD64A1 061 ⏸ | — |
 | `aerosol_optik_derinlik` | 1 | all | M2TMNXAER (MERRA2) | MOD08_M3 ⏸ |
 | `ozon_kolon` | DU | all | M2TMNXSLV `TO3` (MERRA2) | OMTO3e 004 ⏸ |
-| `no2` (troposferik) | 10^15 molekül/cm² | all | OMNO2d 004 (OMI) ⏸ | — |
+| `no2` (troposferik) | 10^15 molekül/cm² | all | OMNO2d 004 (OMI), 2004-10'dan | — |
 | `so2` | DU | all | OMSO2e 004 (OMI) ⏸ | — |
 | `deniz_yuzey_sicakligi` | °C | ocean | MODISA_L3m_SST ⏸ | — |
 | `klorofil` | mg/m³ | ocean | MODISA_L3m_CHL ⏸ | — |

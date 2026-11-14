@@ -184,8 +184,8 @@ urunler:
     zaman: gunluk
     mekansal_cozunurluk: [0.25, 0.25]
     valid_start: "2004-10"
-    durum: ertelendi
-    not: "Günlük, tam dosya ~11 MB/gün (~89 GB). OPeNDAP ile yalnız kesit iner ama ~7.700 istek gerekir. Kullanıcı onayı bekleniyor."
+    durum: aktif
+    not: "Günlük, tam dosya ~11 MB/gün (~89 GB). OPeNDAP ile yalnız Türkiye kesiti iner (~40 KB/gün, 7.713 dosya, ~306 MB). Aylık ortalama için en az 5 geçerli gün."
   OMTO3e:
     short_name: OMTO3e
     version: "004"
