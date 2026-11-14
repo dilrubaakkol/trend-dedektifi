@@ -226,6 +226,10 @@ Ayrı bir `iliski_iller.csv` dosyası yoktur; il satırları `ciftler.csv` için
 - `mevsim_anomali`: dört mevsimin değerleri art arda dizilir, her mevsimden kendi uzun dönem ortalaması çıkarılır.
 - `aylik_anomali`: her aydan o ayın 12 aylık klimatolojisi çıkarılır. `_nis_eyl`: yalnız Nisan–Eylül ayları (NDVI tarafı).
 - Her seriden korelasyondan önce doğrusal trend çıkarılır.
+- **GRACE yıllık ortalaması (çift 4, Kişi 3 kararı 2026-11-14):** Yıl, en az 9 ayı doluysa geçerli sayılır
+  (`physics/ciftler.py`, `GRACE_MIN_AY = 9`). GRACE'te 2017–2018 büyük boşluğu dışında da dağınık eksik aylar
+  var; 12 ay şartı birçok yılı gereksiz yere atardı. Büyük boşluk yılları (2017: 6 ay, 2018: 7 ay) yine atılır.
+  Toplam alınan değişkenlerde (yağış, buharlaşma) eksik aya hiç izin verilmez.
 
 **`ciftler.csv` sütunları:**
 
