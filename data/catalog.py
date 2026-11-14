@@ -66,9 +66,9 @@ def variable(name: str, product_key: str | None = None) -> dict:
 
 
 def unverified() -> list[str]:
-    """dogrulanmadi: true olan ürün ve değişkenlerin listesi (rapor için)."""
+    """katalog_dogrulanmadi: true olan ürün ve değişkenlerin listesi (rapor için)."""
     cat = load_catalog()
-    out = [f"ürün {k}: {p.get('not', '')}" for k, p in cat["urunler"].items() if p.get("dogrulanmadi")]
+    out = [f"ürün {k}: {p.get('not', '')}" for k, p in cat["urunler"].items() if p.get("katalog_dogrulanmadi")]
     out += [f"değişken {v['ad']} ({v['urun']}): {v['dosya_degiskeni']}"
-            for v in cat["degiskenler"] if v.get("dogrulanmadi")]
+            for v in cat["degiskenler"] if v.get("katalog_dogrulanmadi")]
     return out

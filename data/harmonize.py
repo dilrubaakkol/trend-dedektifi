@@ -267,8 +267,8 @@ def harmonize_variable(v: dict, grids=None, raw: xr.Dataset | None = None) -> li
             valid_start=valid_start or "sabit", source_variable=v["dosya_degiskeni"],
             source_units=v["birim_orijinal"], kategori=v["kategori"], urun_anahtari=v["urun"],
         )
-        if v.get("dogrulanmadi") or p.get("dogrulanmadi"):
-            attrs["dogrulanmadi"] = "evet — katalog kaydının bir kısmı doğrulanmadı"
+        if v.get("katalog_dogrulanmadi") or p.get("katalog_dogrulanmadi"):
+            attrs["katalog_dogrulanmadi"] = "evet — katalog kaydının bir kısmı doğrulanmadı"
         if v.get("bilinen_sorunlar"):  # katalogdaki bilinen veri sorunu notu dosyaya taşınır
             attrs["bilinen_sorunlar"] = v["bilinen_sorunlar"]
         path = write_netcdf(finalize(out, attrs), processed_path(v["ad"], p["dosya_kodu"], g))
