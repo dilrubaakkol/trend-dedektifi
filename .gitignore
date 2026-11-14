@@ -27,3 +27,6 @@ outputs/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Yerel OPeNDAP ayarı (kişiye özel yollar)
+.dodsrc
