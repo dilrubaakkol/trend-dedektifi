@@ -1,0 +1,666 @@
+# Trend Dedektifi veri kataloğu (Kişi 1). Yeni değişken = yeni kayıt; kod değişmez.
+#
+# urunler: NASA ürünleri. short_name / version / doi / daac / valid_start CMR'den
+#   (earthaccess.search_datasets) doğrulanmıştır (2026-11-14). "dogrulanmadi: true" olan alan
+#   CMR'de bulunamamış ya da henüz bir dosyada görülmemiştir; ayrıntı "not" alanında.
+# degiskenler: sözleşmedeki Türkçe ASCII ad × ürün. "ana: true" = data.load() varsayılanı.
+#   dosya_degiskeni dosyanın içinde görülerek doğrulanmıştır (dogrulanmadi: false ise).
+#
+# erisim:
+#   opendap  — Cloud OPeNDAP (DAP4): Türkiye kesiti sunucuda alınır, yalnız o indirilir (en hızlı)
+#   stream   — earthaccess.open ile yalnızca Türkiye kesiti okunur (NetCDF4/HDF5 ürünler)
+#   download — dosya tam indirilir, Türkiye'ye kesilir; keep_raw: false ise ham dosya silinir (HDF4)
+# okuyucu (data/fetch.py): netcdf | hdf5_grid | hdfeos5_grid | hdf4_cmg | srtm_dem
+# durum: aktif | ertelendi (neden "not" içinde)
+# donusum (data/harmonize.py UNIT_CONVERSIONS): yok, K_to_C, Pa_to_hPa, kg_m2_s_to_mm_ay,
+#   acc3h_to_mm_ay, mm_saat_to_mm_ay, kesir_to_yuzde, olcek (ham*olcek + ofset), molek_to_1e15
+# mekansal_cozunurluk: derece (enlem, boylam)
+
+bbox: [25.0, 34.5, 45.5, 43.0]      # batı, güney, doğu, kuzey (TURKIYE_BBOX)
+donem: ["2001-01", "2025-12"]
+
+urunler:
+  MERRA2_SLV:
+    short_name: M2TMNXSLV
+    version: "5.12.4"
+    daac: GES DISC
+    provider: GES_DISC
+    doi: 10.5067/AP1B0BA5PD2K
+    dosya_kodu: MERRA2           # işlenmiş dosya adındaki ürün kodu: <degisken>__MERRA2.nc
+    erisim: opendap
+    okuyucu: netcdf
+    zaman: aylik
+    mekansal_cozunurluk: [0.5, 0.625]
+    valid_start: "1980-01"
+    durum: aktif
+  MERRA2_FLX:
+    short_name: M2TMNXFLX
+    version: "5.12.4"
+    daac: GES DISC
+    provider: GES_DISC
+    doi: 10.5067/0JRLVL8YV2Y4
+    dosya_kodu: MERRA2
+    erisim: opendap
+    okuyucu: netcdf
+    zaman: aylik
+    mekansal_cozunurluk: [0.5, 0.625]
+    valid_start: "1980-01"
+    durum: aktif
+  MERRA2_RAD:
+    short_name: M2TMNXRAD
+    version: "5.12.4"
+    daac: GES DISC
+    provider: GES_DISC
+    doi: 10.5067/OU3HJDS973O0
+    dosya_kodu: MERRA2
+    erisim: opendap
+    okuyucu: netcdf
+    zaman: aylik
+    mekansal_cozunurluk: [0.5, 0.625]
+    valid_start: "1980-01"
+    durum: aktif
+    not: "MOD08_M3 bulut oranı yerine (MOD08_M3 ~350 MB/ay)."
+  MERRA2_AER:
+    short_name: M2TMNXAER
+    version: "5.12.4"
+    daac: GES DISC
+    provider: GES_DISC
+    doi: 10.5067/FH9A0MLJPC7N
+    dosya_kodu: MERRA2
+    erisim: opendap
+    okuyucu: netcdf
+    zaman: aylik
+    mekansal_cozunurluk: [0.5, 0.625]
+    valid_start: "1980-01"
+    durum: aktif
+  GPM_IMERG:
+    short_name: GPM_3IMERGM
+    version: "07"
+    daac: GES DISC
+    provider: GES_DISC
+    doi: 10.5067/GPM/IMERG/3B-MONTH/07
+    dosya_kodu: GPM
+    erisim: opendap
+    okuyucu: hdf5_grid           # grup "Grid", boyut sırası (time, lon, lat)
+    grup: Grid
+    zaman: aylik
+    mekansal_cozunurluk: [0.1, 0.1]
+    valid_start: "1998-01"
+    durum: aktif
+  GLDAS:
+    short_name: GLDAS_NOAH025_M
+    version: "2.1"
+    daac: GES DISC
+    provider: GES_DISC
+    doi: 10.5067/SXAVCZFAQLNO
+    dosya_kodu: GLDAS
+    erisim: opendap
+    okuyucu: netcdf
+    zaman: aylik
+    mekansal_cozunurluk: [0.25, 0.25]
+    valid_start: "2000-01"
+    durum: aktif
+    not: "Aylık dosyada _tavg = 3 saatlik ortalama oran, _acc = 3 saatlik birikimin ortalaması (README_GLDAS2.pdf, madde 6)."
+  MOD10CM:
+    short_name: MOD10CM
+    version: "61"
+    daac: NSIDC DAAC
+    provider: NSIDC_CPRD
+    doi: 10.5067/MODIS/MOD10CM.061
+    dosya_kodu: MOD10CM
+    erisim: download
+    keep_raw: false
+    okuyucu: hdf4_cmg
+    zaman: aylik
+    mekansal_cozunurluk: [0.05, 0.05]
+    valid_start: "2000-03"
+    durum: aktif
+  MOD13C2:
+    short_name: MOD13C2
+    version: "061"
+    daac: LP DAAC
+    provider: LPCLOUD
+    doi: 10.5067/MODIS/MOD13C2.061
+    dosya_kodu: MOD13C2
+    erisim: opendap
+    okuyucu: hdf4_cmg
+    zaman: aylik
+    mekansal_cozunurluk: [0.05, 0.05]
+    valid_start: "2000-02"
+    durum: aktif
+    not: "Tam dosya ~90 MB/ay (~29 GB); OPeNDAP ile yalnız Türkiye kesiti (~0,3 MB/ay) iner. HDF scale_factor bölen kuralındadır."
+  MOD11C3:
+    short_name: MOD11C3
+    version: "061"
+    daac: LP DAAC
+    provider: LPCLOUD
+    doi: 10.5067/MODIS/MOD11C3.061
+    dosya_kodu: MOD11C3
+    erisim: opendap
+    okuyucu: hdf4_cmg
+    zaman: aylik
+    mekansal_cozunurluk: [0.05, 0.05]
+    valid_start: "2000-02"
+    durum: aktif
+    not: "Tam dosya ~68 MB/ay; OPeNDAP ile yalnız Türkiye kesiti iner."
+  AIRS3STM:
+    short_name: AIRS3STM
+    version: "7.0"
+    daac: GES DISC
+    provider: GES_DISC
+    doi: 10.5067/UBENJB9D3T2H
+    dosya_kodu: AIRS
+    erisim: opendap
+    okuyucu: hdf4_airs
+    zaman: aylik
+    mekansal_cozunurluk: [1.0, 1.0]
+    valid_start: "2002-09"
+    durum: ertelendi
+    not: "HDF4, tam dosya ~200 MB/ay. OPeNDAP ile denenmedi (değişken adları doğrulanmadı); şimdilik su buharı MERRA-2 TQV'den."
+  MOD08_M3:
+    short_name: MOD08_M3
+    version: "6.1"
+    daac: LAADS DAAC
+    provider: LAADS
+    doi: 10.5067/MODIS/MOD08_M3.061
+    dosya_kodu: MOD08
+    erisim: download
+    okuyucu: hdf4_mod08
+    zaman: aylik
+    mekansal_cozunurluk: [1.0, 1.0]
+    valid_start: "2000-02"
+    durum: ertelendi
+    not: "~350 MB/ay (~100 GB). Bulut ve AOD şimdilik MERRA-2 RAD/AER'den."
+  OMNO2d:
+    short_name: OMNO2d
+    version: "004"
+    daac: GES DISC
+    provider: GES_DISC
+    doi: 10.5067/AURA/OMI/DATA3407
+    dosya_kodu: OMI
+    erisim: opendap
+    okuyucu: hdfeos5_grid
+    grid_yolu: HDFEOS/GRIDS/ColumnAmountNO2/Data Fields
+    zaman: gunluk
+    mekansal_cozunurluk: [0.25, 0.25]
+    valid_start: "2004-10"
+    durum: ertelendi
+    not: "Günlük, tam dosya ~11 MB/gün (~89 GB). OPeNDAP ile yalnız kesit iner ama ~7.700 istek gerekir. Kullanıcı onayı bekleniyor."
+  OMTO3e:
+    short_name: OMTO3e
+    version: "004"
+    daac: GES DISC
+    provider: GES_DISC
+    doi: 10.5067/Aura/OMI/DATA3402
+    dosya_kodu: OMI
+    erisim: opendap
+    okuyucu: hdfeos5_grid
+    grid_yolu: HDFEOS/GRIDS/OMI Column Amount O3/Data Fields
+    zaman: gunluk
+    mekansal_cozunurluk: [0.25, 0.25]
+    valid_start: "2004-10"
+    durum: ertelendi
+    not: "Günlük ~2,4 MB/gün. grid_yolu dosyada görülmedi. Ozon şimdilik MERRA-2 TO3'ten."
+  OMSO2e:
+    short_name: OMSO2e
+    version: "004"
+    daac: GES DISC
+    provider: GES_DISC
+    doi: 10.5067/AURA/OMI/DATA3408
+    dosya_kodu: OMI
+    erisim: opendap
+    okuyucu: hdfeos5_grid
+    grid_yolu: HDFEOS/GRIDS/OMI Total Column Amount SO2/Data Fields
+    zaman: gunluk
+    mekansal_cozunurluk: [0.25, 0.25]
+    valid_start: "2004-10"
+    durum: ertelendi
+    not: "Günlük ~3 MB/gün. grid_yolu dosyada görülmedi."
+  GRACE_MASCON:
+    short_name: TELLUS_GRAC-GRFO_MASCON_CRI_GRID_RL06.3_V4
+    version: RL06.3Mv04
+    daac: PO.DAAC
+    provider: POCLOUD
+    doi: 10.5067/TEMSC-3JC634
+    dosya_kodu: GRACE
+    erisim: download
+    keep_raw: true
+    okuyucu: netcdf
+    tek_dosya: true              # tüm aylar tek dosyada
+    zaman: aylik_duzensiz        # ay ortası damgalar, eksik aylar var
+    mekansal_cozunurluk: [0.5, 0.5]
+    valid_start: "2002-04"
+    durum: aktif
+  SRTMGL30:
+    short_name: SRTMGL30
+    version: "002"
+    daac: LP DAAC
+    provider: LPCLOUD
+    doi: 10.5067/MEASURES/SRTM/SRTMGL30.002
+    dosya_kodu: SRTM
+    erisim: download
+    keep_raw: true
+    okuyucu: srtm_dem
+    zaman: sabit
+    mekansal_cozunurluk: [0.008333333, 0.008333333]
+    valid_start: "2000-02"
+    durum: aktif
+    not: "SRTMGL3 (90 m, ~100 karo) yerine 30″ sürüm; 0,05°/0,25° ortalama için yeterli, 2 karo."
+  MODISA_SST:
+    short_name: MODISA_L3m_SST
+    version: R2019.0
+    daac: OB.DAAC
+    provider: OB_DAAC
+    doi: null
+    dosya_kodu: MODISA
+    erisim: stream
+    okuyucu: netcdf
+    granul_deseni: "L3m.MO.SST.sst.9km"
+    zaman: aylik
+    mekansal_cozunurluk: [0.0833333, 0.0833333]
+    valid_start: "2002-07"
+    durum: ertelendi
+    dogrulanmadi: true
+    not: "CMR koleksiyon kaydında DOI yok. Aylık 9 km granül adı deseni henüz doğrulanmadı (öncelik d)."
+  MODISA_CHL:
+    short_name: MODISA_L3m_CHL
+    version: "2022.0"
+    daac: OB.DAAC
+    provider: OB_CLOUD
+    doi: 10.5067/AQUA/MODIS/L3M/CHL/2022.0
+    dosya_kodu: MODISA
+    erisim: stream
+    okuyucu: netcdf
+    granul_deseni: "L3m.MO.CHL.chlor_a.9km"
+    zaman: aylik
+    mekansal_cozunurluk: [0.0833333, 0.0833333]
+    valid_start: "2002-07"
+    durum: ertelendi
+    dogrulanmadi: true
+    not: "Aylık 9 km granül adı deseni henüz doğrulanmadı (öncelik d)."
+  MCD64A1:
+    short_name: MCD64A1
+    version: "061"
+    daac: LP DAAC
+    provider: LPCLOUD
+    doi: 10.5067/MODIS/MCD64A1.061
+    dosya_kodu: MCD64
+    erisim: download
+    okuyucu: hdf4_sinusoidal
+    zaman: aylik
+    mekansal_cozunurluk: [0.0045, 0.0045]
+    valid_start: "2000-11"
+    durum: ertelendi
+    not: "MCD64CMQ CMR'de bulunamadı. MCD64A1 500 m sinüzoidal, Türkiye için 6 karo/ay; yeniden projeksiyon okuyucusu yok."
+
+degiskenler:
+  # ---------------------------------------------------------------- atmosfer
+  - ad: sicaklik_2m
+    urun: MERRA2_SLV
+    ana: true
+    kategori: atmosfer
+    domain: land
+    dosya_degiskeni: T2M
+    long_name: 2 m hava sıcaklığı
+    birim_orijinal: K
+    birim: °C
+    donusum: K_to_C
+  - ad: sicaklik_2m
+    urun: GLDAS
+    kategori: atmosfer
+    domain: land
+    dosya_degiskeni: Tair_f_inst
+    long_name: Hava sıcaklığı (GLDAS zorlama verisi)
+    birim_orijinal: K
+    birim: °C
+    donusum: K_to_C
+  - ad: ozgul_nem_2m
+    urun: MERRA2_SLV
+    ana: true
+    kategori: atmosfer
+    domain: land
+    dosya_degiskeni: QV2M
+    long_name: 2 m özgül nem
+    birim_orijinal: kg kg-1
+    birim: kg/kg
+    donusum: yok
+  - ad: ruzgar_u_10m
+    urun: MERRA2_SLV
+    ana: true
+    kategori: atmosfer
+    domain: all
+    dosya_degiskeni: U10M
+    long_name: 10 m doğu yönlü rüzgâr bileşeni
+    birim_orijinal: m s-1
+    birim: m/s
+    donusum: yok
+  - ad: ruzgar_v_10m
+    urun: MERRA2_SLV
+    ana: true
+    kategori: atmosfer
+    domain: all
+    dosya_degiskeni: V10M
+    long_name: 10 m kuzey yönlü rüzgâr bileşeni
+    birim_orijinal: m s-1
+    birim: m/s
+    donusum: yok
+  - ad: ruzgar_hizi
+    urun: GLDAS
+    ana: true
+    kategori: atmosfer
+    domain: land
+    dosya_degiskeni: Wind_f_inst
+    long_name: Rüzgâr hızı (anlık değerlerin aylık ortalaması)
+    birim_orijinal: m s-1
+    birim: m/s
+    donusum: yok
+  - ad: deniz_seviyesi_basinci
+    urun: MERRA2_SLV
+    ana: true
+    kategori: atmosfer
+    domain: all
+    dosya_degiskeni: SLP
+    long_name: Deniz seviyesi basıncı
+    birim_orijinal: Pa
+    birim: hPa
+    donusum: Pa_to_hPa
+  - ad: su_buhari_kolon
+    urun: MERRA2_SLV
+    ana: true
+    kategori: atmosfer
+    domain: all
+    dosya_degiskeni: TQV
+    long_name: Toplam yağışa geçebilir su buharı
+    birim_orijinal: kg m-2
+    birim: kg/m²
+    donusum: yok
+    not: "Sözleşmede ana ürün AIRS3STM; AIRS ertelendiği için şimdilik MERRA-2."
+  - ad: su_buhari_kolon
+    urun: AIRS3STM
+    kategori: atmosfer
+    domain: all
+    dosya_degiskeni: TotH2OVap_A
+    long_name: Toplam su buharı kolonu (AIRS, yükselen geçiş)
+    birim_orijinal: kg m-2
+    birim: kg/m²
+    donusum: yok
+    dogrulanmadi: true
+  - ad: bulut_orani
+    urun: MERRA2_RAD
+    ana: true
+    kategori: atmosfer
+    domain: all
+    dosya_degiskeni: CLDTOT
+    long_name: Toplam bulut oranı
+    birim_orijinal: "1"
+    birim: "%"
+    donusum: kesir_to_yuzde
+  - ad: yuzey_sicakligi_gunduz
+    urun: MOD11C3
+    ana: true
+    kategori: arazi
+    domain: land
+    dosya_degiskeni: LST_Day_CMG
+    long_name: Kara yüzey sıcaklığı, gündüz
+    birim_orijinal: K
+    birim: °C
+    donusum: olcek
+    olcek: 0.02
+    ofset: -273.15
+    bayraklar: [0]
+    grids: ["025", "005"]
+  - ad: yuzey_sicakligi_gece
+    urun: MOD11C3
+    ana: true
+    kategori: arazi
+    domain: land
+    dosya_degiskeni: LST_Night_CMG
+    long_name: Kara yüzey sıcaklığı, gece
+    birim_orijinal: K
+    birim: °C
+    donusum: olcek
+    olcek: 0.02
+    ofset: -273.15
+    bayraklar: [0]
+    grids: ["025", "005"]
+  # ---------------------------------------------------------------- su döngüsü
+  - ad: yagis
+    urun: GPM_IMERG
+    ana: true
+    kategori: su_dongusu
+    domain: land
+    dosya_degiskeni: precipitation
+    long_name: Toplam yağış (IMERG Final)
+    birim_orijinal: mm/hr
+    birim: mm/ay
+    donusum: mm_saat_to_mm_ay
+  - ad: yagis
+    urun: GLDAS
+    kategori: su_dongusu
+    domain: land
+    dosya_degiskeni: Rainf_f_tavg
+    long_name: Toplam yağış (GLDAS zorlama verisi)
+    birim_orijinal: kg m-2 s-1
+    birim: mm/ay
+    donusum: kg_m2_s_to_mm_ay
+  - ad: yagis
+    urun: MERRA2_FLX
+    kategori: su_dongusu
+    domain: land
+    dosya_degiskeni: PRECTOT
+    long_name: Toplam yağış (MERRA-2)
+    birim_orijinal: kg m-2 s-1
+    birim: mm/ay
+    donusum: kg_m2_s_to_mm_ay
+  - ad: buharlasma
+    urun: GLDAS
+    ana: true
+    kategori: su_dongusu
+    domain: land
+    dosya_degiskeni: Evap_tavg
+    long_name: Evapotranspirasyon (toplam buharlaşma)
+    birim_orijinal: kg m-2 s-1
+    birim: mm/ay
+    donusum: kg_m2_s_to_mm_ay
+  - ad: yuzey_akisi
+    urun: GLDAS
+    ana: true
+    kategori: su_dongusu
+    domain: land
+    dosya_degiskeni: Qs_acc
+    long_name: Yüzey (fırtına) akışı
+    birim_orijinal: kg m-2 (3 saatlik birikim ortalaması)
+    birim: mm/ay
+    donusum: acc3h_to_mm_ay
+  - ad: taban_akisi
+    urun: GLDAS
+    ana: true
+    kategori: su_dongusu
+    domain: land
+    dosya_degiskeni: Qsb_acc
+    long_name: Taban (yeraltı) akışı
+    birim_orijinal: kg m-2 (3 saatlik birikim ortalaması)
+    birim: mm/ay
+    donusum: acc3h_to_mm_ay
+  - ad: toprak_nemi
+    urun: GLDAS
+    ana: true
+    kategori: su_dongusu
+    domain: land
+    dosya_degiskeni: SoilMoi0_10cm_inst
+    long_name: Toprak nemi, 0-10 cm
+    birim_orijinal: kg m-2
+    birim: kg/m²
+    donusum: yok
+  - ad: kok_bolgesi_nemi
+    urun: GLDAS
+    ana: true
+    kategori: su_dongusu
+    domain: land
+    dosya_degiskeni: RootMoist_inst
+    long_name: Kök bölgesi toprak nemi
+    birim_orijinal: kg m-2
+    birim: kg/m²
+    donusum: yok
+  - ad: toplam_su_depolama
+    urun: GRACE_MASCON
+    ana: true
+    kategori: su_dongusu
+    domain: land
+    dosya_degiskeni: lwe_thickness
+    long_name: Toplam su depolama anomalisi (eşdeğer su kalınlığı)
+    birim_orijinal: cm
+    birim: cm
+    donusum: yok
+  # ---------------------------------------------------------------- kar
+  - ad: kar_ortusu
+    urun: MOD10CM
+    ana: true
+    kategori: kar
+    domain: land
+    dosya_degiskeni: Snow_Cover_Monthly_CMG
+    long_name: Aylık kar örtüsü oranı
+    birim_orijinal: "% (0-100); 211 gece, 250 bulut, 253 karar yok, 254 su, 255 dolgu"
+    birim: "%"
+    donusum: yok
+    gecerli_aralik: [0, 100]
+    grids: ["025", "005"]
+  - ad: kar_su_esdegeri
+    urun: GLDAS
+    ana: true
+    kategori: kar
+    domain: land
+    dosya_degiskeni: SWE_inst
+    long_name: Kar su eşdeğeri
+    birim_orijinal: kg m-2
+    birim: mm
+    donusum: yok
+  # ---------------------------------------------------------------- arazi / bitki örtüsü
+  - ad: ndvi
+    urun: MOD13C2
+    ana: true
+    kategori: arazi
+    domain: land
+    dosya_degiskeni: CMG 0.05 Deg Monthly NDVI
+    long_name: NDVI (normalize fark bitki örtüsü indeksi)
+    birim_orijinal: "DN (HDF scale_factor=10000 bölen olarak; NDVI = DN/10000)"
+    birim: "1"
+    donusum: olcek
+    olcek: 0.0001
+    gecerli_aralik: [-2000, 10000]
+    kalite: {degisken: "CMG 0.05 Deg Monthly pixel reliability", izinli: [0, 1]}
+    grids: ["025", "005"]
+  - ad: evi
+    urun: MOD13C2
+    ana: true
+    kategori: arazi
+    domain: land
+    dosya_degiskeni: CMG 0.05 Deg Monthly EVI
+    long_name: EVI (geliştirilmiş bitki örtüsü indeksi)
+    birim_orijinal: "DN (EVI = DN/10000)"
+    birim: "1"
+    donusum: olcek
+    olcek: 0.0001
+    gecerli_aralik: [-2000, 10000]
+    kalite: {degisken: "CMG 0.05 Deg Monthly pixel reliability", izinli: [0, 1]}
+    grids: ["025", "005"]
+  - ad: yanan_alan
+    urun: MCD64A1
+    ana: true
+    kategori: arazi
+    domain: land
+    dosya_degiskeni: Burn Date
+    long_name: Yanan alan oranı
+    birim_orijinal: gün (yılın günü)
+    birim: "%"
+    donusum: yok
+    dogrulanmadi: true
+  # ---------------------------------------------------------------- hava kalitesi
+  - ad: aerosol_optik_derinlik
+    urun: MERRA2_AER
+    ana: true
+    kategori: hava_kalitesi
+    domain: all
+    dosya_degiskeni: TOTEXTTAU
+    long_name: Toplam aerosol sönüm optik derinliği (550 nm)
+    birim_orijinal: "1"
+    birim: "1"
+    donusum: yok
+  - ad: ozon_kolon
+    urun: MERRA2_SLV
+    ana: true
+    kategori: hava_kalitesi
+    domain: all
+    dosya_degiskeni: TO3
+    long_name: Toplam kolon ozon
+    birim_orijinal: Dobsons
+    birim: DU
+    donusum: yok
+  - ad: ozon_kolon
+    urun: OMTO3e
+    kategori: hava_kalitesi
+    domain: all
+    dosya_degiskeni: ColumnAmountO3
+    long_name: Toplam kolon ozon (OMI)
+    birim_orijinal: DU
+    birim: DU
+    donusum: yok
+    dogrulanmadi: true
+  - ad: no2
+    urun: OMNO2d
+    ana: true
+    kategori: hava_kalitesi
+    domain: all
+    dosya_degiskeni: ColumnAmountNO2TropCloudScreened
+    long_name: Troposferik NO2 kolonu (bulut oranı < %30)
+    birim_orijinal: molec/cm2
+    birim: 10^15 molekül/cm²
+    donusum: molek_to_1e15
+    bayraklar: [-1.2676506e+30]
+  - ad: so2
+    urun: OMSO2e
+    ana: true
+    kategori: hava_kalitesi
+    domain: all
+    dosya_degiskeni: ColumnAmountSO2
+    long_name: SO2 kolonu (gezegen sınır tabakası)
+    birim_orijinal: DU
+    birim: DU
+    donusum: yok
+    dogrulanmadi: true
+  # ---------------------------------------------------------------- deniz
+  - ad: deniz_yuzey_sicakligi
+    urun: MODISA_SST
+    ana: true
+    kategori: deniz
+    domain: ocean
+    dosya_degiskeni: sst
+    long_name: Deniz yüzeyi sıcaklığı (MODIS-Aqua, gündüz 11 µm)
+    birim_orijinal: degree_C
+    birim: °C
+    donusum: yok
+    dogrulanmadi: true
+  - ad: klorofil
+    urun: MODISA_CHL
+    ana: true
+    kategori: deniz
+    domain: ocean
+    dosya_degiskeni: chlor_a
+    long_name: Klorofil-a yoğunluğu
+    birim_orijinal: mg m-3
+    birim: mg/m³
+    donusum: yok
+    dogrulanmadi: true
+  # ---------------------------------------------------------------- sabit
+  - ad: rakim
+    urun: SRTMGL30
+    ana: true
+    kategori: sabit
+    domain: land
+    dosya_degiskeni: elevation
+    long_name: Ortalama rakım
+    birim_orijinal: m
+    birim: m
+    donusum: yok
+    bayraklar: [-9999]
+    grids: ["025", "005"]
