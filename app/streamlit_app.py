@@ -6,8 +6,8 @@ Hikâye: Uydu ölçer → biz hazırlarız → sen kullanırsın.
 Akış: açılış (dönen Dünya) → nasıl çalışır (3 adım) → giriş (merak eden / araştırmacı) →
 Türkiye haritası · İlimi bul · Birlikte değişenler · Veriyi indir · Nasıl hesaplıyoruz?
 Her sayfanın başında tek bir büyük cevap cümlesi vardır; ayrıntı araştırmacıya açılır.
-Site yeni hesap yapmaz; Katman 1–4 dosyalarını okur. Dosyalar henüz yoksa sentetik yer tutucu
-tablolar gösterilir ve işaretlenir.
+Site yeni hesap yapmaz; analiz paketini okur: L3_ozet (il/bölge trendleri) ve L4_iliski/ciftler.csv.
+Gerçek dosyalar varsa her zaman onlar kullanılır; yoksa sentetik yer tutucu tablolar gösterilir ve işaretlenir.
 """
 
 from __future__ import annotations
@@ -76,9 +76,9 @@ def vlabel(key: str) -> str:
 
 
 def unit_of(birim: str) -> str:
-    """'mm/10 yil' → 'mm'; birimsiz NDVI için boş metin."""
-    u = str(birim).replace("/10 yil", "").strip()
-    return "" if u in ("1", "") else u
+    """'mm/10 yil' ya da 'mm/yıl' → ekranda '… / 10 yıl' önüne yazılacak birim; birimsiz NDVI için boş metin."""
+    u = str(birim if pd.notna(birim) else "").replace("/10 yil", "").replace(" / 10 yıl", "").strip()
+    return "" if u in ("1", "", "-", "nan") else u
 
 
 def num(v: float) -> str:
@@ -102,15 +102,21 @@ def db_ok() -> bool:
 
 @st.cache_data(ttl=300, show_spinner="Veri hazırlanıyor…")
 def get_tables(use_db: bool) -> dict:
-    """Trend ve ilişki tabloları: önce MS SQL, olmazsa dosyalar / yer tutucu (5 dk önbellek)."""
+    """Trend ve ilişki tabloları (5 dk önbellek).
+
+    Sıra: gerçek analiz paketi (L3_ozet + L4_iliski) → veri tabanındaki gerçek tablolar → yer tutucu.
+    """
+    files = U.load_tables()
+    if not files["yer_tutucu"]:
+        return {**files, "kaynak_turu": "dosya"}
     if use_db:
         try:
             t = DB.load_tables()
-            if t is not None:
-                return {**t, "kaynak_turu": "mssql"}
+            if t is not None and not t["yer_tutucu"]:
+                return {**t, "yer_tutucu_tablolar": [], "kaynak_turu": "mssql"}
         except Exception:  # noqa: BLE001
             pass
-    return {**U.load_tables(), "kaynak_turu": "dosya"}
+    return {**files, "kaynak_turu": "dosya"}
 
 
 def main_product(var: str) -> str:
@@ -126,11 +132,40 @@ def seasons_for(df: pd.DataFrame, var: str) -> list[str]:
 
 def verdict(row) -> tuple[str, str]:
     """Bir trend satırı için sade hüküm ve rengi: (metin, css sınıfı)."""
+    if row.get("anlamli", 0) == -1 or pd.isna(row["egim_10yil"]):
+        return "Hesaplanamadı", "info"
     if row["anlamli_fdr"] == 1 and not row["belirsiz"]:
         return "Gerçek bir değişim", "ok"
     if row["belirsiz"]:
         return "Testler çelişiyor", "warn"
     return "Henüz belirsiz", "info"
+
+
+def flag_badges(row) -> str:
+    """Satırın güvenilirlik rozetleri: veri uyarısı (trend_uyarisi), doğrulanmadı (Kademe 2), az hücre."""
+    out = []
+    warn = str(row.get("trend_uyarisi") or "")
+    if warn:
+        out.append(f'<span class="td-badge warn" title="{html.escape(warn)}">⚠ veri uyarısı</span>')
+    if str(row.get("dogrulanmadi") or "").lower() == "evet":
+        out.append('<span class="td-badge warn" title="Kademe 2 ürün: bağımsız doğrulaması yapılmadı">'
+                   "doğrulanmadı</span>")
+    if "az hücre" in str(row.get("not") or ""):
+        out.append(f'<span class="td-badge info" title="{html.escape(str(row["not"]))}">az hücre</span>')
+    return " ".join(out)
+
+
+def warning_callout(df: pd.DataFrame) -> None:
+    """Seçili tablodaki veri uyarılarını (L2/L3 trend_uyarisi, doğrulanmadı) herkese açık gösterir."""
+    warns = sorted({w for w in df.get("trend_uyarisi", pd.Series(dtype=str)) if w})
+    unver = bool((df.get("dogrulanmadi", pd.Series(dtype=str)) == "evet").any())
+    if not warns and not unver:
+        return
+    items = "".join(f'<div class="td-li">{html.escape(w)}</div>' for w in warns)
+    if unver:
+        items += '<div class="td-li">Bu ürün Kademe 2: sonuçlar bağımsız olarak doğrulanmadı.</div>'
+    st.markdown(f'<div class="td-callout warn"><span class="td-badge warn">⚠ veri uyarısı</span> '
+                f"<b>Bu sonucu yorumlamadan önce:</b>{items}</div>", unsafe_allow_html=True)
 
 
 def answer(big: str, small: str = "") -> None:
@@ -158,8 +193,15 @@ STAT_COLS = ["degisken", "urun", "mevsim", "donem", "n_yil", "n_hucre", "egim_10
              "p_mk", "p_mk_kontrol", "p_ttest", "belirsiz", "anlamli_fdr", "yil_sayisi_gereken", "kaynak_uyumu"]
 
 
+L3_STAT_COLS = ["degisken", "urun", "mevsim", "donem_baslangic", "donem_bitis", "hucre_sayisi", "sen_egimi", "ga_alt",
+                "ga_ust", "egim_birimi", "p_mk", "p_fdr", "anlamli", "etkin_n", "gereken_yil", "anlamli_hucre_orani",
+                "kaynak_uyumu", "trend_uyarisi", "dogrulanmadi", "not"]
+
+
 def stats_table(df: pd.DataFrame, place_col: str) -> pd.DataFrame:
-    """Araştırmacı tablosu: sütun adları CSV ile aynı."""
+    """Araştırmacı tablosu: sütun adları indirilen CSV ile aynı (gerçek veride sözleşme 2.2)."""
+    if "sen_egimi" in df.columns:
+        return df[[c for c in ["bolge_kodu", "bolge_adi"] + L3_STAT_COLS if c in df.columns]]
     return df[[c for c in [place_col] + STAT_COLS if c in df.columns]]
 
 
@@ -225,13 +267,19 @@ def page_kesfet() -> None:
         t = tr.iloc[0]
         cls = "up" if t["egim_10yil"] > 0 else "down"
         verb = "arttı" if t["egim_10yil"] > 0 else "azaldı"
-        big = (f"Türkiye'de {season_txt}{vname(var).lower()} her 10 yılda "
-               f'<span class="{cls}">{num(t["egim_10yil"])} {unit} {verb}</span>.')
+        if t.get("anlamli", 1) == 1:
+            big = (f"Türkiye'de {season_txt}{vname(var).lower()} her 10 yılda "
+                   f'<span class="{cls}">{num(t["egim_10yil"])} {unit} {verb}</span>.')
+        else:  # anlamlı değil: yön yazılır ama "değişti" denmez
+            big = (f"Türkiye'de {season_txt}{vname(var).lower()}: <span class='ember'>net bir değişim yok.</span> "
+                   f"<span style='font-size:.55em;color:var(--muted)'>(eğim {fmt(t['egim_10yil'], digits=2)} {unit} / "
+                   "10 yıl, tesadüften ayırt edilemiyor)</span>")
     else:
         big = f"Türkiye'de {season_txt}{vname(var).lower()}"
     small = (f"81 ilin <b class='up'>{up}</b> tanesinde gerçek bir artış, <b class='down'>{down}</b> tanesinde gerçek bir azalış "
              f"var. Gri iller: değişim henüz tesadüften ayırt edilemiyor. Dönem {str(df['donem'].iloc[0]).replace('-', '–')}.")
     answer(big, small)
+    warning_callout(pd.concat([df, tr]))
 
     st.plotly_chart(province_trend_map(df, geojson, f"{unit} / 10 yıl" if unit else "/ 10 yıl"), width="stretch",
                     config=PLOT_CFG)
@@ -282,6 +330,7 @@ def page_il() -> None:
     season_txt = "Yıl boyunca" if season == "yillik" else f"{U.SEASONS[season]} aylarında"
     answer(f"{html.escape(il)}: {season_txt} <span class='ember'>{len(real)} değişkende</span> gerçek bir değişim var.",
            f"{len(cur)} değişkene bakıldı. Kalanlarda değişim, eldeki 25 yılla henüz tesadüften ayırt edilemiyor.")
+    warning_callout(cur)
 
     tiles = []
     for _, r in cur.iterrows():
@@ -297,7 +346,7 @@ def page_il() -> None:
         tiles.append(f'<div class="td-tile {"dim" if cls != "ok" else ""}"><div class="t-ico">{icon}</div>'
                      f'<div class="t-name">{html.escape(name)}</div>'
                      f'<div class="t-val {dir_cls}">{arrow} {num(r["egim_10yil"])}<small> {unit} / 10 yıl</small></div>'
-                     f'<span class="td-badge {cls}">{lab}</span>{note}</div>')
+                     f'<span class="td-badge {cls}">{lab}</span> {flag_badges(r)}{note}</div>')
     st.markdown(f'<div class="td-grid">{"".join(tiles)}</div>', unsafe_allow_html=True)
 
     if academic:
@@ -371,24 +420,7 @@ def page_iliski() -> None:
 
 
 def page_indir() -> None:
-    """Araştırmacıya hazır veri paketi ve atıf; diğerlerine davet kartı."""
-    if not academic:
-        st.markdown('<div class="td-lock"><div class="big">🎓</div><h3>Veriyi indirmek araştırmacılar için</h3>'
-                    "<p>Makale, tez ya da proje yazıyorsan; istediğin il, değişken ve mevsimi seç, tek dosyada indir, "
-                    "hazır atıf metniyle kaynak göster.</p></div>", unsafe_allow_html=True)
-        _, mid, _ = st.columns([1, 1, 1])
-        if mid.button("Araştırmacı olarak giriş yap", type="primary", width="stretch"):
-            st.session_state.pop("user", None)
-            st.session_state["login_role"] = "akademisyen"
-            st.rerun()
-        if DB_OK:
-            arts = DB.list_articles()
-            if len(arts):
-                st.markdown(f'<div class="td-mini-h" style="margin-top:40px">Bu veriyi kullanan çalışmalar ({len(arts)})'
-                            "</div>", unsafe_allow_html=True)
-                studies_list(arts)
-        return
-
+    """Hazır veri paketi ve atıf: herkese açık (üye olmadan da). Altta bu veriyi kullanan çalışmalar."""
     answer("Seç, indir, makalende kullan.",
            f"Sürüm {U.VERSION} · {U.LICENSE} lisans · DOI yayında verilecek. Dosyadaki sayı ekrandakiyle birebir aynıdır.")
     il_df = tables["il"]
@@ -429,11 +461,23 @@ def page_indir() -> None:
     t1, t2, t3 = st.tabs(["APA", "BibTeX", "Python ile aç"])
     t1.code(cit["apa"], language=None, wrap_lines=True)
     t2.code(cit["bibtex"], language="bibtex")
+    real = "sen_egimi" in il_df.columns and not placeholder
     t3.code("import pandas as pd\n"
-            "trend = pd.read_csv(\"trend_iller.csv\")\n"
-            "trend.query(\"il == 'Erzurum' and mevsim == 'kis' and anlamli_fdr == 1\")", language="python")
+            + (f"trend = pd.read_csv(\"{PH}trend_iller.csv\", encoding=\"utf-8-sig\", dtype={{\"bolge_kodu\": str}})\n"
+               "trend.query(\"bolge_adi == 'Erzurum' and mevsim == 'kis' and anlamli == 1\")" if real else
+               f"trend = pd.read_csv(\"{PH}trend_iller.csv\", encoding=\"utf-8-sig\")\n"
+               "trend.query(\"il == 'Erzurum' and mevsim == 'kis' and anlamli_fdr == 1\")"), language="python")
     st.caption("Kullandığın NASA ürünlerine de atıf yap: "
                + " · ".join(f'{s["short_name"]} (doi:{s["doi"]})' for s in U.nasa_sources() if s["doi"]))
+    if not academic:
+        st.markdown('<p class="td-note">Makaleni bu listeye eklemek için araştırmacı hesabıyla giriş yap.</p>',
+                    unsafe_allow_html=True)
+    if DB_OK:
+        arts = DB.list_articles()
+        if len(arts):
+            st.markdown(f'<div class="td-mini-h" style="margin-top:40px">Bu veriyi kullanan çalışmalar ({len(arts)})'
+                        "</div>", unsafe_allow_html=True)
+            studies_list(arts)
 
 
 def page_yontem() -> None:
@@ -461,9 +505,11 @@ def page_yontem() -> None:
     if academic:
         with st.expander("Araştırmacı ayrıntısı · yöntem ve formüller"):
             st.markdown("- Trend: Sen eğimi (birim / 10 yıl), `scipy.stats.theilslopes`\n"
-                        "- Anlamlılık: Hamed-Rao düzeltmeli Mann-Kendall, p < 0,05; kontrol: TFPW-MK ve n_etkin − 2 sd'li "
-                        "t-testi. Farklı sonuç → `belirsiz = 1`\n"
-                        "- Çoklu test: Benjamini-Hochberg, α_FDR = 0,10 (Wilks, 2016), yalnız Türkiye kara hücreleri\n"
+                        "- Test: Hamed-Rao düzeltmeli Mann-Kendall (tanımsızsa düzeltmesiz MK, `mk_yedek = 1`)\n"
+                        "- Çoklu test: Benjamini-Hochberg, α_FDR = 0,10 (Wilks, 2016); L3'te dosya × mevsim × düzey içinde\n"
+                        "- Anlamlı (`anlamli = 1`): `p_fdr ≤ 0,10` **ve** %95 genişletilmiş aralık sıfırı dışlıyor; "
+                        "hesaplanamadıysa `-1`\n"
+                        "- İl/bölge: hücrelerin cos(enlem) ağırlıklı alan ortalaması serisinin trendi\n"
                         "- Güven aralığı: Sen aralığının yarı genişlikleri √(n / n_etkin) ile genişletilir\n"
                         "- Gereken yıl: Weatherhead ve ark. (1998), yıllık seri için √12 çarpanıyla\n"
                         "- İlişkiler: trendi çıkarılmış anomaliler, Bretherton ve ark. (1999) n_etkin")
@@ -570,6 +616,9 @@ def page_soru() -> None:
         st.error(f"Soru cevaplanamadı ({type(e).__name__}). Lütfen soruyu farklı yazmayı dene.")
         return
 
+    # llm.evidence.products_of kaynak uyumu dosyasını ürün sanıyor (Kişi 4'e bildirildi): boş satırı gösterme
+    out = {**out, "evidence": [e for e in out.get("evidence") or []
+                               if not str(e.get("id", "")).startswith("trend__") or "__kaynak_uyumu" not in str(e["id"])]}
     plan = out.get("plan") or {}
     chips = [f'<span class="td-badge {"ok" if out.get("verified") else "bad"}">'
              f'{"✓ sayılar doğrulandı" if out.get("verified") else "doğrulanamadı"}</span>',
@@ -579,6 +628,9 @@ def page_soru() -> None:
                      "</span>")
     if ph:
         chips.append('<span class="td-badge warn">örnek veri · yer tutucu paket</span>')
+    n_unver = sum(1 for r in out.get("evidence") or [] if r.get("dogrulanmadi"))
+    if n_unver:
+        chips.append(f'<span class="td-badge warn">⚠ {n_unver} kanıt doğrulanmamış üründen</span>')
     st.markdown('<div style="display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 6px">' + "".join(chips) + "</div>",
                 unsafe_allow_html=True)
 
@@ -608,11 +660,11 @@ def page_soru() -> None:
         if out.get("files"):
             with st.expander("🗂️  Kullanılan paket dosyaları"):
                 st.code("\n".join(out["files"]), language=None)
-    notes = (out.get("academic_warnings") or []) + (out.get("warnings") or [])
+    notes = list(dict.fromkeys((out.get("academic_warnings") or []) + (out.get("warnings") or [])))
     if notes:
-        with st.expander(f"⚠️  Dikkat edilecekler ({len(notes)})"):
-            for w in notes:
-                st.markdown(f"- {w}")
+        st.markdown('<div class="td-callout warn"><span class="td-badge warn">⚠ dikkat</span> <b>Yorumlarken:</b>'
+                    + "".join(f'<div class="td-li">{html.escape(str(w))}</div>' for w in notes) + "</div>",
+                    unsafe_allow_html=True)
 
 
 STATUS = {"yayimlandi": ("Yayımlandı", "ok"), "degerlendirmede": ("Değerlendirmede", "warn"),
@@ -870,8 +922,10 @@ def top_bar() -> None:
     u = user
     who = (f'🎓 <b>{html.escape(u["ad"])}</b><span class="meta">{html.escape(u.get("kurum") or "Akademisyen")}</span>'
            if academic else f'🌍 <b>{html.escape(u["ad"])}</b><span class="meta">Vatandaş</span>')
-    ph = ('<span class="td-chip warn" title="Trend tabloları henüz üretilmedi; gelince site gerçek veriye geçer.">'
-          "⚠ ÖRNEK VERİ</span>") if placeholder else ""
+    which = tables.get("yer_tutucu_tablolar") or []
+    what = ("trendler ve ilişkiler" if len(which) == 3 else "ilişkiler" if which == ["ciftler.csv"] else "trendler")
+    ph = (f'<span class="td-chip warn" title="Analiz paketi bulunamadı ({", ".join(which)}); outputs/ altına '
+          f'gelince site gerçek veriye geçer.">⚠ ÖRNEK VERİ · {what}</span>') if placeholder else ""
     src = ('<span class="td-chip ok">🗄️ MS SQL</span>' if tables.get("kaynak_turu") == "mssql"
            else '<span class="td-chip">📁 dosya</span>')
     a, b = st.columns([6, 1], vertical_alignment="center")
@@ -893,7 +947,7 @@ with st.container(key="content"):
     pages = auth.pages_for(user)
     st.markdown('<div style="height:14px"></div>', unsafe_allow_html=True)
     page = st.segmented_control("Sayfa", pages, default=pages[0], key="page",
-                                format_func=lambda k: auth.PAGES[k] + (" 🔒" if k == "indir" and not academic else ""),
+                                format_func=lambda k: auth.PAGES[k],
                                 label_visibility="collapsed") or pages[0]
     PAGE_FUNCS[page]()
     footer()
