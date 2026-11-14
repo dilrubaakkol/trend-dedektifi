@@ -27,7 +27,7 @@ def src(tmp_path):
     write_netcdf(_fake_real("yagis"), d / "yagis__GLDAS.nc")
     write_netcdf(_fake_real("sicaklik_2m"), d / "sicaklik_2m__MERRA2.nc")
     write_netcdf(_fake_real("yagis"), d / "bulut_orani__MERRA2.nc")       # Kademe 2 örneği
-    write_netcdf(_fake_real("yagis").isel(time=0, drop=True), d / "rakim__SRTM.nc")  # kademe dışı
+    write_netcdf(_fake_real("yagis").isel(time=0, drop=True), d / "rakim__SRTM.nc")  # kademesiz (0)
     write_netcdf(_fake_real("yagis"), d / "yagis__GPM__005.nc")       # 0,05° girmemeli
     write_netcdf(make_synthetic("toprak_nemi", start="2001-01", end="2001-12"),
                  d / "toprak_nemi__GLDAS.nc")                         # sentetik girmemeli
@@ -66,11 +66,11 @@ def test_export_package(src, tmp_path):
     with xr.open_dataset(out / "bulut_orani__MERRA2.nc") as ds:
         assert int(ds.attrs["kademe"]) == 2 and ds.attrs["dogrulanmadi"] == "evet"
     with xr.open_dataset(out / "rakim__SRTM.nc") as ds:
-        assert ds.attrs["kademe"] == "-" and "dogrulanmadi" not in ds.attrs
+        assert ds.attrs["kademe"] == 0 and ds.attrs["kademe"].dtype == np.int32 and "dogrulanmadi" not in ds.attrs
     with open(out / "ICINDEKILER.csv", encoding="utf-8-sig") as f:
         rows = list(csv.DictReader(f))
     assert list(rows[0]) == export.ICINDEKILER_COLS
-    assert [r["kademe"] for r in rows] == ["1", "1", "1", "2", "-"]
+    assert [r["kademe"] for r in rows] == ["1", "1", "1", "2", "0"]
     assert rows[0]["donem"] == "2001-01 … 2001-12" and rows[-1]["donem"] == "sabit"
 
 
@@ -95,7 +95,7 @@ def test_catalog_known_issue_gldas_precip():
 
 def test_kademe_mapping():
     assert export.kademe("ndvi", "MOD13C2") == 1 and export.kademe("evi", "MOD13C2") == 2
-    assert export.kademe("toplam_su_depolama", "GRACE") == 1 and export.kademe("rakim", "SRTM") == "-"
+    assert export.kademe("toplam_su_depolama", "GRACE") == 1 and export.kademe("rakim", "SRTM") == 0
 
 
 def test_data_period_static_and_empty():
@@ -104,3 +104,21 @@ def test_data_period_static_and_empty():
     ds2 = _fake_real("yagis")
     ds2["yagis"][:] = np.nan
     assert export.data_period(ds2) == "veri yok"
+
+
+def test_release_attrs_flags():
+    ds = _fake_real("yagis")
+    ds.attrs["dogrulanmadi"] = "evet — katalog kaydının bir kısmı doğrulanmadı"  # eski harmonize adı
+    a1 = export.release_attrs(ds, "yagis", "GPM", "v0.1")
+    assert "dogrulanmadi" not in a1 and a1["katalog_dogrulanmadi"].startswith("evet")
+    assert a1["kademe"].dtype == np.int32
+    a2 = export.release_attrs(ds, "evi", "MOD13C2", "v0.1")
+    assert a2["dogrulanmadi"] == "evet" and a2["katalog_dogrulanmadi"].startswith("evet")
+
+
+def test_catalog_flag_renamed():
+    from data.catalog import load_catalog, unverified
+    cat = load_catalog()
+    recs = list(cat["urunler"].values()) + cat["degiskenler"]
+    assert not any("dogrulanmadi" in r for r in recs)
+    assert any(r.get("katalog_dogrulanmadi") for r in recs) and unverified()

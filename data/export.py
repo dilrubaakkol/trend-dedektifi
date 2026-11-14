@@ -11,7 +11,10 @@ Kurallar:
 - İçeride ``TURKIYE_BBOX`` kullanılır; yayında kutu ``YAYIN_BBOX`` (25,5–45,0 D, 35,5–42,5 K),
   0,25°'de 28 enlem × 78 boylam hücre. Hücre kenarlarının kutu sınırına tam oturduğu denetlenir.
 - Kademe 1 = ekip belgesindeki çekirdek dosyalar (``KADEME_1``); diğerleri Kademe 2 ve
-  ``dogrulanmadi="evet"`` attr'ı taşır. Sabit alanlar (rakım) kademe dışıdır: ``kademe="-"``.
+  ``dogrulanmadi="evet"`` attr'ı taşır. Sabit alanlar (rakım) kademesizdir: ``kademe=0``.
+- ``kademe`` her dosyada int32'dir: 1, 2 ya da 0 (kademesiz).
+- Katalog kaydının doğrulanmadığını gösteren ayrı bayrak ``katalog_dogrulanmadi``'dır (harmonize
+  yazar); yayın paketindeki ``dogrulanmadi`` yalnız Kademe 2 anlamına gelir.
 - Mevcut ``doi`` attr'ı NASA kaynak ürününün DOI'si olarak kalır; yayın DOI'si ``veri_seti_doi``.
 """
 
@@ -39,8 +42,9 @@ KADEME_1 = {
     ("toprak_nemi", "GLDAS"), ("kar_ortusu", "MOD10CM"), ("kar_su_esdegeri", "GLDAS"),
     ("ndvi", "MOD13C2"), ("toplam_su_depolama", "GRACE"),
 }
-# Kademe dışı (sabit alanlar): kademe attr'ı "-", dogrulanmadi yok
+# Kademesiz (sabit alanlar): kademe attr'ı 0, dogrulanmadi yok
 KADEME_DISI = {"rakim"}
+KADEMESIZ = 0
 
 LISANS = "CC BY 4.0"
 VERI_SETI_DOI = "(yayında doldurulacak)"
@@ -48,10 +52,10 @@ OUTPUTS_DIR = REPO_ROOT / "outputs"
 ICINDEKILER_COLS = ["dosya", "degisken", "birim", "kaynak", "kaynak_doi", "donem", "kademe"]
 
 
-def kademe(degisken: str, urun: str) -> int | str:
-    """Değişken × dosya kodu için yayın kademesi: 1, 2 (doğrulanmadı) ya da "-" (kademe dışı, sabit)."""
+def kademe(degisken: str, urun: str) -> int:
+    """Değişken × dosya kodu için yayın kademesi: 1, 2 (doğrulanmadı) ya da 0 (kademesiz, sabit alan)."""
     if degisken in KADEME_DISI:
-        return "-"
+        return KADEMESIZ
     return 1 if (degisken, urun) in KADEME_1 else 2
 
 
@@ -103,16 +107,16 @@ def release_attrs(ds: xr.Dataset, degisken: str, urun: str, surum: str, bbox=YAY
     """Mevcut attrs'a yayın alanlarını ekler (doi = NASA kaynak DOI'si olarak kalır)."""
     k = kademe(degisken, urun)
     a = dict(ds.attrs)
+    # Eski harmonize çıktısında katalog bayrağı "dogrulanmadi" adıyla yazılmış olabilir: yeni ada taşı
+    if "dogrulanmadi" in a:
+        a.setdefault("katalog_dogrulanmadi", a.pop("dogrulanmadi"))
     w, s, e, n = bbox
     a["processing"] = (f"{a.get('processing', '')}; yayın kutusuna kırpıldı "
                        f"(batı {w}, güney {s}, doğu {e}, kuzey {n})").lstrip("; ")
-    a.update(urun_surumu=surum, veri_seti_doi=VERI_SETI_DOI,
-             kademe=k if k == "-" else np.int32(k), lisans=LISANS,
+    a.update(urun_surumu=surum, veri_seti_doi=VERI_SETI_DOI, kademe=np.int32(k), lisans=LISANS,
              yayin_kutusu=f"{w}, {s}, {e}, {n}")
     if k == 2:
         a["dogrulanmadi"] = "evet"
-    else:
-        a.pop("dogrulanmadi", None)
     return a
 
 
@@ -151,7 +155,7 @@ def export(surum: str, src_dir: Path = TURKIYE_DIR, out_root: Path = OUTPUTS_DIR
                      "kaynak_doi": cut.attrs.get("doi", ""), "donem": data_period(cut),
                      "kademe": kademe(degisken, urun)})
         print(f"  yazıldı: {path.name} (kademe {rows[-1]['kademe']}, {rows[-1]['donem']})")
-    rows.sort(key=lambda r: (str(r["kademe"]).replace("-", "9"), r["dosya"]))
+    rows.sort(key=lambda r: (r["kademe"] or 9, r["dosya"]))  # 1, 2, sonra kademesiz (0)
     with open(out_dir / "ICINDEKILER.csv", "w", newline="", encoding="utf-8-sig") as f:
         wr = csv.DictWriter(f, fieldnames=ICINDEKILER_COLS)
         wr.writeheader()

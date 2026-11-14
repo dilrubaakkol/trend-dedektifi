@@ -1,10 +1,10 @@
 # Trend Dedektifi veri kataloğu (Kişi 1). Yeni değişken = yeni kayıt; kod değişmez.
 #
 # urunler: NASA ürünleri. short_name / version / doi / daac / valid_start CMR'den
-#   (earthaccess.search_datasets) doğrulanmıştır (2026-11-14). "dogrulanmadi: true" olan alan
+#   (earthaccess.search_datasets) doğrulanmıştır (2026-11-14). "katalog_dogrulanmadi: true" olan alan
 #   CMR'de bulunamamış ya da henüz bir dosyada görülmemiştir; ayrıntı "not" alanında.
 # degiskenler: sözleşmedeki Türkçe ASCII ad × ürün. "ana: true" = data.load() varsayılanı.
-#   dosya_degiskeni dosyanın içinde görülerek doğrulanmıştır (dogrulanmadi: false ise).
+#   dosya_degiskeni dosyanın içinde görülerek doğrulanmıştır (katalog_dogrulanmadi: false ise).
 #
 # erisim:
 #   opendap  — Cloud OPeNDAP (DAP4): Türkiye kesiti sunucuda alınır, yalnız o indirilir (en hızlı)
@@ -260,7 +260,7 @@ urunler:
     mekansal_cozunurluk: [0.0833333, 0.0833333]
     valid_start: "2002-07"
     durum: ertelendi
-    dogrulanmadi: true
+    katalog_dogrulanmadi: true
     not: "CMR koleksiyon kaydında DOI yok. Aylık 9 km granül adı deseni henüz doğrulanmadı (öncelik d)."
   MODISA_CHL:
     short_name: MODISA_L3m_CHL
@@ -276,7 +276,7 @@ urunler:
     mekansal_cozunurluk: [0.0833333, 0.0833333]
     valid_start: "2002-07"
     durum: ertelendi
-    dogrulanmadi: true
+    katalog_dogrulanmadi: true
     not: "Aylık 9 km granül adı deseni henüz doğrulanmadı (öncelik d)."
   MCD64A1:
     short_name: MCD64A1
@@ -384,7 +384,7 @@ degiskenler:
     birim_orijinal: kg m-2
     birim: kg/m²
     donusum: yok
-    dogrulanmadi: true
+    katalog_dogrulanmadi: true
   - ad: bulut_orani
     urun: MERRA2_RAD
     ana: true
@@ -575,7 +575,7 @@ degiskenler:
     birim_orijinal: gün (yılın günü)
     birim: "%"
     donusum: yok
-    dogrulanmadi: true
+    katalog_dogrulanmadi: true
   # ---------------------------------------------------------------- hava kalitesi
   - ad: aerosol_optik_derinlik
     urun: MERRA2_AER
@@ -606,7 +606,7 @@ degiskenler:
     birim_orijinal: DU
     birim: DU
     donusum: yok
-    dogrulanmadi: true
+    katalog_dogrulanmadi: true
   - ad: no2
     urun: OMNO2d
     ana: true
@@ -628,7 +628,7 @@ degiskenler:
     birim_orijinal: DU
     birim: DU
     donusum: yok
-    dogrulanmadi: true
+    katalog_dogrulanmadi: true
   # ---------------------------------------------------------------- deniz
   - ad: deniz_yuzey_sicakligi
     urun: MODISA_SST
@@ -640,7 +640,7 @@ degiskenler:
     birim_orijinal: degree_C
     birim: °C
     donusum: yok
-    dogrulanmadi: true
+    katalog_dogrulanmadi: true
   - ad: klorofil
     urun: MODISA_CHL
     ana: true
@@ -651,7 +651,7 @@ degiskenler:
     birim_orijinal: mg m-3
     birim: mg/m³
     donusum: yok
-    dogrulanmadi: true
+    katalog_dogrulanmadi: true
   # ---------------------------------------------------------------- sabit
   - ad: rakim
     urun: SRTMGL30
