@@ -443,6 +443,7 @@ degiskenler:
     birim_orijinal: kg m-2 s-1
     birim: mm/ay
     donusum: kg_m2_s_to_mm_ay
+    bilinen_sorunlar: "2025-12: GES DISC granülü revizyon 3; Giovanni eski sürümle ~2 kat düşük değer veriyor; docs/dogrulama.md'ye bakınız"
   - ad: yagis
     urun: MERRA2_FLX
     kategori: su_dongusu

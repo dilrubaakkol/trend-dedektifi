@@ -49,6 +49,17 @@ time,mean_GPM_3IMERGM_07_precipitation
 """
 
 
+def test_read_giovanni_csv_user_bbox(tmp_path):
+    text = GIOVANNI_CSV.replace('Bounding Box:,"38.0,37.5,44.0,41.5"',
+                                'User Bounding Box:,"40.5,39.5,42,40.5"\n'
+                                'Data Bounding Box:,"40.625,39.5,41.875,40.5"')
+    f = tmp_path / "g.csv"
+    f.write_text(text.replace("time,", "time, "), encoding="utf-8")
+    s, meta = read_giovanni_csv(f)
+    assert meta["bbox"] == (40.5, 39.5, 42.0, 40.5)
+    assert s.loc["2001-01-01"] == pytest.approx(0.10)
+
+
 def test_read_giovanni_csv(tmp_path):
     f = tmp_path / "g.csv"
     f.write_text(GIOVANNI_CSV, encoding="utf-8")

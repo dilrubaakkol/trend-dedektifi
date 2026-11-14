@@ -49,7 +49,9 @@ def read_giovanni_csv(path) -> tuple[pd.Series, dict]:
         except ValueError:
             pass
     bbox = None
-    bb = meta.get("Bounding Box")
+    # Yeni Giovanni CSV'leri "User Bounding Box" (istenen kutu) ve "Data Bounding Box" (hücre
+    # kenarlarına oturmuş kutu) yazar; eski biçimde yalnız "Bounding Box" vardır.
+    bb = meta.get("User Bounding Box") or meta.get("Bounding Box")
     if bb:
         nums = [float(x) for x in re.findall(r"-?\d+(?:\.\d+)?", bb)]
         if len(nums) == 4:
