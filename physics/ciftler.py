@@ -49,9 +49,11 @@ CIFTLER = (
     Cift(3, "toprak_nemi", "GLDAS", "ndvi", "MOD13C2", "aylik_anomali_nis_eyl", +1, 1,
          gecikmeler=(1, 2), not_="NDVI, toprak neminden 1 ya da 2 ay sonra."),
     Cift(4, "yagis", "GPM", "toplam_su_depolama", "GRACE", "yillik", +1, 1, harita=False,
-         not_="GRACE çözünürlüğü kaba: yalnız bölge ve Türkiye. GRACE boşluk yılları atılır."),
+         not_=("Yalnız 7 bölge + Türkiye (8 satır), il satırı ve harita yok: GRACE uydusunun "
+               "gerçek çözünürlüğü yaklaşık 300 km, çoğu il tek bir GRACE hücresinden küçük. "
+               "En az 9 ayı dolu olmayan yıllar (GRACE ile GRACE-FO arasındaki boşluk) atılır.")),
     Cift(5, "sicaklik_2m", "MERRA2", "buharlasma", "GLDAS", "yaz_JJA", +1, 2,
-         not_="Kurak yerde buharlaşmayı su sınırlar; ilişki zayıf ya da ters çıkabilir."),
+         not_="Yaz sıcaklığı ile buharlaşma; yönü yerin kuraklığına bağlıdır."),
     Cift(6, "sicaklik_2m", "MERRA2", "yuzey_sicakligi_gunduz", "MOD11C3", "aylik_anomali", +1, 2,
          not_="Kalite kontrolü: aynı olgunun iki ölçümü, güçlü pozitif beklenir."),
 )

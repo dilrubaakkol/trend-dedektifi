@@ -50,6 +50,7 @@ def test_satir_sayisi_ve_sutunlar(maske):
     assert (df["bolge_turu"].value_counts().to_dict() == {"il": 81, "bolge": 7, "turkiye": 1})
     assert df.loc[df["bolge_turu"] == "turkiye", "hucre_sayisi"].item() == 1303
     assert df.loc[df["bolge_kodu"] == "42", "bolge_adi"].item() == "Konya"
+    assert df.loc[df["bolge_kodu"] == "01", "bolge_adi"].item() == "Adana"   # iki haneli plaka
 
 
 def test_konya_ters_yonde_digerleri_beklenen(maske):
@@ -129,3 +130,22 @@ def test_csv_yazimi(maske, tmp_path):
     assert geri["p_fdr"].isna().sum() == 8                        # boş hücre
     assert "Konya" in geri["bolge_adi"].values and geri["anlamli"].dtype.kind == "i"
     assert ",0." in yol.read_text(encoding="utf-8-sig")            # ondalık ayıracı nokta
+    assert ",il,01,Adana," in yol.read_text(encoding="utf-8-sig")  # plaka dosyada da "01"
+
+
+def test_cift5_notu_etikete_gore(maske):
+    """Çift 5: ters yönde çıkan il 'su sınırlı', beklenen yönde çıkan 'enerji sınırlı' notu alır."""
+    from physics.tablo import NOT_CIFT5
+    a, b = _cift(maske)                                   # Konya ters, diğerleri beklenen
+    df = cift_tablosu(5, a, b.clip(min=0))
+    konya = df[df["bolge_kodu"] == "42"].iloc[0]
+    assert konya["etiket"] == "ters_yonde"
+    assert NOT_CIFT5["ters_yonde"] in konya["not"] and NOT_TERS not in konya["not"]
+    diger = df[(df["bolge_turu"] == "il") & (df["etiket"] == "beklenen_yonde")]
+    assert len(diger) and diger["not"].str.contains("Enerji sınırlı").all()
+
+
+def test_cift4_notu_8_satiri_aciklar(maske):
+    a, b = _cift(maske, ters_bolge=None)
+    df = cift_tablosu(4, a.clip(min=0), b)
+    assert df["not"].str.contains("8 satır").all() and df["not"].str.contains("300 km").all()

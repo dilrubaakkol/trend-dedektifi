@@ -146,6 +146,8 @@ Her faz sentetik veriyle test edilir ve testler geçmeden sonraki faza geçilmez
 - NetCDF: float32 değişkenlerde boş değer NaN, `etiket` ve `anlamli` int8 (boş değer kodu yok, −99 / −1 anlamlı). Attr'lar: ortak alanlar, `doi_1`, `doi_2`, `kademe`, `dogrulanmadi`.
 - **Kişi 4 uyumsuzluğu (2026-11-14):** `llm/evidence.py` L4 tablosunda eski taslaktaki `bolge` sütununu okuyor. Kesinleşen sözleşmede bu sütun yok; yerine `bolge_kodu` (il: plaka) ve `bolge_adi` var. Kişi 4, L3 için kullandığı eşleştirmeyi (`bolge_kodu` ya da `bolge_adi`) L4'te de kullanmalı. Ayrıca çift 3'ün iki satırı var (`gecikme_ay` 1 ve 2); kanıt kimliğine gecikme eklenmeli. `llm/` klasörü bizim değil; kullanıcı aracılığıyla Kişi 4'e iletildi.
 
+- **Kişi 5 uyumsuzluğu (2026-11-14):** `app/urun_io.py` L4 için ekip belgesindeki ilk adları bekliyor: `L4_iliski/iliski_iller.csv` dosyası ve `il`, `plaka`, `n_etkin`, `anlamli_fdr`, `kontrol_etiketi`, `zaman_olcegi` sütunları; dosyayı `utf-8` ile okuyor. Kesinleşen sözleşmede bunların karşılıkları şöyle: `ciftler.csv`, satırlar `bolge_turu == "il"` ile süzülür, `il` = `bolge_adi`, `plaka` = `bolge_kodu`, `n_etkin` = `etkin_n`, `kontrol_etiketi` = `etiket`, `anlamli_fdr` = `anlamli`, `zaman_olcegi` = `seri`. Dosya `utf-8-sig` ile okunmalı. Ayrıca çift 4'ün il satırı yok (yalnızca bölge ve Türkiye). 6 çiftin listesi aynı. Kullanıcı aracılığıyla Kişi 5'e iletilecek.
+
 ### Faz 6: Gerçek veriyle çalıştırma ve fizik kontrolü
 - Kişi 1'in gerçek L1 dosyalarıyla çalıştırılır
 - Akıl kontrolleri:
@@ -154,6 +156,20 @@ Her faz sentetik veriyle test edilir ve testler geçmeden sonraki faza geçilmez
 - `ters_yonde` çıkan yerlerin listesi incelenip her birine kısa bir açıklama yazılır. Örnek: Konya ovasında sulama, kurak bölgede çift 5
 - Kişi 5'e: "İlişkiler" sayfası için haritalar ve `ters_yonde` listesi. Demo adım 4: sıcaklık–kar ilişkisi
 - Kişi 4'e: yöntem belgesinin (YONTEM.pdf) L4 paragrafı ve sınırlılıklar
+
+**Durum (2026-11-14): ilk gerçek veri çalıştırması yapıldı.** Kişi 1'in L1 paketiyle (`v0.1`) çalıştırıldı. Çıktı `outputs/trend-dedektifi-turkiye-v0.1/L4_iliski/` klasöründe (git dışı).
+
+| Çift | Türkiye satırı | Akıl kontrolü |
+|---|---|---|
+| 1 sıcaklık ~ kar (kış) | r = −0,90, beklenen yönde; 7 bölgenin hepsi beklenen yönde | ✅ Sıcak kışta kar az. 1.047 hücre kar kapsamında; Aydın, Mardin ve Kilis'te kar yok (boş satır) |
+| 2 yağış ~ toprak nemi | r = +0,74, beklenen yönde; 89 satırın hepsi beklenen yönde | ✅ |
+| 3 toprak nemi ~ NDVI | gecikme 1: r = +0,28, beklenen yönde; gecikme 2: anlamsız | ✅ Bitki örtüsü 1 ay sonra tepki veriyor, 2 ay sonra etki zayıflıyor |
+| 4 yağış ~ GRACE | r = +0,33, anlamsız; Ege ve Akdeniz beklenen yönde | ⚠️ Kısa seri (19 yıl, 2003–2024); GRACE'in kaba çözünürlüğü ve yeraltı suyu çekimi ilişkiyi zayıflatıyor olabilir |
+| 5 sıcaklık ~ buharlaşma (yaz) | r = −0,36, anlamsız. Marmara, Ege, Akdeniz ve İç Anadolu ile 38 il **ters yönde**; hiçbir yerde beklenen yönde değil | ✅ Belgede öngörülmüştü: Türkiye yazları su sınırlı. Sıcak yaz aynı zamanda kurak yazdır, toprakta buharlaşacak su kalmaz. En nemli bölge Karadeniz'de ters ilişki yok (anlamsız). **Jüri için en güçlü bulgu.** Not: GLDAS buharlaşması model çıktısıdır |
+| 6 hava ~ yüzey sıcaklığı | r = +0,82; 89 satırın hepsi beklenen yönde, en düşük il r = 0,61 | ✅ Kalite kontrolü geçti |
+
+- **Eksik kışlar (Kişi 1'e sorulacak):** `kar_ortusu__MOD10CM` dosyasında 2003-12 ve 2016-02 ayları boş. Bu yüzden kış 2004 ve 2016 düşüyor ve çift 1 24 yerine 22 kışla hesaplanıyor. Şubat 2016'da Terra uydusu bir süre arızalıydı (gerçek olabilir); Aralık 2003'ün kontrol edilmesi gerekiyor. Diğer boş aylar (2001-06, 2002-03, 2022-10) kış dışında kalıyor.
+- **Kalan iş:** `ters_yonde` çıkan çift 3 hücreleri (gecikme 1'de 16, gecikme 2'de 10 hücre) haritada incelenecek. Kişi 5'e "İlişkiler" sayfası için çift 5 hikâyesi verilecek.
 
 ### Faz 7: Jüri hazırlığı
 Kısa cevaplar hazırlanacak:
