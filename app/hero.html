@@ -104,6 +104,9 @@
     .lead { font-size: 15px; }
     .btn { padding: 14px 22px; font-size: 15px; }
   }
+  /* Arka plan kipi (giriş ekranı): orta metin ve kaydırma işareti gizlenir, Dünya sola kayar */
+  body.bg-mode .center, body.bg-mode .scroll-cue, body.bg-mode .bl { display: none; }
+  body.bg-mode .vignette { background: radial-gradient(ellipse at 70% 50%, transparent 40%, rgba(0,0,0,.55) 100%); }
   @media (prefers-reduced-motion: reduce) {
     .pill, h1, .lead, .btns, .hud { animation: none; }
   }
@@ -137,12 +140,12 @@
   </div>
 
   <main class="center">
-    <div class="pill">NASA UYDU VERİSİYLE <em>SEBEP</em> SORUŞTURMASI</div>
-    <h1 id="headline">Uydular <span class="ice">karın</span><br>azaldığını gördü. <span class="ember">Neden?</span></h1>
+    <div class="pill" id="pill">NASA UYDU VE MODEL VERİSİ · <em>ATIF YAPILABİLİR</em> TREND VERİ SETİ</div>
+    <h1 id="headline">NASA verisi, <span class="ice">Türkiye</span><br>için analize <span class="ember">hazır.</span></h1>
     <p class="lead" id="lead"></p>
-    <div class="btns">
-      <button class="btn primary" data-target="sorusturma">Soruşturmaya başla &nbsp;→</button>
-      <button class="btn" data-target="proje">Proje ne yapıyor?</button>
+    <div class="btns" id="btns">
+      <button class="btn primary" data-target="giris">Giriş yap &nbsp;→</button>
+      <button class="btn" data-target="proje">Veri seti ne içeriyor?</button>
     </div>
   </main>
   <div class="scroll-cue"></div>
@@ -172,7 +175,21 @@
   const st = $("status");
   st.textContent = TD.status_label || "";
   if (TD.is_placeholder) st.classList.add("warn");
+  if (TD.mode === "bg") document.body.classList.add("bg-mode");
   if (TD.headline_html) $("headline").innerHTML = TD.headline_html;
+  if (TD.pill_html) $("pill").innerHTML = TD.pill_html;
+  // Düğmeler yapılandırmadan gelebilir: [{label, target, primary}]
+  if (Array.isArray(TD.buttons) && TD.buttons.length) {
+    const box = $("btns");
+    box.innerHTML = "";
+    TD.buttons.forEach((b) => {
+      const el = document.createElement("button");
+      el.className = "btn" + (b.primary ? " primary" : "");
+      el.dataset.target = b.target;
+      el.textContent = b.label;
+      box.appendChild(el);
+    });
+  }
   $("lead").textContent = TD.lead || "";
 
   // Butonlar Streamlit sayfasındaki ilgili bölüme kaydırır.

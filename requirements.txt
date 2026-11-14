@@ -25,6 +25,7 @@ requests
 streamlit
 plotly
 leafmap
+pyodbc            # MS SQL Server bağlantısı (kullanıcılar, makaleler, trend tabloları)
 
 # Test
 pytest
