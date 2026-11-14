@@ -1,6 +1,11 @@
 # Ortak sözleşmeler
 
-Modüller birbirleriyle yalnızca bu iki biçim üzerinden konuşur. Değişiklik ekip onayıyla yapılır.
+> **TASLAK (2026-11-14), ekip onayına sunuldu.** Bölüm 1'e L1 yayın paketi eklendi. Bölüm 2'deki
+> eski `results.json` sözleşmesi kaldırıldı; yerine L2/L3/L4 şeması yazıldı. Onaylanana kadar
+> L2–L4 bölümleri öneridir.
+
+Modüller birbirleriyle yalnızca bu biçimler üzerinden konuşur: içeride veri küpleri (bölüm 1) ve
+yayın paketindeki L1–L4 katmanları (bölüm 1.1 ve bölüm 2). Değişiklik ekip onayıyla yapılır.
 
 ## 1. Veri sözleşmesi (Kişi 1 → Kişi 2, 3)
 
@@ -91,8 +96,123 @@ Domain: `land` = Türkiye kara maskeli, `ocean` = deniz maskeli, `all` = kutunun
 | `klorofil` | mg/m³ | ocean | MODISA_L3m_CHL ⏸ | — |
 | `rakim` | m | land | SRTMGL30 002 (SRTM) | — |
 
-## 2. Sonuç sözleşmesi (Kişi 2, 3 → Kişi 4, 5)
+### 1.1 L1 yayın paketi (Kişi 1 → herkes, site)
 
-Tek bir `results.json`; örnek: [`examples/results_example.json`](../examples/results_example.json).
-Her analizin benzersiz `id`'si vardır; LLM metnindeki `[ref:id]` bağlantıları bu kimliklere işaret eder.
-Etiketler yalnızca: `"uyumlu"`, `"celiskili"`, `"yetersiz"`.
+Üretim: `python -m data.export --surum v0.1`. Yayın paketinin kökü
+`outputs/trend-dedektifi-turkiye-<surum>/`. `outputs/` git dışındadır; paket Zenodo'ya yüklenir.
+
+- **Yol:** `outputs/trend-dedektifi-turkiye-v0.1/L1_kup/<degisken>__<urun>.nc`
+- **Kapsam:** Yalnız 0,25° ve yalnız gerçek veri. `__005` ve `SENTETIK` dosyaları girmez.
+- **Kutu:** 25,5°D–45,0°D, 35,5°K–42,5°K, yani 28 enlem × 78 boylam hücre. Hücre kenarları kutu
+  sınırına oturur.
+- **Boyutlar, zaman, maske ve zorunlu attrs:** Bölüm 1'deki gibi.
+- **Yayın attr'ları** (bölüm 1'deki attr'lara ek olarak):
+
+| Attr | Tip | Anlam |
+| --- | --- | --- |
+| `urun_surumu` | metin | Veri seti sürümü, ör. `v0.1` |
+| `veri_seti_doi` | metin | Veri setinin Zenodo DOI'si. Yayına kadar `(yayında doldurulacak)` |
+| `doi` | metin | **NASA kaynak ürününün** DOI'si. Bölüm 1'deki gibi; değişmez |
+| `kademe` | int32 | `1` = Kademe 1; `2` = Kademe 2; `0` = kademesiz (sabit alanlar, ör. `rakim`) |
+| `lisans` | metin | `CC BY 4.0` |
+| `dogrulanmadi` | metin | Yalnız Kademe 2 dosyalarında, değeri `evet` |
+| `bilinen_sorunlar` | metin | Yalnız bilinen bir veri sorunu varsa (ör. `yagis__GLDAS` 2025-12) |
+| `yayin_kutusu` | metin | `25.5, 35.5, 45.0, 42.5` (batı, güney, doğu, kuzey) |
+| `katalog_dogrulanmadi` | metin | Katalog kaydının bir kısmı (ürün ya da dosya değişkeni) doğrulanmadıysa. `dogrulanmadi`'dan ayrı bir bayraktır |
+
+- `processing` attr'ının sonuna "yayın kutusuna kırpıldı (…)" eklenir.
+- **Kademe 1** (10 dosya): `sicaklik_2m` (MERRA2, GLDAS), `yagis` (GPM, GLDAS, MERRA2), `toprak_nemi`
+  (GLDAS), `kar_ortusu` (MOD10CM), `kar_su_esdegeri` (GLDAS), `ndvi` (MOD13C2), `toplam_su_depolama`
+  (GRACE). Liste: `data/export.py` içinde `KADEME_1`.
+- **Kademe 2:** Paketteki diğer bütün gerçek dosyalar.
+- **`L1_kup/ICINDEKILER.csv`:** UTF-8 (BOM'lu), bir satır = bir dosya. Sıralama: önce kademe (1, 2,
+  sonra 0), sonra dosya adı.
+
+| Sütun | Örnek | Anlam |
+| --- | --- | --- |
+| `dosya` | `yagis__GPM.nc` | Dosya adı |
+| `degisken` | `yagis` | Değişken adı (bölüm 1 tablosu) |
+| `birim` | `mm/ay` | `units` attr'ı |
+| `kaynak` | `GPM_3IMERGM 07` | `source_product` + `source_version` |
+| `kaynak_doi` | `10.5067/GPM/IMERG/3B-MONTH/07` | `doi` attr'ı (NASA kaynak DOI'si) |
+| `donem` | `2001-01 … 2025-09` | Kutuda en az bir geçerli hücresi olan ilk ve son ay; sabit alanda `sabit` |
+| `kademe` | `1` | `1`, `2` ya da `0` |
+
+## 2. Analiz katmanları L2–L4 (Kişi 2, 3 → Kişi 4, 5) — TASLAK
+
+Bütün katmanlar L1 küplerinden üretilir ve aynı paket köküne yazılır:
+`outputs/trend-dedektifi-turkiye-<surum>/`. Çerçeve **ilişki**dir, neden değil. Hiçbir sütun ya da
+etiket nedensellik iddia etmez.
+
+Ortak kurallar:
+- Değişken ve ürün kodları L1 dosya adlarıyla aynıdır (`<degisken>__<urun>`).
+- Her dosya kaynak L1 dosyasının `urun_surumu`, `veri_seti_doi`, `kademe`, `lisans` ve `doi` alanlarını
+  taşır: NetCDF'te attrs olarak, CSV'de sütun olarak.
+- Kademe 2 girdisinden üretilen her sonuç `dogrulanmadi = evet` taşır.
+- Ek olarak `donem` (analiz dönemi) ve `seri` alanları bulunur. `seri`, trendin hangi seriden
+  hesaplandığını söyler: ör. `yillik_ortalama`, `aylik_anomali`, `kis_DJF`.
+- Eksik ya da hesaplanamayan değer `NaN`'dır (CSV'de boş hücre).
+
+### 2.1 L2: hücre bazında trend (Kişi 2)
+
+- **Yol:** `L2_trend/<degisken>__<urun>__trend.nc`
+- **Boyutlar:** `lat`, `lon`. L1 ile aynı 28 × 78 ızgara ve aynı koordinatlar. Maskeli hücre `NaN`.
+
+| Değişken | Tip | Birim | Anlam |
+| --- | --- | --- | --- |
+| `sen_egimi` | float32 | `<birim>/10 yıl` | Sen (Theil-Sen) eğimi |
+| `ga_alt`, `ga_ust` | float32 | `<birim>/10 yıl` | Eğimin %95 güven aralığı; etkin n ile genişletilmiş |
+| `p_mk` | float32 | 1 | Hamed-Rao düzeltmeli Mann-Kendall p değeri |
+| `p_fdr` | float32 | 1 | Benjamini-Hochberg ile düzeltilmiş p (q değeri), dosyadaki tüm geçerli hücreler üzerinden |
+| `anlamli` | int8 | — | `1` = `p_fdr ≤ 0,10` (BH, α_FDR = 0,10); `0` = değil; maskeli hücre `-1` |
+| `etkin_n` | float32 | yıl ya da ay | Otokorelasyona göre etkin örneklem büyüklüğü |
+| `gereken_yil` | float32 | yıl | Weatherhead vd. (1998): gözlenen eğimi ayırt etmek için gereken yıl sayısı (yıllık seride √12 düzeltmesi) |
+
+- **attrs:** Ortak kurallardaki alanlar, ayrıca:
+  - `alfa_fdr = 0.10`, `fdr_yontemi = "Benjamini-Hochberg"`, `mk_yontemi = "Hamed-Rao 1998"`
+  - `ga_yontemi`: genişletme formülünün kısa tanımı
+- **Kaynak uyumu:** `L2_trend/<degisken>__kaynak_uyumu.nc`, boyutlar `lat`, `lon`.
+  - `k` (int16): Aynı yönde ve anlamlı trend veren ürün sayısı.
+  - `m` (int16): O hücrede veri olan ürün sayısı.
+  - attr `urunler`: Karşılaştırılan ürün kodları, ör. `GPM, GLDAS, MERRA2`.
+  - Site bunu "k/m kaynak aynı yönde" diye gösterir.
+  - Yalnız birden fazla ürünü olan değişkenler için üretilir: `yagis`, `sicaklik_2m`.
+
+### 2.2 L3: il ve bölge özetleri (Kişi 2 / Kişi 3)
+
+- **Yollar:** `L3_ozet/<degisken>__<urun>__il.csv` ve `L3_ozet/<degisken>__<urun>__bolge.csv`
+- **Bölgeler:** İller Natural Earth, coğrafi bölgeler `data/boundaries/bolgeler.yaml`. Hücre seçimi
+  `data.regions` hücre merkezi kuralıyla yapılır.
+- Bir satır = bir il ya da bölge.
+
+| Sütun | Anlam |
+| --- | --- |
+| `bolge_kodu` | İl: plaka (`25`); bölge: anahtar (`dogu_anadolu`) |
+| `bolge_adi` | Türkçe ad |
+| `hucre_sayisi` | Ortalamaya giren 0,25° hücre sayısı |
+| `sen_egimi`, `ga_alt`, `ga_ust` | Alan ortalaması serisinin trendi (`<birim>/10 yıl`) |
+| `p_mk`, `p_fdr`, `anlamli` | L2 ile aynı tanım. FDR, dosyadaki tüm iller ya da tüm bölgeler üzerinden |
+| `etkin_n`, `gereken_yil` | L2 ile aynı tanım |
+| `anlamli_hucre_orani` | Bölgedeki L2 hücrelerinden `anlamli = 1` olanların oranı (0–1) |
+| `birim`, `donem`, `seri`, `kademe`, `dogrulanmadi` | Ortak alanlar |
+
+### 2.3 L4: değişken çiftleri arasındaki ilişki (Kişi 3)
+
+- **Yol:** `L4_iliski/ciftler.csv`. Bir satır = bir çift × bir bölge.
+- **Çiftler:** 6 değişken çifti. Listeyi ve her çiftin beklenen işaretini Kişi 3 buraya ekleyecek.
+
+| Sütun | Anlam |
+| --- | --- |
+| `cift` | `<degisken1>__<urun1>~<degisken2>__<urun2>`, ör. `sicaklik_2m__MERRA2~kar_ortusu__MOD10CM` |
+| `bolge` | L3 `bolge_kodu` ya da `turkiye` |
+| `r` | Trendi giderilmiş (ya da anomali) seriler arasındaki Pearson korelasyonu |
+| `etkin_n` | Bretherton vd. (1999): n·(1 − r₁·r₂)/(1 + r₁·r₂); r₁, r₂ = iki serinin gecikme-1 otokorelasyonu |
+| `p` | `etkin_n` ile hesaplanmış iki yönlü p değeri |
+| `etiket` | `beklenen_yonde` (anlamlı ve işaret beklenenle aynı) · `ters_yonde` (anlamlı ve işaret ters) · `anlamsiz` (anlamlı değil) |
+
+- **Etiketler yalnız bu üç değerdir.** Hiçbiri nedensellik anlamına gelmez; "ilişki beklenen yönde"
+  diye okunur.
+- **Açık sorular (ekip kararı):**
+  - L4 anlamlılık eşiği (α) ve çoklu test düzeltmesi.
+  - `seri` tanımı: yıllık ya da mevsimlik anomali.
+  - Bölge listesi: tüm iller mi, yalnız bölgeler mi?
