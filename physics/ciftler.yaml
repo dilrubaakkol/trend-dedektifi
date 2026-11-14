@@ -1,0 +1,112 @@
+# L4 değişken çiftleri (docs/sozlesmeler.md 2.3). physics.run ve physics.iliski bu dosyayı okur;
+# kodda çift tanımı yoktur. Yeni çift = yeni bir madde (no benzersiz olmalı).
+#
+# Alanlar
+#   no               : çift numarası (ciftler.csv `cift_no`)
+#   ad               : kısa ad (ekran ve belge için)
+#   x, y             : {degisken, urun} — L1_kup/<degisken>__<urun>.nc. Etiket x ile y'nin birlikte
+#                      değişme yönünü değerlendirir; sözleşmedeki degisken_1 = x, degisken_2 = y.
+#   mevsim           : yillik | kis | ilkbahar | yaz | sonbahar  → yılda bir değer (mevsim ortalaması/toplamı)
+#                      mevsimlik → dört mevsim art arda, her mevsimin kendi ortalamasından farkı
+#                      aylik     → 12 aylık döngüsü çıkarılmış aylık anomali
+#   aylar            : (yalnız aylik) y'nin hangi aylarının kullanılacağı, ör. [4, 5, 6, 7, 8, 9]
+#   gecikme_ay       : tek sayı ya da liste; x, y'den bu kadar ay önce alınır (her gecikme ayrı satır)
+#   beklenen         : "+" aynı yönde, "-" zıt yönde, "0" beklenti yok (yalnız r, p ve yön; harita: false olmalı)
+#   kademe           : 1 ya da 2 (2 = bağımsız doğrulaması yapılmadı)
+#   harita           : hücre haritası (iliski__<x>__<y>.nc) üretilsin mi
+#   fiziksel_gerekce : beklenen ilişkinin bir cümlelik fiziksel açıklaması ("ilişki" dili, nedensellik iddiası değil)
+#   not              : ciftler.csv `not` sütununa her satırda yazılan açıklama
+#   kar_maskesi_esik : (isteğe bağlı) kış ortalaması kar örtüsü bu yüzdenin altındaki hücreler dışarıda
+#   etiket_notlari   : (isteğe bağlı) {beklenen_yonde|ters_yonde|anlamsiz: not} — etikete göre ek not;
+#                      verilmezse ters_yonde satırına genel "incelenmeli" notu eklenir
+#   kalite_kontrolu  : (isteğe bağlı) true ise güçlü ilişki çıkmadığında "veri sorunu olabilir" notu eklenir
+
+# Ürün belirtilmezse (physics.iliski) seçilecek ürün sırası: önce Kademe 1'in ana ürünü.
+urun_onceligi:
+  sicaklik_2m: [MERRA2, GLDAS]
+  yagis: [GPM, GLDAS, MERRA2]
+
+ciftler:
+  - no: 1
+    ad: Kış sıcaklığı ~ kar örtüsü
+    x: {degisken: sicaklik_2m, urun: MERRA2}
+    y: {degisken: kar_ortusu, urun: MOD10CM}
+    mevsim: kis
+    gecikme_ay: 0
+    beklenen: "-"
+    kademe: 1
+    harita: true
+    kar_maskesi_esik: 10
+    fiziksel_gerekce: Sıcak kışlarda kar örtüsünün az olması beklenir.
+    not: Yalnız kış ortalaması kar örtüsü ≥ %10 olan hücreler.
+
+  - no: 2
+    ad: Yağış ~ toprak nemi
+    x: {degisken: yagis, urun: GPM}
+    y: {degisken: toprak_nemi, urun: GLDAS}
+    mevsim: mevsimlik
+    gecikme_ay: 0
+    beklenen: "+"
+    kademe: 1
+    harita: true
+    fiziksel_gerekce: Yağışlı mevsimlerde toprak neminin de yüksek olması beklenir.
+    not: ""
+
+  - no: 3
+    ad: Toprak nemi ~ bitki örtüsü (gecikmeli)
+    x: {degisken: toprak_nemi, urun: GLDAS}
+    y: {degisken: ndvi, urun: MOD13C2}
+    mevsim: aylik
+    aylar: [4, 5, 6, 7, 8, 9]
+    gecikme_ay: [1, 2]
+    beklenen: "+"
+    kademe: 1
+    harita: true
+    fiziksel_gerekce: Büyüme mevsiminde nemli topraktan bir iki ay sonra bitki örtüsünün daha yeşil olması beklenir.
+    not: NDVI, toprak neminden 1 ya da 2 ay sonra.
+
+  - no: 4
+    ad: Yağış ~ toplam su depolama (GRACE)
+    x: {degisken: yagis, urun: GPM}
+    y: {degisken: toplam_su_depolama, urun: GRACE}
+    mevsim: yillik
+    gecikme_ay: 0
+    beklenen: "+"
+    kademe: 1
+    harita: false
+    fiziksel_gerekce: Yağışlı yıllarda yer altı ve yüzey suyu depolamasının artması beklenir.
+    not: >-
+      Yalnız 7 bölge + Türkiye (8 satır), il satırı ve harita yok: GRACE uydusunun gerçek
+      çözünürlüğü yaklaşık 300 km, çoğu il tek bir GRACE hücresinden küçük. En az 9 ayı dolu
+      olmayan yıllar (GRACE ile GRACE-FO arasındaki boşluk) atılır.
+
+  - no: 5
+    ad: Yaz sıcaklığı ~ buharlaşma
+    x: {degisken: sicaklik_2m, urun: MERRA2}
+    y: {degisken: buharlasma, urun: GLDAS}
+    mevsim: yaz
+    gecikme_ay: 0
+    beklenen: "+"
+    kademe: 2
+    harita: true
+    fiziksel_gerekce: Toprakta su yeterliyse sıcak yazlarda buharlaşmanın artması beklenir.
+    not: Yaz sıcaklığı ile buharlaşma; yönü yerin kuraklığına bağlıdır.
+    etiket_notlari:
+      ters_yonde: >-
+        Su sınırlı yaz: sıcak yazlar kurak yazlardır, toprakta su kalmadığı için buharlaşma
+        azalır. Veri hatası değil, kurak iklimin beklenen işaretidir.
+      beklenen_yonde: "Enerji sınırlı yaz: toprakta su yeterli, sıcaklık arttıkça buharlaşma artar."
+      anlamsiz: "Enerji ve su sınırı arasında geçiş: iki etki birbirini dengeliyor olabilir."
+
+  - no: 6
+    ad: Hava sıcaklığı ~ yüzey sıcaklığı (kalite kontrolü)
+    x: {degisken: sicaklik_2m, urun: MERRA2}
+    y: {degisken: yuzey_sicakligi_gunduz, urun: MOD11C3}
+    mevsim: aylik
+    gecikme_ay: 0
+    beklenen: "+"
+    kademe: 2
+    harita: true
+    kalite_kontrolu: true
+    fiziksel_gerekce: Aynı olgunun iki ölçümü olduğu için güçlü pozitif ilişki beklenir.
+    not: "Kalite kontrolü: aynı olgunun iki ölçümü, güçlü pozitif beklenir."

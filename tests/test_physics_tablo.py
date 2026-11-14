@@ -135,7 +135,7 @@ def test_csv_yazimi(maske, tmp_path):
 
 def test_cift5_notu_etikete_gore(maske):
     """Çift 5: ters yönde çıkan il 'su sınırlı', beklenen yönde çıkan 'enerji sınırlı' notu alır."""
-    from physics.tablo import NOT_CIFT5
+    NOT_CIFT5 = CIFT[5].etiket_notlari                    # ciftler.yaml'a taşındı (metin aynı)
     a, b = _cift(maske)                                   # Konya ters, diğerleri beklenen
     df = cift_tablosu(5, a, b.clip(min=0))
     konya = df[df["bolge_kodu"] == "42"].iloc[0]

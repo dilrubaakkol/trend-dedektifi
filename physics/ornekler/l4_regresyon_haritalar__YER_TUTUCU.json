@@ -1,0 +1,127 @@
+{
+ "iliski__sicaklik_2m__buharlasma.nc": {
+  "anlamli": 342,
+  "attrs": {
+   "alfa_fdr": "0.1",
+   "beklenen_yon": "+",
+   "cift": "sicaklik_2m__MERRA2~buharlasma__GLDAS",
+   "cift_no": "5",
+   "donem": "2001-2025",
+   "fdr_hucre_sayisi": "1303",
+   "gecikme_ay": "0",
+   "kademe": "2",
+   "not": "Yaz sıcaklığı ile buharlaşma; yönü yerin kuraklığına bağlıdır.",
+   "seri": "yaz_JJA"
+  },
+  "etiket": -86126,
+  "etkin_n": 30955.62548828125,
+  "gecerli_hucre": 1303,
+  "p": 29.91485833397678,
+  "p_fdr": 32.91993119065046,
+  "r": 685.9328976413235
+ },
+ "iliski__sicaklik_2m__kar_ortusu.nc": {
+  "anlamli": -1066,
+  "attrs": {
+   "alfa_fdr": "0.1",
+   "beklenen_yon": "-",
+   "cift": "sicaklik_2m__MERRA2~kar_ortusu__MOD10CM",
+   "cift_no": "1",
+   "donem": "2002-2025",
+   "fdr_hucre_sayisi": "559",
+   "gecikme_ay": "0",
+   "kademe": "1",
+   "not": "Yalnız kış ortalaması kar örtüsü ≥ %10 olan hücreler.",
+   "seri": "kis_DJF"
+  },
+  "etiket": -160316,
+  "etkin_n": 12206.168345451355,
+  "gecerli_hucre": 559,
+  "p": 1.855336211471193e-21,
+  "p_fdr": 1.8553446674482285e-21,
+  "r": -559.0
+ },
+ "iliski__sicaklik_2m__yuzey_sicakligi_gunduz.nc": {
+  "anlamli": 422,
+  "attrs": {
+   "alfa_fdr": "0.1",
+   "beklenen_yon": "+",
+   "cift": "sicaklik_2m__MERRA2~yuzey_sicakligi_gunduz__MOD11C3",
+   "cift_no": "6",
+   "donem": "2001-01…2025-12",
+   "fdr_hucre_sayisi": "1303",
+   "gecikme_ay": "0",
+   "kademe": "2",
+   "not": "Kalite kontrolü: aynı olgunun iki ölçümü, güçlü pozitif beklenir.",
+   "seri": "aylik_anomali"
+  },
+  "etiket": -86052,
+  "etkin_n": 389431.75009155273,
+  "gecerli_hucre": 1303,
+  "p": 1.6737730147308996e-17,
+  "p_fdr": 1.6741224599688996e-17,
+  "r": 700.1787154078484
+ },
+ "iliski__toprak_nemi__ndvi__gecikme1.nc": {
+  "anlamli": 422,
+  "attrs": {
+   "alfa_fdr": "0.1",
+   "beklenen_yon": "+",
+   "cift": "toprak_nemi__GLDAS~ndvi__MOD13C2",
+   "cift_no": "3",
+   "donem": "2001-04…2025-09",
+   "fdr_hucre_sayisi": "1303",
+   "gecikme_ay": "1",
+   "kademe": "1",
+   "not": "NDVI, toprak neminden 1 ya da 2 ay sonra.",
+   "seri": "aylik_anomali_nis_eyl"
+  },
+  "etiket": -85916,
+  "etkin_n": 194531.93208312988,
+  "gecerli_hucre": 1303,
+  "p": 0.00819405523065313,
+  "p_fdr": 0.008298735457690967,
+  "r": 607.6060425043106
+ },
+ "iliski__toprak_nemi__ndvi__gecikme2.nc": {
+  "anlamli": -880,
+  "attrs": {
+   "alfa_fdr": "0.1",
+   "beklenen_yon": "+",
+   "cift": "toprak_nemi__GLDAS~ndvi__MOD13C2",
+   "cift_no": "3",
+   "donem": "2001-04…2025-09",
+   "fdr_hucre_sayisi": "1303",
+   "gecikme_ay": "2",
+   "kademe": "1",
+   "not": "NDVI, toprak neminden 1 ya da 2 ay sonra.",
+   "seri": "aylik_anomali_nis_eyl"
+  },
+  "etiket": -87218,
+  "etkin_n": 194552.42337036133,
+  "gecerli_hucre": 1303,
+  "p": 635.0957837669612,
+  "p_fdr": 1228.6696758251637,
+  "r": -2.560856097828946
+ },
+ "iliski__yagis__toprak_nemi.nc": {
+  "anlamli": 422,
+  "attrs": {
+   "alfa_fdr": "0.1",
+   "beklenen_yon": "+",
+   "cift": "yagis__GPM~toprak_nemi__GLDAS",
+   "cift_no": "2",
+   "donem": "2001-2025",
+   "fdr_hucre_sayisi": "1303",
+   "gecikme_ay": "0",
+   "kademe": "1",
+   "seri": "mevsim_anomali"
+  },
+  "etiket": -86052,
+  "etkin_n": 127475.77102661133,
+  "gecerli_hucre": 1303,
+  "p": 0.0022786615300671017,
+  "p_fdr": 0.002288960780230921,
+  "r": 694.6342621147633
+ }
+}
