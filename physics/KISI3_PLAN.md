@@ -113,16 +113,38 @@ Her faz sentetik veriyle test edilir ve testler geçmeden sonraki faza geçilmez
 - Vektörleştirilmiş hesap (1.300 hücre birkaç saniyede)
 - **Test:** Sentetik haritada bir bölgeye ilişki, bir bölgeye ters ilişki gömülür; doğru yerler doğru etiketi alır, gerisi `anlamsiz` kalır
 
+**Durum (2026-11-14): ✅ bitti.** `physics/harita.py` (`iliski_harita`, `cift_haritasi`, `etiket_ozeti`), `tests/test_physics_harita.py` (7 test).
+- Vektörleştirilmiş hesap her hücrede `iliski_1d` ile birebir aynı sonucu veriyor (testte hücre hücre karşılaştırıldı). Tam Türkiye ızgarasında 4 çift 0,4 saniyede hesaplanıyor.
+- Gömülü desen testi: batıya beklenen yönde, doğuya ters yönde ilişki gömüldü. Etiketler doğru yerlerde çıktı, deniz hücreleri "hesaplanamadı" (−99) oldu.
+- İlişkisiz 1.120 hücrelik haritada FDR olmadan %5,4 hücre "anlamlı" çıkıyor, FDR sonrasında %0.
+- Çift 1'de FDR yalnızca kar kapsamındaki hücreler üzerinden yapılıyor (`fdr_hucre_sayisi` attr'ı).
+- Yayın attr'ları (`urun_surumu`, `veri_seti_doi`, `lisans`, `doi_1`, `doi_2`, `dogrulanmadi`) Faz 5'te dosya yazılırken eklenecek.
+
 ### Faz 4: İl, bölge ve Türkiye tablosu (`L4_iliski/ciftler.csv`)
 - 81 il, 7 bölge ve Türkiye için alan ağırlıklı (cos enlem) ortalama seriler üzerinden 6 çift hesaplanır
 - İl satırlarında FDR, 81 il üzerinden yapılır
 - Sütunlar: sözleşme 2.3'teki sütunlar ile belgedeki ek sütunlar (`zaman_olcegi`, `gecikme_ay`, `beklenen_yon`, `anlamli_fdr`) ve ortak alanlar (`urun_surumu`, `veri_seti_doi`, `kademe`, `lisans`, `dogrulanmadi`, `donem`, `seri`)
 - Bölge listesi `data.regions` ile alınır (Kişi 1'in Natural Earth il sınırları)
 
+**Durum (2026-11-14): ✅ bitti.** `physics/tablo.py` (`bolge_listesi`, `bolge_maskeleri`, `cift_tablosu`, `ciftler_tablosu`, `csv_yaz`), `tests/test_physics_tablo.py` (9 test).
+- Bölge maskeleri Kişi 1'in `data.regions.subset` fonksiyonundan alınıyor (hücre merkezi kuralı). Türkiye, 7 bölgenin toplamı ve 81 ilin toplamı aynı sayıyı veriyor: 1.303 hücre. En küçük iller Kilis ve Yalova (2'şer hücre); `hucre_sayisi` sütununda görünüyor.
+- Satır sayısı: 81 il + 7 bölge + Türkiye = 89 satır. Çift 3'te iki gecikme olduğu için 178 satır, çift 4'te yalnızca 8 satır (bölge ve Türkiye).
+- Gömülü desen testi: Konya'ya ters ilişki gömüldü, Konya `ters_yonde` çıktı; geri kalan 80 il ve Türkiye `beklenen_yonde`.
+- CSV: UTF-8 BOM'lu (Excel Türkçe karakterleri doğru açsın diye), ondalık nokta, boş değer boş hücre.
+- **Kişi 5 için örnek:** `physics/ornekler/ciftler__YER_TUTUCU.csv` (542 satır, sentetik). Yeniden üretmek için: `python -m physics.ornek_l4`.
+- **Kişi 1'e not:** İl plakası için `data.regions._iller()` (iç fonksiyon) kullanılıyor. `list_regions()` plakayı da verirse oraya geçilir.
+
 ### Faz 5: Yayın paketine bağlantı (`python -m physics.run`)
 - L1 küplerini okur (yayın paketi ya da `cache/processed/`) ve `outputs/trend-dedektifi-turkiye-<surum>/L4_iliski/` klasörüne yazar
 - Kademe 2 girdili çiftlerde (5, 6) `dogrulanmadi = evet` yazılır
 - Gerçek veri yoksa yalnızca `cache/physics/` klasörüne, "YER TUTUCU" işaretli olarak yazar. Yayın paketine asla sentetik sonuç girmez
+
+**Durum (2026-11-14): ✅ bitti.** `physics/run.py` (yeni), `tests/test_physics_run.py` (5 test). Eski `run.py` rafa kalktı ve `physics/run_yol_haritasi.py` adını aldı.
+- `python -m physics.run --surum v0.1`: `outputs/trend-dedektifi-turkiye-v0.1/L1_kup/` dosyalarını okuyor, aynı pakete `L4_iliski/` yazıyor. L1 dosyası eksik olan çiftler uyarıyla atlanıyor.
+- `python -m physics.run --sentetik`: uçtan uca deneme. Çıktı yalnızca `cache/physics/L4_iliski__YER_TUTUCU/` klasörüne gidiyor ve her satırda YER TUTUCU notu var.
+- Güvenlik: L1 içinde sentetik dosya varsa yayın paketine hiçbir şey yazılmıyor (testle kanıtlandı).
+- NetCDF: float32 değişkenlerde boş değer NaN, `etiket` ve `anlamli` int8 (boş değer kodu yok, −99 / −1 anlamlı). Attr'lar: ortak alanlar, `doi_1`, `doi_2`, `kademe`, `dogrulanmadi`.
+- **Kişi 4 uyumsuzluğu (2026-11-14):** `llm/evidence.py` L4 tablosunda eski taslaktaki `bolge` sütununu okuyor. Kesinleşen sözleşmede bu sütun yok; yerine `bolge_kodu` (il: plaka) ve `bolge_adi` var. Kişi 4, L3 için kullandığı eşleştirmeyi (`bolge_kodu` ya da `bolge_adi`) L4'te de kullanmalı. Ayrıca çift 3'ün iki satırı var (`gecikme_ay` 1 ve 2); kanıt kimliğine gecikme eklenmeli. `llm/` klasörü bizim değil; kullanıcı aracılığıyla Kişi 4'e iletildi.
 
 ### Faz 6: Gerçek veriyle çalıştırma ve fizik kontrolü
 - Kişi 1'in gerçek L1 dosyalarıyla çalıştırılır

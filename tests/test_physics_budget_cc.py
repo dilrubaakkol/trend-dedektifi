@@ -115,7 +115,7 @@ def test_cc_kapsama_100_tohum():
 # ------------------------------------------------------------------ physics.run girişleri
 def test_run_butce_ve_cc(monkeypatch):
     """Veri okuma taklit edilir; analyze_budget / analyze_cc doğru fonksiyonlara bağlanıyor."""
-    import physics.run as run
+    import physics.run_yol_haritasi as run
     d = synthetic_budget(kayip_mm_per_year=25.0, yagis_yayilim_mm_per_month=0.5, seed=1)
     q, T = synthetic_cc(7.0, seed=2)
     tablo = {("toplam_su_depolama", None): d["grace_cm"], ("yagis", None): d["yagis"]["GPM"],
