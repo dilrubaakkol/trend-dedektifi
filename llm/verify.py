@@ -71,8 +71,22 @@ def _ok_number(tok: str, candidates: set[float], allowed: set[float]) -> bool:
     return False
 
 
-def verify_text(text: str, results: dict, extra_allowed: set[float] | None = None) -> VerifyResult:
-    """Açıklama metnini sonuçlara karşı denetler."""
+def _strip_phrases(text: str, phrases) -> str:
+    """Değişken adı ve birimleri ("Hava sıcaklığı (2 m)", "10^15 molekül/cm²") sayı içerir ama sonuç değildir;
+    denetimden önce metinden çıkarılır. Uzun ifadeler önce çıkarılır."""
+    # Yalnız hem harf hem rakam içeren ifadeler: birimi "1" olan değişkenler metindeki her "1"i silmesin.
+    keep = {p for p in (phrases or []) if p and re.search(r"\d", p) and re.search(r"[^\W\d_]", p)}
+    for ph in sorted(keep, key=len, reverse=True):
+        text = text.replace(ph, " ")
+    return text
+
+
+def verify_text(text: str, results: dict, extra_allowed: set[float] | None = None,
+                ignore_phrases=None) -> VerifyResult:
+    """Açıklama metnini sonuçlara karşı denetler.
+
+    ignore_phrases: içinde rakam olan ama sonuç olmayan ifadeler (değişken başlıkları, birimler)."""
+    text = _strip_phrases(text, ignore_phrases)
     ids = {a.get("id") for a in results.get("analyses", [])}
     unknown = sorted({r for r in REF.findall(text) if r not in ids})
 

@@ -8,6 +8,7 @@ Tüm sayılar `format_tr` ile Türkçe biçimde yazılır (arayüzle aynı).
 from __future__ import annotations
 
 import json
+import re
 
 from .format_tr import format_p, format_tr
 from .kb import KnowledgeBase
@@ -63,9 +64,16 @@ def _title(kb: KnowledgeBase, name: str | None) -> str:
     return kb.variables.get(name, {}).get("baslik", name or "?")
 
 
+_PER_DECADE = re.compile(r"/\s*(10|on)\s*y[ıi]l|/\s*decade", re.I)
+
+
 def _slope_units(a: dict) -> str:
-    u = a.get("birim") or a.get("units") or ""
-    return f"{u}/10 yıl".strip() if u not in ("1", "") else "/10 yıl"
+    """Eğim birimi. L3 `birim` sütunu temel birimdir ("mm"); "/10 yıl" burada eklenir. Sütun zaten
+    "mm/10 yıl" yazılmışsa tekrar eklenmez (sözleşme bunu açıkça yazmıyor; iki durum da güvenli)."""
+    u = str(a.get("birim") or a.get("units") or "").strip()
+    if _PER_DECADE.search(u):
+        return u
+    return f"{u}/10 yıl" if u not in ("1", "") else "/10 yıl"
 
 
 # --------------------------------------------------------------------------- kanıt tablosu

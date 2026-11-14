@@ -128,6 +128,13 @@ class KnowledgeBase:
                 best, score = ad, s
         return best
 
+    def number_phrases(self) -> list[str]:
+        """Değişken başlıkları ve birimleri: doğrulayıcı bunlardaki rakamları sonuç saymaz."""
+        out = []
+        for v in self.variables.values():
+            out += [str(v.get("baslik", "")), str(v.get("birim", ""))]
+        return out
+
     # ------------------------------------------------------------------ LLM için özet
     def catalog_for_prompt(self) -> str:
         """Planlayıcı LLM'e verilen kısa katalog: kart ve değişken kimlikleri + açıklamaları."""

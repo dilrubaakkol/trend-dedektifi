@@ -278,6 +278,38 @@ def test_template_is_always_verified(kb, konya_plan, pkg):
     assert verify_text(text, r).ok and "−1,84" in text and "kg/m²/10 yıl" in text
 
 
+@pytest.mark.parametrize("birim,expected", [
+    ("mm", "mm/10 yıl"), ("mm/10 yıl", "mm/10 yıl"), ("°C / 10 yil", "°C / 10 yil"), ("1", "/10 yıl"),
+])
+def test_slope_units_not_doubled(birim, expected):
+    from llm.explain import _slope_units
+    assert _slope_units({"birim": birim}) == expected
+
+
+def test_verify_ignores_digits_in_variable_names(kb):
+    r = {"analyses": [{"id": "x", "r": -0.5}]}
+    t = "Hava sıcaklığı (2 m) ile NO₂ (10^15 molekül/cm²) arasında r = −0,5 [ref:x]."
+    assert not verify_text(t, r).ok
+    assert verify_text(t, r, ignore_phrases=kb.number_phrases()).ok
+
+
+def test_real_l4_example_from_physics(kb, regions, tmp_path):
+    """Kişi 3'ün örnek ciftler.csv'si (YER TUTUCU sayılar) ile adaptör ve doğrulayıcı."""
+    src = ROOT / "physics" / "ornekler" / "ciftler__YER_TUTUCU.csv"
+    if not src.exists():
+        pytest.skip("örnek dosya yok")
+    pkg = tmp_path / "trend-dedektifi-turkiye-ornek"
+    (pkg / "L3_ozet").mkdir(parents=True)
+    (pkg / "L4_iliski").mkdir()
+    (pkg / "L4_iliski" / "ciftler.csv").write_bytes(src.read_bytes())
+    for q, must in [("Erzurum'da kar azalıyor mu?", "iliski__sicaklik_2m__MERRA2__kar_ortusu__MOD10CM"),
+                    ("Konya'da kuraklık artıyor mu?", "iliski__toprak_nemi__GLDAS__ndvi__MOD13C2__g2"),
+                    ("Konya'da yeraltı suyu azalıyor mu?", "iliski__yagis__GPM__toplam_su_depolama__GRACE")]:
+        out = answer(q, None, kb, None, regions, package=pkg)
+        ids = {a["id"] for a in out["results"]["analyses"]}
+        assert must in ids and out["verified"], (q, out["warnings"])
+
+
 # --------------------------------------------------------------------------- uçtan uca (akademisyen)
 def test_answer_academic(kb, regions, pkg):
     out = answer("Konya'da kuraklık artıyor mu?", None, kb, None, regions, package=pkg)
