@@ -42,17 +42,33 @@ META = {"donem": "2001-01 … 2025-12", "seri": "yillik_ortalama", "urun_surumu"
         "veri_seti_doi": "(yayında doldurulacak)", "lisans": "CC BY 4.0"}
 
 
-def _l3(pkg, deg, urun, il_rows, bolge_rows, birim, kademe=1):
+def _l3(pkg, deg, urun, il_rows, bolge_rows, birim, kademe=1, kis=None, uyari=""):
+    """docs/sozlesmeler.md 2.2 biçiminde L3 il/bölge CSV'leri. Her bölge için 5 mevsim satırı yazılır:
+    yıllık satır verilen değerlerle, kış satırı `kis` ile (verilmezse), öteki mevsimler BİLEREK 99 —
+    adaptör yanlış mevsimi seçerse testler yakalar."""
     d = pkg / "L3_ozet"
     d.mkdir(parents=True, exist_ok=True)
+    eb = f"{birim} / 10 yıl"
     for kind, rows in (("il", il_rows), ("bolge", bolge_rows)):
         recs = []
-        for kod, ad, sen, lo, hi, p, q, anl, oran, n in rows:
-            recs.append({"bolge_kodu": kod, "bolge_adi": ad, "hucre_sayisi": n, "sen_egimi": sen,
-                         "ga_alt": lo, "ga_ust": hi, "p_mk": p, "p_fdr": q, "anlamli": anl,
-                         "etkin_n": 21.0, "gereken_yil": 31.0, "anlamli_hucre_orani": oran,
-                         "birim": birim, "kademe": kademe,
-                         "dogrulanmadi": "evet" if kademe == 2 else "", **META})
+        for kod, anahtar, ad, duzey, ust, sen, lo, hi, p, q, anl, oran, n in rows:
+            for mevsim in ("yillik", "kis", "ilkbahar", "yaz", "sonbahar"):
+                if mevsim == "yillik":
+                    v = (sen, lo, hi, p, q, anl, oran)
+                elif mevsim == "kis" and kis is not None:
+                    v = kis
+                else:
+                    v = (99.0, 98.0, 100.0, 0.5, 0.5, 0, 0.0)
+                recs.append({"bolge_kodu": kod, "bolge_anahtari": anahtar, "bolge_adi": ad, "duzey": duzey,
+                             "ust_bolge": ust, "mevsim": mevsim, "hucre_sayisi": n, "sen_egimi": v[0],
+                             "ga_alt": v[1], "ga_ust": v[2], "p_mk": v[3], "p_fdr": v[4], "anlamli": v[5],
+                             "etkin_n": 21.0, "gereken_yil": 31.0, "mk_yedek": 0, "anlamli_hucre_orani": v[6],
+                             "anlamli_artan_orani": 0.0, "anlamli_azalan_orani": v[6],
+                             "medyan_hucre_egimi": v[0], "birim": birim, "egim_birimi": eb,
+                             "donem_baslangic": 2001, "donem_bitis": 2025, "trend_uyarisi": uyari, "not": "",
+                             "kademe": kademe, "dogrulanmadi": "evet" if kademe == 2 else "",
+                             "urun_surumu": "v0.1", "veri_seti_doi": "(yayında doldurulacak)",
+                             "lisans": "CC BY 4.0", "doi": ""})
         pd.DataFrame(recs).to_csv(d / f"{deg}__{urun}__{kind}.csv", index=False, encoding="utf-8-sig")
 
 
@@ -61,17 +77,25 @@ def pkg(tmp_path_factory):
     """Konya + İç Anadolu için yer tutucu L3/L4. Konya'nın buharlaşma il özeti yok (bölgeye düşmeli),
     L4 yalnız bölge düzeyinde (ilden bölgeye düşmeli)."""
     p = tmp_path_factory.mktemp("paket") / "trend-dedektifi-turkiye-v0.1"
-    il = lambda *v: [("42", "Konya", *v)]
-    bolge = lambda *v: [("ic_anadolu", "İç Anadolu Bölgesi", *v)]
+    il = lambda *v: [("42", "konya", "Konya", "il", "ic_anadolu", *v)]
+    bolge = lambda *v: [("ic_anadolu", "ic_anadolu", "İç Anadolu Bölgesi", "bolge", "", *v),
+                        ("turkiye", "turkiye", "Türkiye", "ulke", "", *v)]
     _l3(p, "toprak_nemi", "GLDAS", il(-1.84, -2.6, -1.1, 0.002, 0.03, 1, 0.62, 40),
         bolge(-1.2, -1.9, -0.5, 0.01, 0.06, 1, 0.48, 330), "kg/m²")
     _l3(p, "yagis", "GPM", il(-0.9, -2.4, 0.6, 0.31, 0.52, 0, 0.05, 40),
-        bolge(-0.4, -1.5, 0.7, 0.45, 0.6, 0, 0.03, 330), "mm/ay")
+        bolge(-0.4, -1.5, 0.7, 0.45, 0.6, 0, 0.03, 330), "mm/yıl", kis=(-4.2, -6.0, -2.4, 0.001, 0.01, 1, 0.7))
     _l3(p, "yagis", "GLDAS", il(-1.1, -2.7, 0.5, 0.22, 0.44, 0, 0.08, 40),
-        bolge(-0.6, -1.7, 0.5, 0.3, 0.5, 0, 0.04, 330), "mm/ay")
+        bolge(-0.6, -1.7, 0.5, 0.3, 0.5, 0, 0.04, 330), "mm/yıl",
+        uyari="zorlama verisi homojen olmayabilir; trend için MERRA2/GPM tercih edilmeli")
+    pd.DataFrame([   # Kişi 2'nin kaynak uyumu dosyası (ortak dönem): yıllık k/m = 0/2, kış 1/2
+        {"bolge_kodu": "42", "bolge_anahtari": "konya", "bolge_adi": "Konya", "duzey": "il", "mevsim": m,
+         "k": k, "m": 2, "isaret_uyumu": 1.0, "egim_GPM": -0.9, "anlamli_GPM": 0, "egim_GLDAS": -1.1,
+         "anlamli_GLDAS": 0, "egim_birimi": "mm/yıl / 10 yıl", "ortak_donem": "2001-01 … 2025-09",
+         "urunler": "GPM, GLDAS"} for m, k in (("yillik", 0), ("kis", 1))
+    ]).to_csv(p / "L3_ozet" / "yagis__kaynak_uyumu__il.csv", index=False, encoding="utf-8-sig")
     _l3(p, "sicaklik_2m", "MERRA2", il(0.48, 0.31, 0.65, 0.0004, 0.002, 1, 0.97, 20),
         bolge(0.45, 0.3, 0.6, 0.0006, 0.003, 1, 0.95, 160), "°C")
-    _l3(p, "buharlasma", "GLDAS", [], bolge(0.7, 0.2, 1.2, 0.02, 0.08, 1, 0.4, 330), "mm/ay", kademe=2)
+    _l3(p, "buharlasma", "GLDAS", [], bolge(0.7, 0.2, 1.2, 0.02, 0.08, 1, 0.4, 330), "mm/yıl", kademe=2)
     (p / "L4_iliski").mkdir()
     # docs/sozlesmeler.md 2.3 sütunları. Konya (il, plaka 42): çift 2, çift 3 (gecikme 1 ve 2), çift 5.
     # Çift 4 (GRACE) il düzeyinde yok -> bölge satırına düşmeli. Çift 1 (kar) planla ilgisiz -> alınmamalı.
@@ -246,6 +270,109 @@ def test_relation_sentence_uses_q_for_il_and_p_for_bolge(kb, konya_plan, pkg):
     assert verify_text(text, r).ok
 
 
+@pytest.mark.parametrize("q,mevsim", [
+    ("Konya'da kuraklık artıyor mu?", "yillik"), ("Konya'da kışın kuraklık artıyor mu?", "kis"),
+    ("Konya'da yaz kuraklığı", "yaz"), ("Konya'da sonbahar yağışı", "sonbahar"),
+    ("Erzurum'da kar azalıyor mu?", "kis"),            # kar kartının varsayılanı
+    ("Erzurum'da ilkbaharda kar azalıyor mu?", "ilkbahar"),
+])
+def test_plan_mevsim(kb, regions, q, mevsim):
+    assert plan_question(q, kb, None, regions)["mevsim"] == mevsim
+
+
+def test_season_row_is_selected(kb, regions, pkg):
+    """Kış sorusunda kış satırı; hiçbir kanıtta 99 (yanlış mevsim nöbetçisi) olmamalı."""
+    plan = plan_question("Konya'da kışın kuraklık artıyor mu?", kb, None, regions)
+    r = collect_evidence(plan, pkg)
+    gpm = next(a for a in r["analyses"] if a["id"] == "trend__yagis__GPM__kis")
+    assert (gpm["sen_egimi"], gpm["mevsim"], gpm["label"]) == (-4.2, "kis", "anlamli_azalis")
+    uyum = next(a for a in r["analyses"] if a["type"] == "kaynak_uyumu")
+    assert (uyum["id"], uyum["k"], uyum["m"]) == ("uyum__yagis__kis", 1, 2)
+    yillik = collect_evidence(plan_question("Konya'da kuraklık artıyor mu?", kb, None, regions), pkg)
+    assert all(a.get("sen_egimi") != 99.0 for a in yillik["analyses"])
+
+
+def test_card_default_season_falls_back_to_yearly(kb, regions, tmp_path):
+    """Kar kartının varsayılanı kış; paket yalnız yıllık satır içeriyorsa yıllığa düşülür ve söylenir.
+    Kullanıcı kışı AÇIKÇA sorduysa düşülmez."""
+    p = tmp_path / "trend-dedektifi-turkiye-v0.1"
+    _l3(p, "kar_ortusu", "MOD10CM", [("25", "erzurum", "Erzurum", "il", "dogu_anadolu",
+                                      -2.1, -3.0, -1.2, 0.001, 0.02, 1, 0.41, 30)], [], "%")
+    f = p / "L3_ozet" / "kar_ortusu__MOD10CM__il.csv"
+    df = pd.read_csv(f, encoding="utf-8-sig", dtype={"bolge_kodu": str})
+    df[df["mevsim"] == "yillik"].to_csv(f, index=False, encoding="utf-8-sig")
+    r = collect_evidence(plan_question("Erzurum'da kar azalıyor mu?", kb, None, regions), p)
+    t = next(a for a in r["analyses"] if a["type"] == "trend")
+    assert (t["id"], t["mevsim"]) == ("trend__kar_ortusu__MOD10CM", "yillik")
+    assert any("yıllık sonuç kullanıldı" in w for w in r["warnings"])
+    r = collect_evidence(plan_question("Erzurum'da kışın kar azalıyor mu?", kb, None, regions), p)
+    assert not [a for a in r["analyses"] if a["type"] == "trend"]
+    assert any("istenen mevsim" in w for w in r["warnings"])
+
+
+def test_agreement_from_l3_file_and_trend_warning(kb, regions, pkg):
+    out = answer("Konya'da kuraklık artıyor mu?", None, kb, None, regions, package=pkg)
+    uyum = next(a for a in out["results"]["analyses"] if a["type"] == "kaynak_uyumu")
+    assert uyum["ortak_donem"] == "2001-01 … 2025-09" and uyum["isaret_uyumu"] == 1.0
+    assert "yagis__kaynak_uyumu__il.csv" in " ".join(out["files"])
+    assert any("MERRA2/GPM tercih" in w for w in out["academic_warnings"])        # trend_uyarisi
+    assert "MERRA2/GPM tercih" not in out["explanation"]                           # bulgulara girmez
+    assert out["verified"]
+
+
+def test_real_l3_from_stats_pipeline(kb, regions, tmp_path):
+    """Kişi 2'nin kendi kodu (stats.l2 + stats.l3) ile üretilen L3 paketini adaptör doğru okumalı.
+    Küp ve bölgeler sentetik (YER TUTUCU); bölge anahtarları gerçek (konya / ic_anadolu / turkiye)."""
+    np = pytest.importorskip("numpy")
+    xr = pytest.importorskip("xarray")
+    pytest.importorskip("shapely")
+    from shapely.geometry import box
+    from stats import l2 as st_l2, l3 as st_l3
+
+    lat, lon = 38.125 + 0.25 * np.arange(4), 32.125 + 0.25 * np.arange(6)
+    l1 = tmp_path / "outputs" / "trend-dedektifi-turkiye-v0.1" / "L1_kup"
+    l1.mkdir(parents=True)
+    rows = []
+    for i, urun in enumerate(["GPM", "GLDAS"]):
+        t = pd.date_range("2001-01", "2025-12", freq="MS")
+        x = np.asarray((t.year - 2001) + (t.month - 0.5) / 12)
+        v = 40 - 2.0 * x[:, None, None] + np.random.default_rng(i).normal(0, 1, (len(t), 4, 6))
+        da = xr.DataArray(v.astype("float32"), coords={"time": t, "lat": lat, "lon": lon},
+                          dims=("time", "lat", "lon"), name="yagis",
+                          attrs={"units": "mm/ay", "kademe": np.int32(1), "lisans": "CC BY 4.0", "doi": "x",
+                                 "urun_surumu": "v0.1", "veri_seti_doi": "(yayında doldurulacak)", "domain": "land"})
+        da.to_dataset().assign_attrs(da.attrs).to_netcdf(l1 / f"yagis__{urun}.nc")
+        rows.append({"dosya": f"yagis__{urun}.nc", "degisken": "yagis", "birim": "mm/ay", "kaynak": urun,
+                     "kaynak_doi": "x", "donem": "2001-01 … 2025-12", "kademe": 1})
+    pd.DataFrame(rows).to_csv(l1 / "ICINDEKILER.csv", index=False, encoding="utf-8-sig")
+    bolgeler = [
+        {"duzey": "il", "anahtar": "konya", "ad": "Konya", "kod": "42", "ust": "ic_anadolu",
+         "sorgu": box(32.0, 38.0, 33.5, 39.0)},
+        {"duzey": "bolge", "anahtar": "ic_anadolu", "ad": "İç Anadolu", "kod": "ic_anadolu", "ust": "",
+         "sorgu": box(32.0, 38.0, 33.5, 39.0)},
+        {"duzey": "ulke", "anahtar": "turkiye", "ad": "Türkiye", "kod": "turkiye", "ust": "",
+         "sorgu": box(32.0, 38.0, 33.5, 39.0)},
+    ]
+    st_l2.uret("v0.1", kok=tmp_path / "outputs")
+    st_l3.uret("v0.1", kok=tmp_path / "outputs", bolgeler=bolgeler)
+    pkg = tmp_path / "outputs" / "trend-dedektifi-turkiye-v0.1"
+
+    plan = plan_question("Konya'da yağış nasıl değişti?", kb, None, regions)
+    r = collect_evidence(plan, pkg)
+    gpm = next(a for a in r["analyses"] if a["id"] == "trend__yagis__GPM")
+    il = pd.read_csv(pkg / "L3_ozet" / "yagis__GPM__il.csv", dtype={"bolge_kodu": str}, encoding="utf-8-sig")
+    beklenen = il[(il["bolge_anahtari"] == "konya") & (il["mevsim"] == "yillik")].iloc[0]
+    assert gpm["sen_egimi"] == pytest.approx(beklenen["sen_egimi"]) and gpm["region_level"] == "il"
+    assert gpm["egim_birimi"] == beklenen["egim_birimi"] and gpm["label"] == "anlamli_azalis"
+    assert gpm["donem"] == f"{int(beklenen['donem_baslangic'])}–{int(beklenen['donem_bitis'])}"
+    uyum = next(a for a in r["analyses"] if a["type"] == "kaynak_uyumu")
+    assert (uyum["k"], uyum["m"]) == (2, 2) and uyum["file"] == "L3_ozet/yagis__kaynak_uyumu__il.csv"
+    out = answer("Konya'da yağış nasıl değişti?", None, kb, None, regions, package=pkg)
+    assert out["verified"], out["warnings"]
+    tr = collect_evidence(plan_question("Türkiye genelinde yağış nasıl değişti?", kb, None, regions), pkg)
+    assert next(a for a in tr["analyses"] if a["type"] == "trend")["region_level"] == "turkiye"
+
+
 def test_collect_evidence_without_package(konya_plan, tmp_path):
     r = collect_evidence(konya_plan, tmp_path / "yok")
     assert r["analyses"] == [] and r["warnings"]
@@ -267,6 +394,11 @@ def test_verify_old_contract_still_works():
     assert verify_text(t, EXAMPLE).ok
 
 
+def test_verify_year_month_dates():
+    r = {"analyses": [{"id": "x", "k": 1, "m": 2, "ortak_donem": "2001-01 … 2025-09"}]}
+    assert verify_text("Ortak dönem 2001-01 … 2025-09, 1/2 ürün [ref:x].", r).ok
+
+
 def test_verify_rejects_unknown_ref_and_uncited():
     r = verify_text("Kar azalıyor [ref:yok_boyle]. Değişim -2.1 %.", EXAMPLE)
     assert r.unknown_refs == ["yok_boyle"] and r.uncited_sentences and not r.ok
@@ -275,7 +407,7 @@ def test_verify_rejects_unknown_ref_and_uncited():
 def test_template_is_always_verified(kb, konya_plan, pkg):
     r = collect_evidence(konya_plan, pkg)
     text = template_explanation(konya_plan, r, kb)
-    assert verify_text(text, r).ok and "−1,84" in text and "kg/m²/10 yıl" in text
+    assert verify_text(text, r).ok and "−1,84" in text and "kg/m² / 10 yıl" in text
 
 
 @pytest.mark.parametrize("birim,expected", [

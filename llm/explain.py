@@ -49,6 +49,9 @@ türetme; sayı içeren her cümlenin sonuna [ref:<id>] ekle; ilişkinin kesin n
 }
 
 
+MEVSIM_ADI = {"yillik": "yıllık", "kis": "kış (Ara–Şub)", "ilkbahar": "ilkbahar (Mar–May)",
+              "yaz": "yaz (Haz–Ağu)", "sonbahar": "sonbahar (Eyl–Kas)"}
+
 SERI = {"yillik_ortalama": "yıllık ortalama", "yillik": "yıllık", "aylik_anomali": "aylık anomali",
         "aylik_anomali_nis_eyl": "aylık anomali (Nisan–Eylül)", "mevsim_anomali": "mevsimlik anomali",
         "kis_DJF": "kış (DJF)", "ilkbahar_MAM": "ilkbahar (MAM)", "yaz_JJA": "yaz (JJA)",
@@ -68,8 +71,10 @@ _PER_DECADE = re.compile(r"/\s*(10|on)\s*y[ıi]l|/\s*decade", re.I)
 
 
 def _slope_units(a: dict) -> str:
-    """Eğim birimi. L3 `birim` sütunu temel birimdir ("mm"); "/10 yıl" burada eklenir. Sütun zaten
-    "mm/10 yıl" yazılmışsa tekrar eklenmez (sözleşme bunu açıkça yazmıyor; iki durum da güvenli)."""
+    """Eğim birimi. L3 `egim_birimi` sütunu varsa aynen kullanılır ("°C / 10 yıl", sözleşme 2.2).
+    Yoksa `birim`e "/10 yıl" eklenir; birim zaten "/10 yıl" içeriyorsa tekrar eklenmez."""
+    if a.get("egim_birimi"):
+        return str(a["egim_birimi"]).strip()
     u = str(a.get("birim") or a.get("units") or "").strip()
     if _PER_DECADE.search(u):
         return u
@@ -111,8 +116,10 @@ def _sentence(a: dict, kb: KnowledgeBase) -> str | None:
     rid, lab = a.get("id"), LABELS.get(a.get("label"), a.get("label") or "")
     t = a.get("type")
     if t == "trend" and a.get("sen_egimi") is not None:
-        s = (f"{_title(kb, a['variable'])} ({a['product']}"
-             + (f", {seri_adi(a['seri'])}" if a.get("seri") else "") + f"): Sen eğimi "
+        donem = a.get("donem") or ""
+        ctx = [a["product"]] + [x for x in (MEVSIM_ADI.get(a.get("mevsim"), seri_adi(a["seri"]) if a.get("seri") else None),
+                                            donem) if x]
+        s = (f"{_title(kb, a['variable'])} ({', '.join(ctx)}): Sen eğimi "
              + format_tr(a["sen_egimi"], _slope_units(a)))
         if a.get("ga_alt") is not None and a.get("ga_ust") is not None:
             s += f" (%95 GA {format_tr([a['ga_alt'], a['ga_ust']])})"
@@ -137,8 +144,14 @@ def _sentence(a: dict, kb: KnowledgeBase) -> str | None:
             s += "; Mann-Kendall " + format_p(a["mk_p"])
         return s + f" [ref:{rid}]. Sonuç: {lab}."
     if t == "kaynak_uyumu":
-        return (f"{_title(kb, a['variable'])}: {', '.join(a['urunler'])} ürünlerinden {a['k']}/{a['m']} "
-                f"tanesi aynı yönde anlamlı ({a['kapsam']}) [ref:{rid}]. Sonuç: {lab}.")
+        s = (f"{_title(kb, a['variable'])}: {', '.join(a['urunler'])} ürünlerinden {a['k']}/{a['m']} "
+             f"tanesi aynı yönde anlamlı")
+        if a.get("isaret_uyumu") is not None:
+            s += f", eğim işareti uyumu %{format_tr(a['isaret_uyumu'] * 100, digits=0)}"
+        s += f" ({a['kapsam']}"
+        if a.get("ortak_donem"):
+            s += f", {a['ortak_donem']}"
+        return s + f") [ref:{rid}]. Sonuç: {lab}."
     if t == "iliski" and a.get("r") is not None:
         if a.get("label") == "anlamsiz":       # bölge/Türkiye satırlarında FDR yok; genel ifade kullan
             lab = "ilişki anlamlı değil"

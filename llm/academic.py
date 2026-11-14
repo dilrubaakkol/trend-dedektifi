@@ -33,38 +33,51 @@ def _relations(results):
 
 
 def methods_paragraph(results: dict, kb) -> str:
-    """Makalenin "Veri ve yöntem" bölümüne uyarlanabilecek paragraf."""
+    """Makalenin "Veri ve yöntem" bölümüne uyarlanabilecek paragraf (sözleşme 2.1–2.3 tanımları)."""
     trends = _trends(results)
     if not trends:
         return ""
-    names = sorted({f"{kb.variables.get(t['variable'], {}).get('baslik', t['variable'])} ({t['product']})"
-                    for t in trends})
+    title = lambda v: kb.variables.get(v, {}).get("baslik", v)
+    names = sorted({f"{title(t['variable'])} ({t['product']})" for t in trends})
     cells = [t["hucre_sayisi"] for t in trends if t.get("hucre_sayisi") is not None]
-    donem = sorted({str(t.get("donem")) for t in trends if t.get("donem")})
-    seri = sorted({seri_adi(t.get("seri")) for t in trends if t.get("seri")})
+    donem = sorted({str(t["donem"]) for t in trends if t.get("donem")})
+    mevsim = trends[0].get("mevsim") or "yillik"
     region = results.get("region", {}).get("name") or trends[0].get("region_name")
 
+    from .explain import MEVSIM_ADI
     cell_txt = ""
     if cells:
         lo, hi = int(min(cells)), int(max(cells))
         cell_txt = f" ({lo} hücre)" if lo == hi else f" (ürüne göre {lo}–{hi} hücre)"
+    seri = ("her yıl için yıllık değer" if mevsim == "yillik"
+            else f"her yıl için {MEVSIM_ADI.get(mevsim, mevsim)} değeri")
     p = [
-        f"{', '.join(names)} için {' / '.join(donem) or 'analiz dönemi'} aylık NASA ürünleri 0,25° ortak "
-        f"ızgaraya getirilmiş; hücre merkezi {region} sınırı içinde kalan hücrelerin{cell_txt} alan "
-        "ortalaması alınmıştır.",
-        f"Trendler {', '.join(seri) or 'belirtilen'} serisinden Theil-Sen eğimiyle (Sen, 1968) kestirilmiş; "
-        "anlamlılık otokorelasyon düzeltmeli Mann-Kendall testiyle (Hamed ve Rao, 1998) sınanmış ve çoklu "
-        "test için Benjamini-Hochberg yanlış keşif oranı düzeltmesi (Benjamini ve Hochberg, 1995; "
-        "α_FDR = 0,10) uygulanmıştır.",
-        "Eğimin %95 güven aralığı etkin örneklem büyüklüğüne göre genişletilmiş, gözlenen eğimi ayırt etmek "
-        "için gereken süre Weatherhead vd. (1998) ile hesaplanmıştır.",
+        f"{', '.join(names)} için aylık NASA ürünleri 0,25° ortak ızgaraya getirilmiş; hücre merkezi "
+        f"{region} sınırı içinde kalan hücrelerin{cell_txt} cos(enlem) ağırlıklı alan ortalaması alınmıştır.",
+        f"Bu ortalamadan {seri} üretilmiş (ortalama alınan değişkenlerde dönem ortalaması, yağış ve "
+        "buharlaşma gibi birikimli değişkenlerde dönem toplamı); eksik ay oranı %20'yi aşan yıllar dışarıda "
+        "bırakılmış"
+        + (" (GRACE için yıllıkta en az 6 geçerli ay)" if any(t["product"] == "GRACE" for t in trends) else "")
+        + " ve en az 12 geçerli yılı olan serilerde trend hesaplanmıştır"
+        + (f" (analiz dönemi {', '.join(donem)})." if donem else "."),
+        "Trend Theil-Sen eğimiyle (Sen, 1968) kestirilmiş, anlamlılık otokorelasyon düzeltmeli Mann-Kendall "
+        "testiyle (Hamed ve Rao, 1998) sınanmıştır. Çoklu test için Benjamini-Hochberg yanlış keşif oranı "
+        "düzeltmesi (Benjamini ve Hochberg, 1995) aynı düzeydeki (81 il ya da 7 bölge) satırlar içinde "
+        "uygulanmıştır; Türkiye geneli tek satır olduğundan düzeltme gerektirmez.",
+        "Eğimin %95 güven aralığı, artıkların gecikme-1 otokorelasyonundan hesaplanan etkin örneklem "
+        "büyüklüğü ve t dağılımıyla genişletilmiştir. Bir trend, q ≤ 0,10 ve güven aralığı sıfırı dışladığında "
+        "anlamlı kabul edilmiştir. Gözlenen eğimi ayırt etmek için gereken süre Weatherhead vd. (1998) "
+        "ile hesaplanmıştır.",
     ]
     level = (results.get("region") or {}).get("level")
-    fallback = sorted({f"{kb.variables.get(t['variable'], {}).get('baslik', t['variable'])} → {t.get('region_name')}"
+    fallback = sorted({f"{title(t['variable'])} → {t.get('region_name')}"
                        for t in trends if t.get("region_level") != level})
     if fallback:
-        p.append("İl özeti bulunmayan değişkenlerde bağlı olunan bölgenin ortalaması kullanılmıştır ("
+        p.append("Seçilen düzeyde özeti bulunmayan değişkenlerde daha geniş bölgenin ortalaması kullanılmıştır ("
                  + "; ".join(fallback) + ").")
+    if any(a.get("type") == "kaynak_uyumu" for a in results.get("analyses", [])):
+        p.append("Birden çok ürünü olan değişkenlerde ürünler ortak döneme kırpılarak yeniden test edilmiş ve "
+                 "aynı yönde anlamlı trend veren ürün sayısı (k/m) raporlanmıştır.")
     rel = _relations(results)
     if rel:
         rseri = sorted({seri_adi(a["seri"]) for a in rel if a.get("seri")})
@@ -156,6 +169,14 @@ def academic_warnings(results: dict, kb) -> list[str]:
         if t.get("hucre_sayisi") is not None and t["hucre_sayisi"] < 4:
             w.append(f"{title(t['variable'])} ({t['product']}): bölge ortalaması yalnız "
                      f"{format_tr(t['hucre_sayisi'], digits=0)} hücreye dayanıyor [ref:{t['id']}].")
+    for t in trends:
+        if t.get("trend_uyarisi"):
+            w.append(f"{title(t['variable'])} ({t['product']}): {t['trend_uyarisi']}")
+        if t.get("not"):
+            w.append(f"{title(t['variable'])} ({t['product']}), {t.get('region_name')}: {t['not']}")
+        if t.get("mk_yedek") == 1:
+            w.append(f"{title(t['variable'])} ({t['product']}): Hamed-Rao düzeltmesi tanımsız çıktığı için "
+                     f"düzeltmesiz Mann-Kendall kullanıldı [ref:{t['id']}].")
     for a in results.get("analyses", []):
         if a.get("type") == "kaynak_uyumu" and a["label"] != "uyumlu":
             w.append(f"{title(a['variable'])}: ürünler aynı yönde anlamlı değil ({a['k']}/{a['m']}) "
@@ -168,7 +189,7 @@ def academic_warnings(results: dict, kb) -> list[str]:
 
 
 def _period_years(donem) -> int | None:
-    """"2001-01 … 2025-12" -> 25."""
+    """"2001-01 … 2025-12" ya da "2001–2024" -> yıl sayısı."""
     import re
-    ys = [int(y) for y in re.findall(r"(?<!\d)(\d{4})-\d{2}", str(donem or ""))]
+    ys = [int(y) for y in re.findall(r"(?<!\d)(1[89]\d\d|20\d\d)(?!\d)", str(donem or ""))]
     return ys[-1] - ys[0] + 1 if len(ys) >= 2 else None

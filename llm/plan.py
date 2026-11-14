@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import re
 
-from .kb import KnowledgeBase
+from .kb import KnowledgeBase, tr_lower
 
 PLAN_SYSTEM = """Sen bir NASA yer bilimi veri asistanısın. Kullanıcının Türkiye hakkındaki sorusunu,
 aşağıdaki katalogdan BİR süreç kartına ya da (uygun kart yoksa) BİR değişkene eşle ve soruda geçen
@@ -17,6 +17,24 @@ yer adını aynen çıkar. Katalogda olmayan kimlik UYDURMA. Yalnızca şu JSON'
  "yer": "<soruda geçen il ya da coğrafi bölge adı; ilçe/kasaba/havza geçiyorsa bağlı olduğu İL adı; yoksa null>",
  "gerekce": "<neden bu kartı/değişkeni seçtiğini lise öğrencisine anlatan tek cümle>"}
 """
+
+
+# Sorudaki mevsim ifadesi -> L3 mevsimi. Sıra önemli: "sonbahar" "bahar"dan önce denenir.
+MEVSIM_KALIPLARI = [
+    ("sonbahar", r"sonbahar"), ("ilkbahar", r"ilkbahar|bahar(?:da|ın|ları)?(?![a-zçğıöşü])"),
+    ("kis", r"kış(?:ın|ları|lar|ta)?(?![a-zçğıöşü])|kis_djf"),
+    ("yaz", r"yaz(?:ın|ları|lar|da|ın)?(?![a-zçğıöşü])|yaz mevsimi"),
+    ("yillik", r"yıllık"),
+]
+
+
+def detect_mevsim(question: str) -> str | None:
+    """Soruda mevsim geçiyorsa L3 mevsim kodu ("kis", "yaz", ...); yoksa None."""
+    q = tr_lower(question)
+    for kod, desen in MEVSIM_KALIPLARI:
+        if re.search(r"(?<![a-zçğıöşü])(?:" + desen + ")", q):
+            return kod
+    return None
 
 
 def _parse_json(text: str) -> dict:
@@ -47,6 +65,7 @@ def plan_question(question: str, kb: KnowledgeBase, client=None,
       belirti, supheliler, fiziksel_test, alternatifler,
       region (data/regions anahtarı), region_level ("il"|"bolge"|"turkiye"), region_bolge (ilin bölgesi),
       region_name, place_matched, needs_region, region_missing,
+      mevsim ("yillik" | "kis" | "ilkbahar" | "yaz" | "sonbahar"; L3 satırı seçimi),
       method ("llm" | "anahtar_kelime"), gerekce, warnings, message
     """
     warnings: list[str] = []
@@ -85,6 +104,13 @@ def plan_question(question: str, kb: KnowledgeBase, client=None,
         plan.update(ok=False, message="Bu soruyu henüz desteklenen bir konuyla eşleştiremedim. "
                                       "Şu konularda soru sorabilirsin: " + ", ".join(topics) + ".")
         return plan
+
+    # Mevsim: soruda geçen > kartın varsayılanı (ör. kar -> kış) > yıllık
+    card = kb.cards.get(plan.get("card_id") or "", {})
+    asked = detect_mevsim(question)
+    plan["mevsim"] = asked or card.get("mevsim") or "yillik"
+    # Kullanıcı mevsimi açıkça sorduysa o mevsim yoksa yıllığa DÜŞÜLMEZ (evidence.py).
+    plan["mevsim_kaynak"] = "soru" if asked else ("kart" if card.get("mevsim") else "varsayilan")
 
     place = kb.resolve_place(choice["yer"], available_regions) if choice["yer"] else None
     if not place or place["region"] is None:

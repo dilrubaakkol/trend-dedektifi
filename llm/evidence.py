@@ -24,10 +24,13 @@ OUTPUTS = REPO / "outputs"
 CATALOG = REPO / "data" / "catalog.yaml"
 
 _TR = str.maketrans("çğıöşüÇĞİÖŞÜâîûÂÎÛ", "cgiosuCGIOSUaiuAIU")
-L3_FIELDS = ["sen_egimi", "ga_alt", "ga_ust", "p_mk", "p_fdr", "anlamli", "anlamli_hucre_orani",
-             "etkin_n", "gereken_yil", "hucre_sayisi"]
-META_FIELDS = ["birim", "donem", "seri", "kademe", "dogrulanmadi", "urun_surumu", "veri_seti_doi",
-               "lisans", "doi"]
+# docs/sozlesmeler.md 2.2 (L3) sütunları
+L3_FIELDS = ["sen_egimi", "ga_alt", "ga_ust", "p_mk", "p_fdr", "anlamli", "etkin_n", "gereken_yil",
+             "mk_yedek", "hucre_sayisi", "anlamli_hucre_orani", "anlamli_artan_orani", "anlamli_azalan_orani",
+             "medyan_hucre_egimi", "donem_baslangic", "donem_bitis"]
+META_FIELDS = ["mevsim", "birim", "egim_birimi", "trend_uyarisi", "not", "kademe", "dogrulanmadi",
+               "urun_surumu", "veri_seti_doi", "lisans", "doi", "bolge_adi", "duzey", "ust_bolge"]
+MEVSIMLER = ("yillik", "kis", "ilkbahar", "yaz", "sonbahar")
 
 
 def norm_key(name: str) -> str:
@@ -60,7 +63,8 @@ def find_package(root: Path | str | None = None) -> Path | None:
 
 def products_of(pkg: Path, degisken: str) -> list[str]:
     """L3'te bu değişken için hangi ürünlerin özeti var (ör. yagis -> ['GLDAS', 'GPM', 'MERRA2'])."""
-    return sorted({p.name.split("__")[1] for p in (pkg / "L3_ozet").glob(f"{degisken}__*__*.csv")})
+    return sorted({p.name.split("__")[1] for p in (pkg / "L3_ozet").glob(f"{degisken}__*__*.csv")
+                   if p.name.split("__")[1] != "kaynak_uyumu"})
 
 
 def provenance(degisken: str, urun_kodu: str, catalog_path: Path = CATALOG) -> dict:
@@ -77,38 +81,65 @@ def provenance(degisken: str, urun_kodu: str, catalog_path: Path = CATALOG) -> d
 
 
 # --------------------------------------------------------------------------- L3
-def _l3_row(pkg: Path, degisken: str, urun: str, region: dict) -> tuple[dict | None, str | None, str]:
-    """Bölgenin L3 satırı. İl için il dosyası (ad eşleşmesi); yoksa ilin bölgesine düşülür.
+def _read_l3(f: Path) -> pd.DataFrame | None:
+    """L3 CSV'si (bolge_kodu metin; boş hücre NaN). Boş ya da bozuk dosyada None.
 
-    Dönen: (satır, kaynak dosya yolu, gerçekte kullanılan bölge düzeyi "il"|"bolge"|"turkiye")
-    """
-    tries = []
+    Sözleşme 2.2 öncesi biçime (bolge_anahtari / duzey / mevsim sütunu olmayan; ör. arayüzün eski yer
+    tutucu paketi) uyum: anahtar addan (bölgede koddan) türetilir, düzey dosya adından, mevsim "yillik"."""
+    if not f.exists():
+        return None
+    try:
+        df = pd.read_csv(f, dtype={"bolge_kodu": str}, encoding="utf-8-sig")
+    except pd.errors.EmptyDataError:
+        return None
+    if df.empty or not ({"bolge_anahtari"} <= set(df.columns) or {"bolge_kodu", "bolge_adi"} <= set(df.columns)):
+        return None
+    if "bolge_anahtari" not in df.columns:
+        kod = df["bolge_kodu"].astype(str)
+        df["bolge_anahtari"] = [norm_key(k) if not k.strip().isdigit() else norm_key(a)
+                                for k, a in zip(kod, df["bolge_adi"])]
+    if "duzey" not in df.columns:
+        il_dosyasi = f.stem.endswith("__il")
+        df["duzey"] = ["il" if il_dosyasi else ("ulke" if k == "turkiye" else "bolge")
+                       for k in df["bolge_anahtari"]]
+    if "mevsim" not in df.columns:
+        df["mevsim"] = "yillik"
+    return df
+
+
+def _levels(region: dict) -> list[tuple[str, str, str]]:
+    """Denenecek (dosya düzeyi, satır düzeyi, anahtar) sırası: il -> ilin bölgesi -> Türkiye.
+    Türkiye satırı bölge dosyasında `duzey = ulke` olarak durur (sözleşme 2.2)."""
+    out = []
     if region["level"] == "il":
-        tries += [("il", region["key"]), ("bolge", region.get("bolge"))]
+        out.append(("il", "il", region["key"]))
+        if region.get("bolge"):
+            out.append(("bolge", "bolge", region["bolge"]))
     elif region["level"] == "bolge":
-        tries += [("bolge", region["key"])]
-    else:
-        tries += [("bolge", "turkiye")]
-    for level, key in tries:
-        if not key:
+        out.append(("bolge", "bolge", region["key"]))
+    out.append(("bolge", "ulke", "turkiye"))
+    return out
+
+
+def _l3_row(pkg: Path, stem: str, region: dict, mevsim: str) -> tuple[dict | None, str | None, str]:
+    """Bölge × mevsim satırı. `stem`: "<degisken>__<urun>" ya da "<degisken>__kaynak_uyumu".
+    Dönen: (satır, paket köküne göreli dosya yolu, kullanılan düzey "il"|"bolge"|"turkiye")."""
+    for file_level, row_level, key in _levels(region):
+        f = pkg / "L3_ozet" / f"{stem}__{file_level}.csv"
+        df = _read_l3(f)
+        if df is None:
             continue
-        f = pkg / "L3_ozet" / f"{degisken}__{urun}__{'il' if level == 'il' else 'bolge'}.csv"
-        if not f.exists():
-            continue
-        try:
-            df = pd.read_csv(f, dtype={"bolge_kodu": str}, encoding="utf-8-sig")
-        except pd.errors.EmptyDataError:   # boş özet dosyası: bu düzeyi atla
-            continue
-        if df.empty or not {"bolge_kodu", "bolge_adi"} <= set(df.columns):
-            continue
-        hit = df[(df["bolge_kodu"].map(norm_key) == key) | (df["bolge_adi"].map(norm_key) == key)]
+        hit = df[(df["bolge_anahtari"].map(norm_key) == key) & (df["duzey"].astype(str) == row_level)
+                 & (df["mevsim"] == mevsim)]
         if len(hit):
-            return hit.iloc[0].to_dict(), f.relative_to(pkg).as_posix(), "turkiye" if key == "turkiye" else level
+            level = "turkiye" if row_level == "ulke" else row_level
+            return hit.iloc[0].to_dict(), f.relative_to(pkg).as_posix(), level
     return None, None, region["level"]
 
 
 def trend_label(row: dict) -> str:
-    """İşaret + anlamlılık bayrağı -> etiket (hesap değil, sınıflandırma)."""
+    """İşaret + anlamlılık bayrağı -> etiket (hesap değil, sınıflandırma). `anlamli` sözleşme 2.1
+    kuralıyla Kişi 2 tarafından belirlenir (p_fdr ≤ 0,10 ve GA sıfırı dışlıyor)."""
     s, a = _num(row.get("sen_egimi")), _num(row.get("anlamli"))
     if s is None or a is None or a < 0:
         return "yetersiz"
@@ -117,33 +148,54 @@ def trend_label(row: dict) -> str:
     return "anlamsiz"
 
 
-def _trend_evidence(pkg, degisken, urun, region) -> dict | None:
-    row, path, level = _l3_row(pkg, degisken, urun, region)
+def _suffix(mevsim: str) -> str:
+    return "" if mevsim == "yillik" else f"__{mevsim}"
+
+
+def _meta(row: dict, keys) -> dict:
+    return {k: (None if pd.isna(row.get(k)) or row.get(k) == "" else row.get(k)) for k in keys if k in row}
+
+
+def _trend_evidence(pkg, degisken, urun, region, mevsim) -> dict | None:
+    row, path, level = _l3_row(pkg, f"{degisken}__{urun}", region, mevsim)
     if row is None:
         return None
-    e = {"id": f"trend__{degisken}__{urun}", "type": "trend", "variable": degisken, "product": urun,
-         "region_level": level, "region_name": row.get("bolge_adi"), "file": path,
+    e = {"id": f"trend__{degisken}__{urun}{_suffix(mevsim)}", "type": "trend", "variable": degisken,
+         "product": urun, "region_level": level, "region_name": row.get("bolge_adi"), "file": path,
          "label": trend_label(row)}
     e.update({k: _num(row.get(k)) for k in L3_FIELDS})
-    e.update({k: (None if pd.isna(row.get(k)) else row.get(k)) for k in META_FIELDS if k in row})
-    e["dogrulanmadi"] = str(e.get("dogrulanmadi", "")).strip().lower() == "evet"
+    e.update(_meta(row, META_FIELDS))
+    if e.get("donem_baslangic") is not None and e.get("donem_bitis") is not None:
+        e["donem"] = f"{int(e['donem_baslangic'])}–{int(e['donem_bitis'])}"
+    e["dogrulanmadi"] = str(row.get("dogrulanmadi", "")).strip().lower() == "evet"
     e["provenance"] = provenance(degisken, urun)
     return e
 
 
-def _agreement(trends: list[dict], degisken: str) -> dict | None:
-    """Aynı değişkenin ürünleri arasında yön uyumu: k ürün aynı yönde anlamlı / m ürünün verisi var."""
+def _agreement(pkg: Path, trends: list[dict], degisken: str, region: dict, mevsim: str) -> dict | None:
+    """Ürünler arası yön uyumu. Önce Kişi 2'nin L3 kaynak uyumu dosyası (ortak döneme kırpılmış,
+    sözleşme 2.2); yoksa elimizdeki trend satırlarının etiket SAYIMI (yedek, farklı dönemler olabilir)."""
+    row, path, level = _l3_row(pkg, f"{degisken}__kaynak_uyumu", region, mevsim)
+    if row is not None and _num(row.get("m")) is not None:
+        k, m = int(_num(row["k"]) or 0), int(_num(row["m"]))
+        if m < 1:
+            return None
+        return {"id": f"uyum__{degisken}{_suffix(mevsim)}", "type": "kaynak_uyumu", "variable": degisken,
+                "k": k, "m": m, "isaret_uyumu": _num(row.get("isaret_uyumu")),
+                "urunler": [u.strip() for u in str(row.get("urunler", "")).split(",") if u.strip()],
+                "ortak_donem": row.get("ortak_donem"), "mevsim": mevsim, "region_level": level,
+                "label": "uyumlu" if k == m else ("kismen" if k > 0 else "uyumsuz"),
+                "kapsam": "bölge ortalaması serileri, ortak dönem", "file": path}
     usable = [t for t in trends if t["variable"] == degisken and t.get("sen_egimi") is not None]
     if len(usable) < 2:
         return None
     up = sum(t["label"] == "anlamli_artis" for t in usable)
     down = sum(t["label"] == "anlamli_azalis" for t in usable)
     k, m = max(up, down), len(usable)
-    return {"id": f"uyum__{degisken}", "type": "kaynak_uyumu", "variable": degisken,
-            "k": k, "m": m, "yon": "artis" if up >= down else "azalis",
-            "urunler": [t["product"] for t in usable],
+    return {"id": f"uyum__{degisken}{_suffix(mevsim)}", "type": "kaynak_uyumu", "variable": degisken,
+            "k": k, "m": m, "urunler": [t["product"] for t in usable], "mevsim": mevsim,
             "label": "uyumlu" if k == m else ("kismen" if k > 0 else "uyumsuz"),
-            "kapsam": "bölge ortalaması (L3) üzerinden"}
+            "kapsam": "ürün satırlarının sayımı (kaynak uyumu dosyası yok; dönemler farklı olabilir)"}
 
 
 # --------------------------------------------------------------------------- L4
@@ -241,6 +293,8 @@ def collect_evidence(plan: dict, pkg: Path | str | None = None) -> dict:
         out["warnings"].append("Analiz paketi (L3) bulunamadı; önce istatistik çıktıları üretilmeli.")
         return out
 
+    mevsim = plan.get("mevsim") or "yillik"
+    out["mevsim"] = mevsim
     targets = {b["degisken"] for b in plan.get("belirti", [])}
     variables = targets | {s["degisken"] for s in plan.get("supheliler", [])}
     trends = []
@@ -249,12 +303,18 @@ def collect_evidence(plan: dict, pkg: Path | str | None = None) -> dict:
         if not prods:
             out["warnings"].append(f"{v} için L3 özeti yok.")
         for u in prods:
-            e = _trend_evidence(pkg, v, u, region)
+            e = _trend_evidence(pkg, v, u, region, mevsim)
+            if e is None and mevsim != "yillik" and plan.get("mevsim_kaynak") != "soru":
+                e = _trend_evidence(pkg, v, u, region, "yillik")   # kartın varsayılan mevsimi yoksa
+                if e:
+                    out["warnings"].append(f"{v} ({u}): {mevsim} satırı yok, yıllık sonuç kullanıldı.")
+            elif e is None and plan.get("mevsim_kaynak") == "soru":
+                out["warnings"].append(f"{v} ({u}): istenen mevsim ({mevsim}) için L3 satırı yok.")
             if e:
                 trends.append(e)
     out["analyses"] += trends
-    for v in variables:
-        a = _agreement(trends, v)
+    for v in sorted(variables):
+        a = _agreement(pkg, trends, v, region, mevsim)
         if a:
             out["analyses"].append(a)
     rel = _relation_evidence(pkg, variables, targets, region)
@@ -266,6 +326,6 @@ def collect_evidence(plan: dict, pkg: Path | str | None = None) -> dict:
                                "sonucu kullanıldı: " + "; ".join(fell) + ".")
     if trends and any(t["region_level"] != region["level"] for t in trends):
         out["warnings"].append("Bazı değişkenlerde il özeti yok; bağlı olduğu bölgenin sonucu kullanıldı.")
-    donemler = {t.get("donem") for t in trends if t.get("donem")}
-    out["period"] = sorted(donemler)[0] if len(donemler) == 1 else (sorted(donemler) or None)
+    donemler = sorted({t.get("donem") for t in trends if t.get("donem")})
+    out["period"] = donemler[0] if len(donemler) == 1 else (donemler or None)
     return out
