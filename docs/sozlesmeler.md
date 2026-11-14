@@ -342,6 +342,9 @@ dosyaları.
 
 > Kişi 3 doldurdu (2026-11-14). Çift listesi ekip belgesindeki ("Veri Ürünü Tanımı") 6 çifttir; ek çift
 > yok. Kış = Aralık (Y−1) + Ocak + Şubat (Y); Mart dahil değil.
+> **Güncelleme (2026-11-15, genel ilişki motoru):** Çift tanımları koddan `physics/ciftler.yaml` dosyasına
+> taşındı (şema aşağıda, "Çift ayar dosyası"). 6 çiftin `ciftler.csv` ve harita çıktısı birebir aynı kaldı.
+> Tek çift komutu `python -m physics.iliski` eklendi; çıktısı `L4_iliski/ozel/` altına gider.
 
 **Dosyalar** (paket kökü altında):
 
@@ -379,7 +382,7 @@ Ayrı bir `iliski_iller.csv` dosyası yoktur; il satırları `ciftler.csv` için
 | --- | --- |
 | `cift_no`, `cift`, `degisken_1`, `degisken_2`, `seri` | Yukarıdaki tablo |
 | `gecikme_ay` | Çift 3'te 1 ya da 2; ötekilerde 0 |
-| `beklenen_yon` | `+` ya da `-` |
+| `beklenen_yon` | `+` ya da `-` (ciftler.yaml'da beklentisiz çift için `0`; o zaman anlamlı satırın `etiket`'i boştur) |
 | `bolge_turu` | `il`, `bolge` ya da `turkiye` |
 | `bolge_kodu`, `bolge_adi` | L3 ile aynı: il plakası / bölge anahtarı (`dogu_anadolu`), Türkçe ad |
 | `hucre_sayisi` | Bölge serisine giren 0,25° hücre sayısı (çift 1'de kar maskesinden sonra) |
@@ -412,3 +415,49 @@ attrs: ortak alanlar, ayrıca `cift`, `cift_no`, `seri`, `gecikme_ay`, `beklenen
 - **Anlamlılık eşikleri:**
   - Haritalar ve il satırları: FDR (α_FDR = 0,10). Bu, belgedeki ve L2'deki eşikle aynıdır.
   - Bölge ve Türkiye satırları: p < 0,05. Bu satırlar az sayıda olduğu için çoklu test düzeltmesi yapılmaz.
+
+**Çift ayar dosyası `physics/ciftler.yaml`** (2026-11-15). `physics.run` çiftleri yalnız bu dosyadan okur;
+yeni çift = yeni bir madde (`python -m physics.run --ciftler <yaml>` ile başka bir dosya da verilebilir).
+
+| Alan | Zorunlu | Anlam |
+| --- | --- | --- |
+| `no` | evet | `cift_no`; dosyada benzersiz |
+| `ad` | hayır | Kısa Türkçe ad (ekran ve belge için) |
+| `x`, `y` | evet | `{degisken, urun}` → `L1_kup/<degisken>__<urun>.nc`. `degisken_1 = x`, `degisken_2 = y` |
+| `mevsim` | evet | `yillik`, `kis`, `ilkbahar`, `yaz`, `sonbahar` (yılda bir değer), `mevsimlik` (→ `seri = mevsim_anomali`), `aylik` (→ `aylik_anomali`) |
+| `aylar` | hayır | Yalnız `aylik`: y'nin kullanılan ayları. `[4..9]` → `seri = aylik_anomali_nis_eyl` |
+| `gecikme_ay` | hayır | Sayı ya da liste (varsayılan 0). x, y'den bu kadar ay önce alınır; her gecikme ayrı satır ve (birden çoksa) ayrı harita |
+| `beklenen` | evet | `"+"`, `"-"` ya da `"0"` (beklenti yok; `harita: false` olmalı) |
+| `kademe` | evet | 1 ya da 2 |
+| `harita` | hayır | `iliski__*.nc` üretilsin mi (varsayılan `true`) |
+| `fiziksel_gerekce` | hayır | Beklenen ilişkinin bir cümlelik açıklaması ("ilişki" dili; nedensellik iddiası değil) |
+| `not` | hayır | `not` sütununa her satırda yazılır |
+| `kar_maskesi_esik` | hayır | Kış ortalaması kar örtüsü bu yüzdenin altındaki hücreler dışarıda (x ya da y `kar_ortusu` olmalı) |
+| `etiket_notlari` | hayır | `{beklenen_yonde, ters_yonde, anlamsiz: metin}`: etikete göre ek not (çift 5). Yoksa `ters_yonde` satırına genel "incelenmeli" notu |
+| `kalite_kontrolu` | hayır | `true`: güçlü ilişki çıkmazsa "veri sorunu olabilir" notu (çift 6) |
+
+Ayrıca dosyanın başında `urun_onceligi: {degisken: [urun, …]}` durur; tek çift komutunda ürün verilmezse
+bu sıra (Kademe 1 ana ürünü önce) kullanılır. Değişkene bağlı kurallar kodda kalır: GRACE yıllık ortalaması
+için en az 9 ay, birikimli değişkenlerde mevsim toplamı.
+
+**Tek çift çıktısı `L4_iliski/ozel/`** (`python -m physics.iliski … --kaydet`). Yayın paketinin sabit
+parçası değildir; kullanıcının istediği çift için üretilir.
+
+| Yol | İçerik |
+| --- | --- |
+| `L4_iliski/ozel/<x>__<y>__<bolge>__<mevsim>[__gecikmeN].csv` | `<bolge>`: il/bölge anahtarı (`erzurum`, `dogu_anadolu`), `turkiye`, `tum_iller` ya da `tum_bolgeler`. `__gecikmeN` yalnız gecikme > 0 iken eklenir (aynı seçimin farklı gecikmesi üzerine yazılmasın) |
+
+Sütunlar: yukarıdaki `ciftler.csv` sütunları, sonra şu ekler.
+
+| Sütun | Anlam |
+| --- | --- |
+| `r_ham`, `p_ham` | Trend **çıkarılmadan** korelasyon ve p (aynı etkin n yöntemi). `r` ile farkı büyükse ortak trend ilişkiyi şişiriyor (sahte korelasyon) ya da gizliyor demektir; yorum `r` ile yapılır |
+| `egim_x_10yil`, `egim_y_10yil` | İki bölge serisinin doğrusal eğimi (birim / 10 yıl) |
+| `yon` | `pozitif` / `negatif` (`r`'nin işareti) |
+| `uyari` | L1 `bilinen_sorunlar` / `trend_uyarisi`, Kademe 2 ve ortak trend uyarıları (` \| ` ile ayrılmış) |
+
+Yöntem `ciftler.csv` ile aynıdır. `cift_no` 0 ise seçim ciftler.yaml'daki bir çifte karşılık gelmez; karşılık
+geliyorsa o çiftin numarası ve ayarları (kar maskesi, aylar, notlar) kullanılır. Anlamlılık: `tum_iller`'de
+81 il üzerinde BH-FDR (`p_fdr ≤ 0,10`); tek il, bölge ve Türkiye satırında `p < 0,05` (`p_fdr` boş).
+Beklenen yön verilmezse anlamlı satırın `etiket`'i boştur. GRACE (`toplam_su_depolama`) il için hesaplanmaz.
+

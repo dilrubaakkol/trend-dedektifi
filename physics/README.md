@@ -1,0 +1,41 @@
+# physics/ — L4 ilişki motoru (Kişi 3)
+
+İki değişkenin yıldan yıla **birlikte değişip değişmediğini** ölçer ve fiziğin beklediği yönle
+karşılaştırır. Sonuç bir **ilişkidir**, nedensellik iddiası taşımaz. Yalnız yerel L1 paketi okunur.
+
+Yöntem (her iki komutta aynı): bölgenin cos(enlem) ağırlıklı alan ortalaması → mevsim döngüsü dışarıda
+kalan seri (yılda bir mevsim değeri ya da aylık anomali) → iki seriden doğrusal trend çıkarılır →
+Pearson r → Bretherton vd. (1999) etkin n ile p → 81 il için BH-FDR (α = 0,10), bölge ve Türkiye için
+p < 0,05 → etiket `beklenen_yonde` / `ters_yonde` / `anlamsiz`.
+
+| Dosya | İş |
+| --- | --- |
+| `ciftler.yaml` | Çiftlerin tanımı (şema: `docs/sozlesmeler.md` 2.3). Yeni çift = yeni madde |
+| `ciftler.py` | YAML'ı okur, çiftin serilerini hazırlar |
+| `seriler.py` | Mevsim, yıllık, mevsim anomalisi, aylık anomali, gecikme |
+| `iliski.py` | Tek seri hesabı (trend çıkarma, r, etkin n, p, FDR); `python -m physics.iliski` girişi |
+| `tablo.py`, `harita.py` | İl/bölge tablosu ve hücre haritası |
+| `run.py` | Bütün çiftler → `L4_iliski/` |
+| `tek_cift.py` | Tek çift komutu → ekran / JSON / `L4_iliski/ozel/` |
+
+## Komutlar
+
+```bash
+# 1) ciftler.yaml'daki bütün çiftler → outputs/trend-dedektifi-turkiye-v0.1/L4_iliski/
+python -m physics.run --surum v0.1
+
+# 2) Tek il, tek mevsim: kış sıcaklığı ile kar örtüsü, Erzurum (~1 sn)
+python -m physics.iliski --x sicaklik_2m --y kar_ortusu --bolge Erzurum --mevsim kis --beklenen -
+
+# 3) 81 il birden, FDR ile; yağış 1 ay önce, ilkbahar NDVI; CSV'ye de yaz (~5 sn)
+python -m physics.iliski --x yagis --y ndvi --bolge tum_iller --mevsim ilkbahar --gecikme 1 --beklenen + --kaydet
+```
+
+`--bolge`: il adı ya da plaka (`Elazığ`, `23`), bölge (`Doğu Anadolu`), `turkiye`, `tum_iller`,
+`tum_bolgeler`. `--mevsim`: `yillik`, `kis`, `ilkbahar`, `yaz`, `sonbahar`, `mevsimlik`, `aylik`.
+Ürün verilmezse Kademe 1 öncelikli ürün seçilir ve ekranda yazılır (`--urun-x`, `--urun-y` ile değişir).
+`--json` makine okunur çıktı verir. Yanlış yazılan değişken, ürün ya da il için mevcut seçenekler listelenir.
+
+Ekrandaki **ham r** trendi çıkarmadan, **r (trendsiz)** trendi çıkararak hesaplanır. İkisi çok farklıysa
+iki serinin aynı dönemdeki trendi ilişkiyi şişiriyor (sahte korelasyon) ya da gizliyor demektir; yorum
+trendsiz r ile yapılır ve komut bunu uyarı olarak yazar.
