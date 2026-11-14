@@ -1,3 +1,5 @@
+# YOL HARİTASI (2026-11-14): v0.1 kapsamında kullanılmıyor (bkz. physics/KISI3_PLAN.md, bölüm 2).
+# Kod ve testleri ileride kullanılmak üzere duruyor; silmeyin.
 """İşaret değiştiren sınır: bir eksen (rakım, enlem, boylam) boyunca trendin yön değiştirdiği yer.
 
 Sade anlatım: pikseller eksen boyunca dilimlere ayrılır (ör. 100 m'lik rakım basamakları), her

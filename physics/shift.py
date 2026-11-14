@@ -1,3 +1,5 @@
+# YOL HARİTASI (2026-11-14): v0.1 kapsamında kullanılmıyor (bkz. physics/KISI3_PLAN.md, bölüm 2).
+# Kod ve testleri ileride kullanılmak üzere duruyor; silmeyin.
 """Sınır kayması: kar çizgisinin yıllar içinde kaç metre yükseldiği (KISI3_PLAN.md, Adım 6).
 
 Sade anlatım: her kış, bölgedeki pikseller 100 m'lik rakım basamaklarına ayrılır ve her

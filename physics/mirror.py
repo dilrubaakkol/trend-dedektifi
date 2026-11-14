@@ -1,3 +1,5 @@
+# YOL HARİTASI (2026-11-14): v0.1 kapsamında kullanılmıyor (bkz. physics/KISI3_PLAN.md, bölüm 2).
+# Kod ve testleri ileride kullanılmak üzere duruyor; silmeyin.
 """Ayna bölgeler: aynı süreç, farklı yerlerde zıt yönlü trend.
 
 Sade anlatım: anlamlı trendi olan pikseller "artan" ve "azalan" diye ayrılır, yan yana
