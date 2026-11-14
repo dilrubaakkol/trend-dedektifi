@@ -80,6 +80,16 @@ CREATE TABLE dbo.trend_bolgeler (
 );
 GO
 
+-- Uyarı rozetleri için L3 alanları (sözleşme 2.2); eski kurulumlara da eklenir.
+IF COL_LENGTH('dbo.trend_iller', 'trend_uyarisi') IS NULL
+ALTER TABLE dbo.trend_iller ADD p_fdr FLOAT NULL, anlamli SMALLINT NULL, etkin_n FLOAT NULL,
+    trend_uyarisi NVARCHAR(600) NULL, dogrulanmadi NVARCHAR(10) NULL, kademe TINYINT NULL, [not] NVARCHAR(200) NULL;
+GO
+IF COL_LENGTH('dbo.trend_bolgeler', 'trend_uyarisi') IS NULL
+ALTER TABLE dbo.trend_bolgeler ADD p_fdr FLOAT NULL, anlamli SMALLINT NULL, etkin_n FLOAT NULL,
+    trend_uyarisi NVARCHAR(600) NULL, dogrulanmadi NVARCHAR(10) NULL, kademe TINYINT NULL, [not] NVARCHAR(200) NULL;
+GO
+
 -- Eski taslak tablo (iliski_iller) sözleşme 2.3 ile ciftler oldu; yalnız yer tutucu veri taşıyordu.
 IF OBJECT_ID('dbo.iliski_iller') IS NOT NULL DROP TABLE dbo.iliski_iller;
 GO

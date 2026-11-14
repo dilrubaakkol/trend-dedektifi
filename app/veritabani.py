@@ -23,10 +23,11 @@ import urun_io as U
 DB_NAME = os.environ.get("TD_MSSQL_DB", "TrendDedektifi")
 SERVER = os.environ.get("TD_MSSQL_SERVER", "localhost")
 DRIVER = os.environ.get("TD_MSSQL_DRIVER", "ODBC Driver 18 for SQL Server")
-TABLES = {"il": ("trend_iller", U.TREND_COLS), "bolge": ("trend_bolgeler", None), "iliski": ("ciftler", U.CIFTLER_COLS)}
+TABLES = {"il": ("trend_iller", U.TREND_COLS + U.EXTRA_COLS), "bolge": ("trend_bolgeler", None),
+          "iliski": ("ciftler", U.CIFTLER_COLS)}
 # pandas, pyodbc bağlantısını SQLAlchemy olmadığı için uyarıyla kabul ediyor; okuma doğru çalışır.
 warnings.filterwarnings("ignore", message="pandas only supports SQLAlchemy")
-BOLGE_COLS = ["bolge"] + [c for c in U.TREND_COLS if c not in ("il", "plaka", "bolge")]
+BOLGE_COLS = ["bolge"] + [c for c in U.TREND_COLS if c not in ("il", "plaka", "bolge")] + U.EXTRA_COLS
 
 
 def conn_str(database: str | None = "") -> str:
@@ -87,7 +88,7 @@ def load_tables() -> dict | None:
                 return None
             placeholder |= bool(df["yer_tutucu"].astype(bool).any())
             cols = cols or BOLGE_COLS
-            df = df[cols].copy()
+            df = df[[c for c in cols if c in df.columns]].copy()  # eski şemada ek sütunlar olmayabilir
             for c in ("belirsiz", "anlamli_fdr"):
                 if c in df:
                     df[c] = df[c].astype("Int64").fillna(0).astype(int)
@@ -98,6 +99,8 @@ def load_tables() -> dict | None:
                 for c in ("etiket", "not", "dogrulanmadi"):
                     df[c] = df[c].fillna("")
                 df["beklenen_yon"] = df["beklenen_yon"].map(U.norm_sign)
+            else:  # trend: uyarı sütunları ve L1 ürün kodları
+                df = U.ensure_trend_cols(df)
             out[key] = df
     src = {"trend_iller.csv": None, "trend_bolgeler.csv": None, "ciftler.csv": None} if placeholder else \
         {"trend_iller.csv": f"mssql:{DB_NAME}.dbo.trend_iller", "trend_bolgeler.csv": f"mssql:{DB_NAME}.dbo.trend_bolgeler",
@@ -114,7 +117,7 @@ def replace_tables(tables: dict, version: str = U.VERSION) -> dict:
         cur.fast_executemany = True
         for key, (table, cols) in TABLES.items():
             cols = cols or BOLGE_COLS
-            df = tables[key][cols].copy()
+            df = tables[key].reindex(columns=cols).copy()
             df = df.astype(object).where(pd.notna(df), None)
             df["veri_surumu"], df["yer_tutucu"] = version, ph
             names = list(df.columns)

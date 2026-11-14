@@ -1,9 +1,14 @@
 """Yayımlanan veri setinin (Katman 1–4) dosyalarını bulan, okuyan ve paketleyen yardımcılar.
 
-Site yeni hesap yapmaz: tablolar `trend_iller.csv`, `trend_bolgeler.csv` ve `L4_iliski/ciftler.csv`
-(sözleşme 2.3) dosyalarından okunur (sütunlar: ekip belgesi "Dosyalar ve tablo sütunları"). Bu dosyalar henüz
-üretilmediyse ekran akışını göstermek için **SENTETİK YER TUTUCU** tablolar üretilir; bu tablolar
-her yerde işaretlenir ve indirilen dosya adı `YER_TUTUCU_` ile başlar.
+Site yeni hesap yapmaz: trendler `L3_ozet/<degisken>__<urun>__{il,bolge}.csv` (sözleşme 2.2), ilişkiler
+`L4_iliski/ciftler.csv` (sözleşme 2.3) dosyalarından okunur. Paket kökü: `TD_PAKET` ortam değişkeni, sonra
+`outputs/trend-dedektifi-turkiye-<surum>/`. Dosyalar henüz yoksa ekran akışını göstermek için
+**SENTETİK YER TUTUCU** tablolar üretilir; bunlar her yerde işaretlenir ve indirilen dosya adı `YER_TUTUCU_`
+ile başlar.
+
+İç tablo biçimi: L3 sütunlarının hepsi korunur, üstüne ekranın kullandığı kısa adlar eklenir
+(`il`, `plaka`, `bolge`, `egim_10yil`, `ci_alt`, `ci_ust`, `anlamli_fdr`, ...). Ürün adları L1 dosya
+kodlarıdır (`MERRA2`, `GPM`, `GLDAS`, ...).
 """
 
 from __future__ import annotations
@@ -11,6 +16,7 @@ from __future__ import annotations
 import io
 import json
 import math
+import os
 import unicodedata
 import zipfile
 from datetime import date
@@ -36,18 +42,24 @@ except Exception:  # noqa: BLE001
     VERI_SETI_DOI = "(yayında doldurulacak)"
     KADEME_1 = set()
 
-# Yayın klasörü (python -m data.export) ve ekip içi yol önerisi (cache/urun/L2_anomali/ vb.).
-SEARCH_DIRS = [ROOT / "outputs" / f"trend-dedektifi-turkiye-{VERSION}", ROOT / "cache" / "urun"]
+# Yayın paketi (python -m data.export / stats.l2 / stats.l3 / physics.run) kökleri, öncelik sırasıyla.
+SEARCH_DIRS = [ROOT / "outputs" / f"trend-dedektifi-turkiye-{VERSION}"]
 LAYERS = [
     ("L1_kup", "1 · Uyumlaştırılmış küp", "Her değişken: Türkiye, ortak 0,25° ızgara, aylık, ortak birim, ülke maskesi",
      "<degisken>__<urun>.nc", "Kişi 1"),
-    ("L2_anomali", "2 · Anomali ve mevsim serileri", "12 aylık klimatoloji, aylık anomali, yıllık ve 4 mevsim ortalaması",
-     "<degisken>__<urun>__anomali.nc", "Kişi 2"),
-    ("L3_trend", "3 · Trend ürünleri", "Hücre trend haritası; il ve bölge trend tabloları; kaynaklar arası uyum",
-     "trend_iller.csv · trend_bolgeler.csv · <degisken>__<urun>__trend.nc", "Kişi 2"),
+    ("L2_trend", "2 · Hücre trendleri", "Her 0,25° hücre ve 5 mevsim için Sen eğimi, Hamed-Rao MK, FDR",
+     "<degisken>__<urun>__trend.nc", "Kişi 2"),
+    ("L3_ozet", "3 · İl ve bölge özetleri", "81 il, 7 bölge ve Türkiye için alan ortalaması trendi; kaynak uyumu",
+     "<degisken>__<urun>__il.csv · __bolge.csv · <degisken>__kaynak_uyumu__*.csv", "Kişi 2"),
     ("L4_iliski", "4 · İlişkiler", "6 değişken çiftinin ilişkisi ve fizik kontrolü",
      "ciftler.csv · iliski__<d1>__<d2>.nc", "Kişi 3"),
 ]
+
+
+def package_dirs() -> list[Path]:
+    """Paket kökleri: önce TD_PAKET (LLM katmanıyla aynı değişken), sonra SEARCH_DIRS."""
+    env = os.environ.get("TD_PAKET")
+    return ([Path(env)] if env else []) + list(SEARCH_DIRS)
 
 TREND_COLS = ["il", "plaka", "bolge", "degisken", "urun", "mevsim", "donem", "n_yil", "n_hucre", "egim_10yil",
               "ci_alt", "ci_ust", "birim", "p_mk", "p_mk_kontrol", "p_ttest", "belirsiz", "anlamli_fdr",
@@ -57,19 +69,38 @@ CIFTLER_COLS = ["cift_no", "cift", "degisken_1", "degisken_2", "seri", "gecikme_
                 "bolge_kodu", "bolge_adi", "hucre_sayisi", "donem", "n", "r", "r1_1", "r1_2", "etkin_n", "p", "p_fdr",
                 "anlamli", "etiket", "not", "urun_surumu", "veri_seti_doi", "lisans", "kademe", "dogrulanmadi",
                 "doi_1", "doi_2"]
+# L3_ozet il/bölge CSV sütunları (docs/sozlesmeler.md 2.2; stats/l3.py L3_COLS ile aynı sıra).
+L3_COLS = ["bolge_kodu", "bolge_anahtari", "bolge_adi", "duzey", "ust_bolge", "mevsim", "hucre_sayisi",
+           "sen_egimi", "ga_alt", "ga_ust", "p_mk", "p_fdr", "anlamli", "etkin_n", "gereken_yil", "mk_yedek",
+           "anlamli_hucre_orani", "anlamli_artan_orani", "anlamli_azalan_orani", "medyan_hucre_egimi",
+           "birim", "egim_birimi", "donem_baslangic", "donem_bitis", "trend_uyarisi", "not",
+           "kademe", "dogrulanmadi", "urun_surumu", "veri_seti_doi", "lisans", "doi"]
+# Ekranın her kaynakta (L3, sentetik, veri tabanı) bulduğu ek sütunlar: uyarı rozetleri bunlardan çıkar.
+EXTRA_COLS = ["p_fdr", "anlamli", "etkin_n", "trend_uyarisi", "dogrulanmadi", "kademe", "not"]
+TEXT_COLS = ("trend_uyarisi", "dogrulanmadi", "not", "kaynak_uyumu")
 SEASONS = {"yillik": "Yıllık", "kis": "Kış", "ilkbahar": "İlkbahar", "yaz": "Yaz", "sonbahar": "Sonbahar"}
 ALPHA_FDR = 0.10
 
-# Kademe 1 değişkenleri: (değişken, ürünler [ana ürün ilk], birim). Ekip belgesindeki tabloyla aynı.
+# Kademe 1 değişkenleri: (değişken, L1 ürün kodları [ana ürün ilk], birim). data/export.py KADEME_1 ile aynı.
 TIER1 = [
-    ("sicaklik_2m", ["M2TMNXSLV", "GLDAS_NOAH025_M"], "°C"),
-    ("yagis", ["GPM_3IMERGM", "GLDAS_NOAH025_M", "M2TMNXFLX"], "mm"),
-    ("toprak_nemi", ["GLDAS_NOAH025_M"], "kg/m²"),
+    ("sicaklik_2m", ["MERRA2", "GLDAS"], "°C"),
+    ("yagis", ["GPM", "GLDAS", "MERRA2"], "mm"),
+    ("toprak_nemi", ["GLDAS"], "kg/m²"),
     ("kar_ortusu", ["MOD10CM"], "%"),
-    ("kar_su_esdegeri", ["GLDAS_NOAH025_M"], "mm"),
+    ("kar_su_esdegeri", ["GLDAS"], "mm"),
     ("ndvi", ["MOD13C2"], ""),
-    ("toplam_su_depolama", ["TELLUS_GRAC-GRFO_MASCON_CRI_GRID_RL06.3_V4"], "cm"),
+    ("toplam_su_depolama", ["GRACE"], "cm"),
 ]
+# (değişken, L1 kodu) → NASA kısa adı (data/catalog.yaml short_name; atıf ve DOI için)
+NASA_SHORT = {("sicaklik_2m", "MERRA2"): "M2TMNXSLV", ("yagis", "MERRA2"): "M2TMNXFLX", ("yagis", "GPM"): "GPM_3IMERGM",
+              ("kar_ortusu", "MOD10CM"): "MOD10CM", ("ndvi", "MOD13C2"): "MOD13C2",
+              ("toplam_su_depolama", "GRACE"): "TELLUS_GRAC-GRFO_MASCON_CRI_GRID_RL06.3_V4"}
+for _v, _prods, _ in TIER1:
+    if "GLDAS" in _prods:
+        NASA_SHORT[(_v, "GLDAS")] = "GLDAS_NOAH025_M"
+# Eski sürüm (veri tabanındaki eski satırlar): NASA kısa adı → L1 kodu
+FILE_CODE = {"M2TMNXSLV": "MERRA2", "M2TMNXFLX": "MERRA2", "GLDAS_NOAH025_M": "GLDAS", "GPM_3IMERGM": "GPM",
+             "MOD10CM": "MOD10CM", "MOD13C2": "MOD13C2", "TELLUS_GRAC-GRFO_MASCON_CRI_GRID_RL06.3_V4": "GRACE"}
 PAIRS = [  # (no, d1, d2, seri, gecikmeler, beklenen yön, mekanizma, kademe) — sözleşme 2.3
     (1, "sicaklik_2m", "kar_ortusu", "kis_DJF", [0], "-", "Sıcak kışta kar azalır", 1),
     (2, "yagis", "toprak_nemi", "mevsim_anomali", [0], "+", "Yağış toprağı besler", 1),
@@ -341,12 +372,132 @@ def control_label(r: float, expected: str, significant: int) -> str:
 
 # ------------------------------------------------------------------ gerçek dosyalar
 def find_file(layer: str, name: str) -> Path | None:
-    """Önce yayın klasöründe, sonra ekip içi `cache/urun/` altında dosyayı arar."""
-    for base in SEARCH_DIRS:
+    """Paket köklerinde (`package_dirs`) `<katman>/<ad>` dosyasını arar."""
+    for base in package_dirs():
         p = base / layer / name
         if p.exists():
             return p
     return None
+
+
+def _is_trend_file(p: Path) -> bool:
+    """`<degisken>__<urun>__{il,bolge}.csv` mi? (kaynak uyumu ve ICINDEKILER hariç)"""
+    parts = p.stem.split("__")
+    return len(parts) == 3 and parts[1] != "kaynak_uyumu" and parts[2] in ("il", "bolge")
+
+
+def l3_dir() -> Path | None:
+    """İçinde en az bir il trend dosyası olan ilk `L3_ozet/` klasörü."""
+    for base in package_dirs():
+        d = base / "L3_ozet"
+        if d.is_dir() and any(_is_trend_file(p) and p.stem.endswith("__il") for p in d.glob("*.csv")):
+            return d
+    return None
+
+
+def _read_l3_csv(p: Path) -> pd.DataFrame:
+    """L3 CSV'si: BOM'lu UTF-8, kodlar ve metin alanları metin olarak (sözleşme 2.2)."""
+    return pd.read_csv(p, encoding="utf-8-sig", dtype={c: str for c in ("bolge_kodu", "bolge_anahtari", "ust_bolge",
+                                                                        "trend_uyarisi", "not", "dogrulanmadi")})
+
+
+def _agreement(d: Path, level: str) -> pd.DataFrame:
+    """`<degisken>__kaynak_uyumu__<düzey>.csv` → [degisken, bolge_anahtari, mevsim, kaynak_uyumu = "k/m"]."""
+    parts = []
+    for p in sorted(d.glob(f"*__kaynak_uyumu__{level}.csv")):
+        df = _read_l3_csv(p)
+        if df.empty or not {"bolge_anahtari", "mevsim", "k", "m"} <= set(df.columns):
+            continue
+        k, m = pd.to_numeric(df["k"], errors="coerce"), pd.to_numeric(df["m"], errors="coerce")
+        ku = [f"{int(a)}/{int(b)}" if pd.notna(a) and pd.notna(b) else "" for a, b in zip(k, m)]
+        parts.append(pd.DataFrame({"degisken": p.stem.split("__")[0], "bolge_anahtari": df["bolge_anahtari"],
+                                   "mevsim": df["mevsim"], "kaynak_uyumu": ku}))
+    return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(
+        columns=["degisken", "bolge_anahtari", "mevsim", "kaynak_uyumu"])
+
+
+def from_l3(df: pd.DataFrame, level: str, agreement: pd.DataFrame | None = None) -> pd.DataFrame:
+    """L3 satırlarına ekranın kısa adlarını ekler; L3 sütunlarının hepsi olduğu gibi kalır.
+
+    - `anlamli` 1 / 0 / -1 (hesaplanamadı) korunur; `anlamli_fdr` = (anlamli == 1).
+    - `yil_sayisi_gereken`: Weatherhead `gereken_yil` ile serinin uzunluğu arasındaki fark (≥ 1 ise).
+    - `belirsiz` L3'te yoktur (tek test motoru); 0 yazılır.
+    """
+    out = df.copy()
+    for c in L3_COLS:
+        if c not in out:
+            out[c] = np.nan
+    if level == "il":
+        out["il"] = out["bolge_adi"]
+        out["plaka"] = pd.to_numeric(out["bolge_kodu"], errors="coerce").astype("Int64")
+        out["bolge"] = out["ust_bolge"]
+        out = out[out["plaka"].notna()]
+    else:
+        out["bolge"] = out["bolge_anahtari"].fillna(out["bolge_kodu"])
+    a, b = pd.to_numeric(out["donem_baslangic"], errors="coerce"), pd.to_numeric(out["donem_bitis"], errors="coerce")
+    out["donem"] = [f"{int(x)}-{int(y)}" if pd.notna(x) and pd.notna(y) else "" for x, y in zip(a, b)]
+    out["n_yil"] = np.nan  # geçerli yıl sayısı L3'te yok; uydurulmaz
+    out["n_hucre"] = out["hucre_sayisi"]
+    out["egim_10yil"], out["ci_alt"], out["ci_ust"] = out["sen_egimi"], out["ga_alt"], out["ga_ust"]
+    out["p_mk_kontrol"], out["p_ttest"], out["belirsiz"] = np.nan, np.nan, 0
+    out["anlamli"] = pd.to_numeric(out["anlamli"], errors="coerce").fillna(-1).astype(int)
+    out["anlamli_fdr"] = (out["anlamli"] == 1).astype(int)
+    extra = pd.to_numeric(out["gereken_yil"], errors="coerce") - (b - a + 1)
+    out["yil_sayisi_gereken"] = extra.where(extra >= 1).round()
+    out = out.drop(columns=["kaynak_uyumu"], errors="ignore")
+    if agreement is not None and len(agreement):
+        out = out.merge(agreement, on=["degisken", "bolge_anahtari", "mevsim"], how="left")
+    else:
+        out["kaynak_uyumu"] = ""
+    return ensure_trend_cols(out)
+
+
+def ensure_trend_cols(df: pd.DataFrame) -> pd.DataFrame:
+    """Her kaynaktan gelen trend tablosunda uyarı sütunları bulunsun; ürün adları L1 kodu olsun."""
+    df = df.copy()
+    if "urun" in df:
+        df["urun"] = df["urun"].map(lambda u: FILE_CODE.get(u, u))
+    fallback = df["anlamli_fdr"] if "anlamli_fdr" in df else -1
+    if "anlamli" in df:
+        df["anlamli"] = pd.to_numeric(df["anlamli"], errors="coerce").fillna(fallback).astype(int)
+    else:
+        df["anlamli"] = pd.Series(fallback, index=df.index).astype(int)
+    for c in EXTRA_COLS:
+        if c not in df:
+            df[c] = np.nan
+    for c in TEXT_COLS:
+        df[c] = df[c].astype(object).where(df[c].notna(), "").astype(str).str.strip() if c in df else ""
+    df["dogrulanmadi"] = df["dogrulanmadi"].str.lower()
+    return df.reset_index(drop=True)
+
+
+def read_l3(d: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """`L3_ozet/` klasöründeki bütün trend dosyalarını il ve bölge tablolarına toplar.
+
+    Değişken ve ürün dosya adından gelir. Türkiye satırı (`duzey = "ulke"`) bölge tablosundadır.
+    """
+    parts: dict[str, list[pd.DataFrame]] = {"il": [], "bolge": []}
+    for p in sorted(d.glob("*.csv")):
+        if not _is_trend_file(p):
+            continue
+        var, prod, level = p.stem.split("__")
+        try:
+            df = _read_l3_csv(p)
+        except pd.errors.EmptyDataError:
+            continue
+        if df.empty:
+            continue
+        parts[level].append(df.assign(degisken=var, urun=prod))
+    if not parts["il"]:
+        raise FileNotFoundError(f"{d} içinde il trend dosyası yok")
+    il = pd.concat(parts["il"], ignore_index=True)
+    bolge = pd.concat(parts["bolge"], ignore_index=True) if parts["bolge"] else il.iloc[0:0].copy()
+    return from_l3(il, "il", _agreement(d, "il")), from_l3(bolge, "bolge", _agreement(d, "bolge"))
+
+
+def has_placeholder_rows(df: pd.DataFrame) -> bool:
+    """Gerçek klasöre yanlışlıkla yer tutucu dosya kopyalandıysa yakalar (`urun_surumu` "YER TUTUCU")."""
+    return "urun_surumu" in df and df["urun_surumu"].astype(str).str.contains("YER TUTUCU", case=False).any()
 
 
 def read_pairs(path) -> pd.DataFrame:
@@ -373,30 +524,41 @@ def pair_rows(df: pd.DataFrame, level: str = "il") -> pd.DataFrame:
 def load_tables() -> dict:
     """Trend ve ilişki tablolarını döndürür.
 
-    Dönüş: {"il", "bolge", "iliski": DataFrame, "yer_tutucu": bool, "kaynak": {ad: yol ya da None}}.
-    "iliski" = `L4_iliski/ciftler.csv` (il + bölge + Türkiye satırları, sözleşme 2.3).
-    Dosyalardan biri bile eksikse o tablo sentetik yer tutucudur ve `yer_tutucu` True olur.
+    Dönüş: {"il", "bolge", "iliski": DataFrame, "yer_tutucu": bool, "yer_tutucu_tablolar": [ad],
+    "kaynak": {ad: yol ya da None}}.
+    - "il", "bolge": `L3_ozet/<degisken>__<urun>__{il,bolge}.csv` (sözleşme 2.2), `read_l3` ile.
+    - "iliski": `L4_iliski/ciftler.csv` (il + bölge + Türkiye satırları, sözleşme 2.3).
+    Bir katman bulunamazsa o tablo sentetik yer tutucudur ve `yer_tutucu` True olur.
     """
-    syn = None
-    out, src, placeholder = {}, {}, False
-    for key, layer, name in (("il", "L3_trend", "trend_iller.csv"), ("bolge", "L3_trend", "trend_bolgeler.csv"),
-                             ("iliski", "L4_iliski", "ciftler.csv")):
-        p = find_file(layer, name)
-        if p is not None:
-            out[key] = read_pairs(p) if key == "iliski" else pd.read_csv(p, encoding="utf-8-sig")
-            src[name] = p
-        else:
-            syn = syn or synthetic_tables()
-            out[key] = {"il": syn[0], "bolge": syn[1], "iliski": syn[2]}[key].copy()
-            src[name] = None
-            placeholder = True
-    return {**out, "yer_tutucu": placeholder, "kaynak": src}
+    syn = synthetic_tables
+    out, src, missing = {}, {}, []
+    d = l3_dir()
+    if d is not None:
+        try:
+            out["il"], out["bolge"] = read_l3(d)
+            src["trend_iller.csv"] = src["trend_bolgeler.csv"] = d
+        except Exception:  # noqa: BLE001 — bozuk paket: yer tutucuya düş, ekranda işaretlenir
+            d = None
+    if d is None:
+        out["il"], out["bolge"] = ensure_trend_cols(syn()[0]), ensure_trend_cols(syn()[1])
+        src["trend_iller.csv"] = src["trend_bolgeler.csv"] = None
+        missing += ["trend_iller.csv", "trend_bolgeler.csv"]
+    p = find_file("L4_iliski", "ciftler.csv")
+    if p is not None:
+        out["iliski"], src["ciftler.csv"] = read_pairs(p), p
+    else:
+        out["iliski"], src["ciftler.csv"] = syn()[2].copy(), None
+        missing.append("ciftler.csv")
+    for name, key in (("trend_iller.csv", "il"), ("trend_bolgeler.csv", "bolge"), ("ciftler.csv", "iliski")):
+        if name not in missing and has_placeholder_rows(out[key]):
+            missing.append(name)
+    return {**out, "yer_tutucu": bool(missing), "yer_tutucu_tablolar": missing, "kaynak": src}
 
 
 def inventory() -> list[dict]:
     """Katman klasörlerindeki gerçek dosyalar: [{katman, dosya, yol, boyut_mb}]."""
     seen, rows = set(), []
-    for base in SEARCH_DIRS:
+    for base in package_dirs():
         for layer, *_ in LAYERS:
             d = base / layer
             if not d.is_dir():
@@ -422,7 +584,7 @@ def variable_cards() -> dict:
 @lru_cache(maxsize=1)
 def nasa_sources() -> list[dict]:
     """Kademe 1 ürünlerinin NASA atıf bilgisi (data/catalog.yaml): short_name, version, daac, doi."""
-    wanted = {p for _, prods, _ in TIER1 for p in prods} | {"SRTMGL30"}
+    wanted = set(NASA_SHORT.values()) | {"SRTMGL30"}
     try:
         cat = yaml.safe_load(CATALOG.read_text(encoding="utf-8"))["urunler"]
     except Exception:  # noqa: BLE001
@@ -460,6 +622,22 @@ def filter_trends(df: pd.DataFrame, variables=None, seasons=None, places=None, k
     return df[m]
 
 
+L3_README = (
+    "  trend_iller.csv     81 il × mevsim: L3_ozet/<degisken>__<urun>__il.csv dosyalarının birleşimi (sözleşme 2.2).\n"
+    "                      sen_egimi / ga_alt / ga_ust birimi egim_birimi sütununda; bolge_kodu = iki haneli plaka\n"
+    "  trend_bolgeler.csv  7 coğrafi bölge ve Türkiye (duzey = ulke) × mevsim\n"
+    "                      kaynak_uyumu = k/m: m üründen k'si aynı yönde anlamlı (L3_ozet/*__kaynak_uyumu__*.csv)\n"
+)
+
+
+def _rel(v) -> str:
+    """Manifest için kaynak yolu: repo içindeyse göreli, değilse olduğu gibi."""
+    try:
+        return Path(v).resolve().relative_to(ROOT).as_posix()
+    except (ValueError, TypeError):
+        return str(v)
+
+
 def build_bundle(tables: dict, variables, seasons, provinces_sel, user: dict, include_nc: bool = False,
                  git_commit: str | None = None) -> tuple[bytes, str]:
     """Akademisyen için seçime göre hazır veri paketi (zip) üretir. Dönüş: (zip baytları, dosya adı).
@@ -482,6 +660,14 @@ def build_bundle(tables: dict, variables, seasons, provinces_sel, user: dict, in
                (rel_f["bolge_turu"] == "turkiye")
         rel_f = rel_f[keep]
 
+    l3 = "sen_egimi" in il_f.columns and not ph  # gerçek L3: sözleşme 2.2 sütunları aynen
+    if l3:
+        il_f, bolge_f = (x[["degisken", "urun"] + L3_COLS + ["kaynak_uyumu"]] for x in (il_f, bolge_f))
+    else:
+        il_f = il_f[[c for c in TREND_COLS if c in il_f.columns]]
+        bolge_f = bolge_f[["bolge"] + [c for c in TREND_COLS if c in bolge_f.columns
+                                       and c not in ("il", "plaka", "bolge")]]
+
     cit = citation()
     files_nc = []
     if include_nc and variables:
@@ -494,8 +680,7 @@ def build_bundle(tables: dict, variables, seasons, provinces_sel, user: dict, in
         "secim": {"degiskenler": list(variables or []) or "hepsi", "mevsimler": list(seasons or []) or "hepsi",
                   "iller": list(provinces_sel or []) or "hepsi"},
         "satir_sayisi": {"trend_iller": len(il_f), "trend_bolgeler": len(bolge_f), "ciftler": len(rel_f)},
-        "kaynak_dosyalar": {k: ("SENTETİK YER TUTUCU" if not v else v.relative_to(ROOT).as_posix()
-                                if isinstance(v, Path) else str(v)) for k, v in tables["kaynak"].items()},
+        "kaynak_dosyalar": {k: ("SENTETİK YER TUTUCU" if not v else _rel(v)) for k, v in tables["kaynak"].items()},
         "netcdf": [r["dosya"] for r in files_nc], "git_commit": git_commit,
         "kullanici_rolu": user.get("rol"),
     }
@@ -505,23 +690,27 @@ def build_bundle(tables: dict, variables, seasons, provinces_sel, user: dict, in
         f"{warn}Trend Dedektifi — Türkiye iklim trendi veri seti, sürüm {VERSION} (ön sürüm)\n"
         f"Lisans: {LICENSE}. DOI: {VERI_SETI_DOI}\n\n"
         "Dosyalar\n"
-        "  trend_iller.csv     il bazında trendler (Sen eğimi / 10 yıl, %95 genişletilmiş aralık, Hamed-Rao MK, FDR)\n"
-        "  trend_bolgeler.csv  7 coğrafi bölge ve Türkiye\n"
+        + (L3_README if l3 else
+           "  trend_iller.csv     il bazında trendler (Sen eğimi / 10 yıl, %95 genişletilmiş aralık, Hamed-Rao MK, FDR)\n"
+           "  trend_bolgeler.csv  7 coğrafi bölge ve Türkiye\n") +
         "  ciftler.csv         6 değişken çifti; il, bölge ve Türkiye satırları (bolge_turu). Trendi çıkarılmış\n"
         "                      serilerin korelasyonu, etkin_n, p / p_fdr, anlamli, etiket (BOM'lu UTF-8)\n"
         "  NASA_KAYNAKLARI.csv kullanılan NASA ürünleri ve DOI'leri (bunlara da atıf yapın)\n"
         "  manifest.json       seçim, sürüm ve kaynak dosyalar\n\n"
-        "CSV kuralı: UTF-8, ondalık ayıracı nokta, boş değer boş hücre.\n"
-        "Anlamlılık: p_mk < 0,05 (Hamed-Rao). Harita ve il tablosunda Benjamini-Hochberg, α_FDR = 0,10.\n"
-        "belirsiz = 1: ana test ile kontrol testi farklı sonuç veriyor.\n"
+        "CSV kuralı: UTF-8 (BOM'lu), ondalık ayıracı nokta, boş değer boş hücre.\n"
+        + ("Anlamlılık: anlamli = 1 ⇔ p_fdr ≤ 0,10 (Benjamini-Hochberg, düzey × mevsim içinde) ve %95 genişletilmiş\n"
+           "aralık sıfırı dışlıyor; -1 = hesaplanamadı. trend_uyarisi doluysa sonucu yorumlamadan önce okuyun;\n"
+           "dogrulanmadi = evet olan (Kademe 2) satırlar doğrulanmamış üründendir.\n" if l3 else
+           "Anlamlılık: p_mk < 0,05 (Hamed-Rao). Harita ve il tablosunda Benjamini-Hochberg, α_FDR = 0,10.\n"
+           "belirsiz = 1: ana test ile kontrol testi farklı sonuç veriyor.\n") +
         "kaynak_uyumu = k/m: m kaynaktan k'si ana kaynakla aynı yönde anlamlı (tutarlılık, bağımsız doğrulama değil).\n"
         "İlişkiler için 'neden' değil 'ilişki' ifadesini kullanın.\n\n"
         f"Atıf (APA):\n  {cit['apa']}\n"
     )
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr(f"{prefix}trend_iller.csv", il_f.to_csv(index=False))
-        z.writestr(f"{prefix}trend_bolgeler.csv", bolge_f.to_csv(index=False))
+        z.writestr(f"{prefix}trend_iller.csv", il_f.to_csv(index=False).encode("utf-8-sig"))
+        z.writestr(f"{prefix}trend_bolgeler.csv", bolge_f.to_csv(index=False).encode("utf-8-sig"))
         z.writestr(f"{prefix}ciftler.csv", rel_f.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"))
         z.writestr("BENIOKU.txt", readme)
         z.writestr("CITATION.bib", cit["bibtex"] + "\n")
@@ -535,9 +724,6 @@ def build_bundle(tables: dict, variables, seasons, provinces_sel, user: dict, in
 
 # ------------------------------------------------------------------ LLM katmanı için yer tutucu paket
 PLACEHOLDER_PACKAGE = ROOT / "cache" / "yer_tutucu_paket" / f"trend-dedektifi-turkiye-{VERSION}"
-# Kısa ad → L1 dosya adındaki ürün kodu (değişken bağlamında; yağışta M2TMNXFLX = MERRA2)
-FILE_CODE = {"M2TMNXSLV": "MERRA2", "M2TMNXFLX": "MERRA2", "GLDAS_NOAH025_M": "GLDAS", "GPM_3IMERGM": "GPM",
-             "MOD10CM": "MOD10CM", "MOD13C2": "MOD13C2", "TELLUS_GRAC-GRFO_MASCON_CRI_GRID_RL06.3_V4": "GRACE"}
 L3_OZET_COLS = ["bolge_kodu", "bolge_adi", "hucre_sayisi", "sen_egimi", "ga_alt", "ga_ust", "p_mk", "p_fdr", "anlamli",
                 "etkin_n", "gereken_yil", "anlamli_hucre_orani", "birim", "donem", "seri", "kademe", "dogrulanmadi",
                 "urun_surumu", "veri_seti_doi", "lisans", "doi"]
@@ -574,12 +760,11 @@ def write_placeholder_package(dest: Path = PLACEHOLDER_PACKAGE) -> Path:
     (dest / "L3_ozet").mkdir(parents=True, exist_ok=True)
     (dest / "L4_iliski").mkdir(parents=True, exist_ok=True)
     for var, products, _ in TIER1:
-        for prod in products:
-            code = FILE_CODE.get(prod, prod)
+        for code in products:
             for level, df in (("il", il), ("bolge", bolge)):
-                d = df[(df["degisken"] == var) & (df["urun"] == prod) & (df["mevsim"] == "yillik")]
+                d = df[(df["degisken"] == var) & (df["urun"] == code) & (df["mevsim"] == "yillik")]
                 if len(d):
-                    _l3_ozet(d, level, dois.get(prod)).to_csv(
+                    _l3_ozet(d, level, dois.get(NASA_SHORT.get((var, code)))).to_csv(
                         dest / "L3_ozet" / f"{var}__{code}__{level}.csv", index=False, encoding="utf-8-sig")
     rel.to_csv(dest / "L4_iliski" / "ciftler.csv", index=False, encoding="utf-8-sig")
     (dest / "YER_TUTUCU.txt").write_text("Bu paketteki sayılar SENTETİK YER TUTUCUDUR; gerçek analiz sonucu değildir.\n",

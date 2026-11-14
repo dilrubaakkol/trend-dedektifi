@@ -223,6 +223,8 @@ button[kind="segmented_control"], button[kind="pills"] {{ background:rgba(8,13,3
 
 .td-callout {{ border-left:3px solid var(--ember); background:rgba(255,138,61,.06); padding:14px 18px;
   border-radius:0 14px 14px 0; color:#e3d6cc; margin-top:14px; line-height:1.6; }}
+.td-callout.warn {{ border-left-color:var(--warn); background:rgba(255,200,87,.07); margin-bottom:10px; }}
+.td-callout.warn .td-li {{ font-size:14px; color:#d8cfb6; }}
 .td-chip {{ display:inline-block; font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.12em;
   padding:5px 10px; border-radius:999px; margin-left:auto; }}
 .td-chip.warn {{ color:var(--warn); border:1px solid rgba(245,196,81,.45); background:rgba(245,196,81,.08); cursor:help; }}

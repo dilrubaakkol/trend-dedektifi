@@ -129,7 +129,7 @@ def test_bundle_marks_placeholder():
     pdf = pd.read_csv(io.BytesIO(pairs), encoding="utf-8-sig", dtype={"bolge_kodu": str})
     assert set(pdf.loc[pdf["bolge_turu"] == "il", "bolge_adi"]) == {"Erzurum"}
     assert {"dogu_anadolu", "turkiye"} <= set(pdf.loc[pdf["bolge_turu"] != "il", "bolge_kodu"])
-    csv = z.read("YER_TUTUCU_trend_iller.csv").decode("utf-8").splitlines()
+    csv = z.read("YER_TUTUCU_trend_iller.csv").decode("utf-8-sig").splitlines()
     assert csv[0].split(",") == U.TREND_COLS and all(",Erzurum," in "," + line for line in csv[1:])
     assert "SENTETİK YER TUTUCU" in z.read("BENIOKU.txt").decode("utf-8")
 
@@ -189,7 +189,8 @@ def test_mssql_roundtrip_in_temporary_database():
         il, bolge, rel = U.synthetic_tables()
         DB.replace_tables({"il": il, "bolge": bolge, "iliski": rel, "yer_tutucu": True})
         back = DB.load_tables()
-        assert back["yer_tutucu"] and len(back["il"]) == len(il) and list(back["il"].columns) == U.TREND_COLS
+        assert back["yer_tutucu"] and len(back["il"]) == len(il)
+        assert list(back["il"].columns) == U.TREND_COLS + U.EXTRA_COLS
     finally:
         DB.DB_NAME = old
         with DB.connect(database="master", autocommit=True) as cn:
@@ -251,3 +252,87 @@ def test_placeholder_package_feeds_llm_answer(tmp_path):
     assert out["verified"] and out["evidence"] and not out.get("message")
     assert "/10 yıl/10 yıl" not in out["explanation"]  # birim tek kez
     assert any(e["id"].startswith("trend__kar_ortusu") for e in out["evidence"])
+
+
+def _real_package(tmp_path):
+    """stats.l2 + stats.l3 ile sentetik küplerden üretilmiş, sözleşme 2.2 biçiminde L3_ozet (değerler sentetik)."""
+    import numpy as np
+    import pandas as pd
+    from shapely.geometry import box
+    from stats import l2, l3
+
+    lat, lon = 38.125 + 0.25 * np.arange(4), 32.125 + 0.25 * np.arange(6)
+    kok = tmp_path / "outputs" / "trend-dedektifi-turkiye-v0.1" / "L1_kup"
+    kok.mkdir(parents=True)
+    rows = []
+    for i, urun in enumerate(("GPM", "GLDAS")):
+        t = pd.date_range("2001-01", "2025-12", freq="MS")
+        yil = np.asarray((t.year - 2001) + (t.month - 0.5) / 12)
+        v = 50 - 2.0 * yil[:, None, None] + np.random.default_rng(i).normal(0, 0.5, (len(t), 4, 6))
+        da = xr_da(v, t, lat, lon)
+        da.to_dataset().assign_attrs(da.attrs).to_netcdf(kok / f"yagis__{urun}.nc")
+        rows.append({"dosya": f"yagis__{urun}.nc", "degisken": "yagis", "birim": "mm/ay", "kaynak": urun,
+                     "kaynak_doi": "x", "donem": "2001-01 … 2025-12", "kademe": 1})
+    pd.DataFrame(rows).to_csv(kok / "ICINDEKILER.csv", index=False, encoding="utf-8-sig")
+    bolgeler = [
+        {"duzey": "il", "anahtar": "konya", "ad": "Konya", "kod": "42", "ust": "ic_anadolu",
+         "sorgu": box(32.0, 38.0, 32.75, 39.0)},
+        {"duzey": "il", "anahtar": "aksaray", "ad": "Aksaray", "kod": "68", "ust": "ic_anadolu",
+         "sorgu": box(32.75, 38.0, 33.5, 39.0)},
+        {"duzey": "bolge", "anahtar": "ic_anadolu", "ad": "İç Anadolu", "kod": "ic_anadolu", "ust": "",
+         "sorgu": box(32.0, 38.0, 33.5, 39.0)},
+        {"duzey": "ulke", "anahtar": "turkiye", "ad": "Türkiye", "kod": "turkiye", "ust": "",
+         "sorgu": box(32.0, 38.0, 33.5, 39.0)},
+    ]
+    l2.uret("v0.1", kok=tmp_path / "outputs")
+    l3.uret("v0.1", kok=tmp_path / "outputs", bolgeler=bolgeler)
+    return tmp_path / "outputs" / "trend-dedektifi-turkiye-v0.1"
+
+
+def xr_da(v, t, lat, lon):
+    """Test küpü: L1 attrs'ı ile (time, lat, lon) yağış (mm/ay)."""
+    import xarray as xr
+    da = xr.DataArray(v.astype("float32"), coords={"time": t, "lat": lat, "lon": lon},
+                      dims=("time", "lat", "lon"), name="yagis")
+    da.attrs = {"units": "mm/ay", "kademe": 1, "lisans": "CC BY 4.0", "doi": "10.0000/test",
+                "urun_surumu": "v0.1", "veri_seti_doi": "(yayında doldurulacak)", "domain": "land"}
+    return da
+
+
+def test_site_reads_real_l3_package(tmp_path, monkeypatch):
+    """Gerçek biçimdeki L3_ozet okunur: yer tutucu bayrağı L3 için kalkar, kısa adlar ve uyarılar gelir."""
+    import io
+    import zipfile
+    import pandas as pd
+    pkg = _real_package(tmp_path)
+    monkeypatch.setattr(U, "SEARCH_DIRS", [pkg])
+    monkeypatch.delenv("TD_PAKET", raising=False)
+    t = U.load_tables()
+    assert t["yer_tutucu_tablolar"] == ["ciftler.csv"]           # L4 yok: yalnız ilişkiler yer tutucu
+    il, bolge = t["il"], t["bolge"]
+    assert set(il["il"]) == {"Konya", "Aksaray"} and set(il["plaka"]) == {42, 68}
+    assert set(il["urun"]) == {"GPM", "GLDAS"} and set(il["mevsim"]) == set(U.SEASONS)
+    assert {"turkiye", "ic_anadolu"} == set(bolge["bolge"])
+    y = il[(il["il"] == "Konya") & (il["urun"] == "GPM") & (il["mevsim"] == "yillik")].iloc[0]
+    assert y["egim_10yil"] == y["sen_egimi"] < 0 and y["anlamli_fdr"] == 1 and y["anlamli"] == 1
+    assert y["kaynak_uyumu"] == "2/2" and y["donem"].startswith("2001-")
+    assert il["trend_uyarisi"].str.contains("GLDAS").any()       # Kişi 2'nin uyarısı satıra taşınır
+    data, name = U.build_bundle(t, ["yagis"], ["yillik"], ["Konya"], {"rol": "vatandas"})
+    assert name.startswith("YER_TUTUCU_")                         # ciftler hâlâ yer tutucu → paket işaretli
+    t2 = {**t, "yer_tutucu": False, "yer_tutucu_tablolar": []}
+    data, name = U.build_bundle(t2, ["yagis"], ["yillik"], ["Konya"], {"rol": "vatandas"})
+    z = zipfile.ZipFile(io.BytesIO(data))
+    df = pd.read_csv(io.BytesIO(z.read("trend_iller.csv")), encoding="utf-8-sig", dtype={"bolge_kodu": str})
+    assert list(df.columns) == ["degisken", "urun"] + U.L3_COLS + ["kaynak_uyumu"]
+    assert set(df["bolge_kodu"]) == {"42"} and len(df) == 2
+
+
+def test_placeholder_rows_in_real_folder_are_flagged(tmp_path, monkeypatch):
+    """outputs/ altına yer tutucu ciftler.csv kopyalanırsa site yine 'örnek veri' der."""
+    pkg = tmp_path / "pkg"
+    (pkg / "L4_iliski").mkdir(parents=True)
+    U.synthetic_tables()[2].to_csv(pkg / "L4_iliski" / "ciftler.csv", index=False, encoding="utf-8-sig")
+    monkeypatch.setattr(U, "SEARCH_DIRS", [pkg])
+    monkeypatch.delenv("TD_PAKET", raising=False)
+    t = U.load_tables()
+    assert "ciftler.csv" in t["yer_tutucu_tablolar"] and t["yer_tutucu"]

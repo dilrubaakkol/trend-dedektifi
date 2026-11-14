@@ -34,6 +34,11 @@ EXAMPLE_USERS = [
     ("Arş. Gör. Zeynep Aydın", "Örnek Üniversitesi · Ziraat Fakültesi", "zeynep.aydin@ornek.edu.tr", None),
     ("Dr. Can Yıldız", "Örnek Su Araştırmaları Enstitüsü", "can.yildiz@ornek.edu.tr", "0000-0000-0000-0002"),
 ]
+# KURGUSAL örnek vatandaşlar (kurum ve ORCID yok).
+EXAMPLE_CITIZENS = [
+    ("Ayşe Yılmaz", "ayse.yilmaz@ornek.com"),
+    ("Mehmet Öztürk", "mehmet.ozturk@ornek.com"),
+]
 # KURGUSAL örnek makaleler: (ekleyen e-posta, alanlar). DOI bilerek boş bırakıldı.
 EXAMPLE_ARTICLES = [
     ("elif.kaya@ornek.edu.tr", {
@@ -105,6 +110,14 @@ def seed_examples() -> None:
         except ValueError:
             with DB.connect() as cn:
                 ids[email] = cn.cursor().execute("SELECT id FROM dbo.kullanicilar WHERE eposta = ?", email).fetchone()[0]
+    citizens = 0
+    for name, email in EXAMPLE_CITIZENS:
+        try:
+            DB.register(name, email, "", "", password, example=True, role="vatandas")
+            citizens += 1
+        except ValueError:  # zaten kayıtlı
+            pass
+    added += citizens
     with DB.connect() as cn:
         have = {r[0] for r in cn.cursor().execute("SELECT baslik FROM dbo.makaleler WHERE ornek = 1").fetchall()}
     n_art = 0
@@ -112,7 +125,8 @@ def seed_examples() -> None:
         if art["baslik"] not in have:
             DB.add_article(ids[email], art, example=True)
             n_art += 1
-    print(f"Örnek kayıtlar: {added} yeni araştırmacı, {n_art} yeni makale (hepsi kurgusal, ornek = 1).")
+    print(f"Örnek kayıtlar: {added - citizens} yeni araştırmacı, {citizens} yeni vatandaş, {n_art} yeni makale "
+          "(hepsi kurgusal, ornek = 1).")
     if added and generated:
         print("\nÖrnek hesapların ortak şifresi (yalnızca şimdi gösterilir, hiçbir yere kaydedilmedi):")
         print(f"    {password}")
