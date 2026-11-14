@@ -21,6 +21,7 @@ LABELS = {
     # L4 ilişki
     "beklenen_yonde": "ilişki anlamlı ve beklenen yönde",
     "ters_yonde": "ilişki anlamlı ama beklenenin tersi yönde",
+    "hesaplanamadi": "ilişki hesaplanamadı",
     # kaynak uyumu
     "uyumlu": "tüm ürünler aynı yönde anlamlı",
     "kismen": "ürünlerin bir kısmı aynı yönde anlamlı",
@@ -47,8 +48,10 @@ türetme; sayı içeren her cümlenin sonuna [ref:<id>] ekle; ilişkinin kesin n
 }
 
 
-SERI = {"yillik_ortalama": "yıllık ortalama", "aylik_anomali": "aylık anomali", "kis_DJF": "kış (DJF)",
-        "ilkbahar_MAM": "ilkbahar (MAM)", "yaz_JJA": "yaz (JJA)", "sonbahar_SON": "sonbahar (SON)"}
+SERI = {"yillik_ortalama": "yıllık ortalama", "yillik": "yıllık", "aylik_anomali": "aylık anomali",
+        "aylik_anomali_nis_eyl": "aylık anomali (Nisan–Eylül)", "mevsim_anomali": "mevsimlik anomali",
+        "kis_DJF": "kış (DJF)", "ilkbahar_MAM": "ilkbahar (MAM)", "yaz_JJA": "yaz (JJA)",
+        "sonbahar_SON": "sonbahar (SON)"}
 
 
 def seri_adi(code) -> str:
@@ -82,7 +85,9 @@ def evidence_table(results: dict, kb: KnowledgeBase) -> list[dict]:
                        bolge=a.get("region_name"), kademe=a.get("kademe"))
         elif t == "iliski":
             row.update(degisken=" ~ ".join(_title(kb, v) for v in a["variables"]), urun=" ~ ".join(a["products"]),
-                       deger=a.get("r"), birim="r", p=a.get("p"), bolge=a.get("region_key"))
+                       deger=a.get("r"), birim="r", p=a.get("p"), q=a.get("p_fdr"),
+                       gecikme_ay=a.get("gecikme_ay"), seri=a.get("seri"),
+                       bolge=a.get("bolge_adi") or a.get("region_key"), kademe=a.get("kademe"))
         elif t == "kaynak_uyumu":
             row.update(degisken=_title(kb, a.get("variable")), urun=", ".join(a["urunler"]),
                        deger=f"{a['k']}/{a['m']}", birim="ürün aynı yönde")
@@ -127,11 +132,28 @@ def _sentence(a: dict, kb: KnowledgeBase) -> str | None:
         return (f"{_title(kb, a['variable'])}: {', '.join(a['urunler'])} ürünlerinden {a['k']}/{a['m']} "
                 f"tanesi aynı yönde anlamlı ({a['kapsam']}) [ref:{rid}]. Sonuç: {lab}.")
     if t == "iliski" and a.get("r") is not None:
+        if a.get("label") == "anlamsiz":       # bölge/Türkiye satırlarında FDR yok; genel ifade kullan
+            lab = "ilişki anlamlı değil"
         v1, v2 = (_title(kb, v) for v in a["variables"])
-        return (f"{v1} ile {v2} arasında trendi giderilmiş seriler üzerinden r = {format_tr(a['r'])} "
-                f"({format_p(a['p']) if a.get('p') is not None else 'p = —'}, etkin n = "
-                f"{format_tr(a.get('etkin_n'), digits=0)}) [ref:{rid}]. Sonuç: {lab}; bu bir ilişkidir, "
-                "nedensellik göstermez.")
+        ctx = [seri_adi(a["seri"])] if a.get("seri") else []
+        if a.get("gecikme_ay"):
+            ctx.append(f"{v2} {a['gecikme_ay']} ay gecikmeli")
+        if a.get("bolge_adi"):
+            ctx.append(str(a["bolge_adi"]))
+        # İl satırında anlamlılık FDR (q), bölge/Türkiye satırında p ile verilir (sözleşme 2.3).
+        if a.get("region_level") == "il" and a.get("p_fdr") is not None:
+            sig = "FDR " + format_p(a["p_fdr"]).replace("p ", "q ", 1)
+        else:
+            sig = format_p(a["p"]) if a.get("p") is not None else "p = —"
+        s = (f"{v1} ile {v2} arasında trendi giderilmiş seriler üzerinden r = {format_tr(a['r'])}"
+             + (f" ({', '.join(ctx)})" if ctx else "")
+             + f"; {sig}, etkin n = {format_tr(a.get('etkin_n'), digits=0)}")
+        if a.get("dogrulanmadi"):
+            s += "; doğrulanmamış (Kademe 2) girdi"
+        s += f" [ref:{rid}]. Sonuç: {lab}; bu bir ilişkidir, nedensellik göstermez."
+        if a.get("label") == "ters_yonde" and a.get("not"):
+            s += f" Not: {a['not']}"
+        return s
     if t == "boundary_shift" and a.get("observed_shift_m_per_decade"):
         o, p = a["observed_shift_m_per_decade"], a.get("predicted_shift_m_per_decade")
         s = f"{a.get('axis', 'eksen')} boyunca gözlenen sınır kayması {format_tr(o, 'm/10 yıl', 0)}"

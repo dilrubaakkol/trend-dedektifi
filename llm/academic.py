@@ -65,10 +65,23 @@ def methods_paragraph(results: dict, kb) -> str:
     if fallback:
         p.append("İl özeti bulunmayan değişkenlerde bağlı olunan bölgenin ortalaması kullanılmıştır ("
                  + "; ".join(fallback) + ").")
-    if _relations(results):
-        p.append("Değişkenler arası ilişki, trendi giderilmiş seriler arasındaki Pearson korelasyonu ve "
-                 "Bretherton vd. (1999) etkin örneklem büyüklüğüyle değerlendirilmiştir; bu sonuçlar "
-                 "nedensellik değil istatistiksel ilişki gösterir.")
+    rel = _relations(results)
+    if rel:
+        rseri = sorted({seri_adi(a["seri"]) for a in rel if a.get("seri")})
+        lags = sorted({a["gecikme_ay"] for a in rel if a.get("gecikme_ay")})
+        txt = ("Değişkenler arası ilişki, doğrusal trendi giderilmiş seriler"
+               + (f" ({', '.join(rseri)})" if rseri else "")
+               + " arasındaki Pearson korelasyonuyla"
+               + (f" ({' ve '.join(str(g) for g in lags)} ay gecikme dahil)" if lags else "")
+               + " değerlendirilmiş; etkin örneklem büyüklüğü Bretherton vd. (1999) ile hesaplanmış ve "
+               "anlamlılık etkin n − 2 serbestlik dereceli t testiyle sınanmıştır.")
+        levels = {a.get("region_level") for a in rel}
+        if "il" in levels:
+            txt += (" İl satırlarında aynı çiftin 81 il p değerleri üzerinden Benjamini-Hochberg düzeltmesi "
+                    "(α_FDR = 0,10) uygulanmıştır.")
+        if levels & {"bolge", "turkiye"}:
+            txt += " Bölge ve Türkiye satırlarında anlamlılık eşiği p < 0,05'tir (az sayıda test)."
+        p.append(txt + " Bu sonuçlar nedensellik değil istatistiksel ilişki gösterir.")
     return " ".join(p)
 
 
@@ -80,11 +93,14 @@ def method_references(results: dict) -> list[str]:
 
 
 def data_citations(results: dict) -> list[str]:
-    """Kullanılan her NASA ürünü için atıf satırı + proje veri paketi."""
+    """Kullanılan her NASA ürünü için atıf satırı (trend + ilişki kanıtları) + proje veri paketi."""
     seen, out = set(), []
-    for t in _trends(results):
-        pv = t.get("provenance") or {}
-        key = pv.get("short_name") or t["product"]
+    sources = [(t.get("provenance") or {}, t["product"], t.get("doi")) for t in _trends(results)]
+    for a in _relations(results):
+        for i, pv in enumerate(a.get("provenance") or []):
+            sources.append((pv or {}, a["products"][i], a.get(f"doi_{i + 1}")))
+    for pv, product, row_doi in sources:
+        key = pv.get("short_name") or product
         if key in seen:
             continue
         seen.add(key)
@@ -94,11 +110,11 @@ def data_citations(results: dict) -> list[str]:
         if pv.get("daac"):
             parts.append(f"NASA {pv['daac']}")
         line = ", ".join(parts)
-        doi = pv.get("doi") or t.get("doi")
+        doi = pv.get("doi") or row_doi
         if doi:
             line += f". https://doi.org/{doi}"
         out.append(line)
-    pkg = [t for t in _trends(results) if t.get("urun_surumu")]
+    pkg = [t for t in _trends(results) + _relations(results) if t.get("urun_surumu")]
     if pkg:
         t = pkg[0]
         line = f"Trend Dedektifi Türkiye veri paketi, {t['urun_surumu']}"
@@ -121,7 +137,9 @@ def academic_warnings(results: dict, kb) -> list[str]:
     title = lambda v: kb.variables.get(v, {}).get("baslik", v)
     w = []
     trends = _trends(results)
-    unver = sorted({f"{title(t['variable'])} ({t['product']})" for t in trends if t.get("dogrulanmadi")})
+    unver = sorted({f"{title(t['variable'])} ({t['product']})" for t in trends if t.get("dogrulanmadi")}
+                   | {" ~ ".join(title(v) for v in a["variables"]) for a in _relations(results)
+                      if a.get("dogrulanmadi")})
     if unver:
         w.append("Kademe 2 (doğrulanmamış) girdi: " + ", ".join(unver) +
                  ". Bu sonuçlar bağımsız veriyle karşılaştırılmadan yayımlanmamalı.")

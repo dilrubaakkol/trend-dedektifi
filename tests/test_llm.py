@@ -73,13 +73,34 @@ def pkg(tmp_path_factory):
         bolge(0.45, 0.3, 0.6, 0.0006, 0.003, 1, 0.95, 160), "°C")
     _l3(p, "buharlasma", "GLDAS", [], bolge(0.7, 0.2, 1.2, 0.02, 0.08, 1, 0.4, 330), "mm/ay", kademe=2)
     (p / "L4_iliski").mkdir()
+    # docs/sozlesmeler.md 2.3 sütunları. Konya (il, plaka 42): çift 2, çift 3 (gecikme 1 ve 2), çift 5.
+    # Çift 4 (GRACE) il düzeyinde yok -> bölge satırına düşmeli. Çift 1 (kar) planla ilgisiz -> alınmamalı.
+    def l4(no, cift, seri, gec, turu, kod, ad, r, p_, q, anl, etiket, kademe=1, not_=""):
+        d1, d2 = (x.split("__")[0] for x in cift.split("~"))
+        return {"cift_no": no, "cift": cift, "degisken_1": d1, "degisken_2": d2, "seri": seri,
+                "gecikme_ay": gec, "beklenen_yon": "+", "bolge_turu": turu, "bolge_kodu": kod,
+                "bolge_adi": ad, "hucre_sayisi": 40, "donem": "2001-01 … 2025-12", "n": 25, "r": r,
+                "r1_1": 0.2, "r1_2": 0.3, "etkin_n": 19.3, "p": p_, "p_fdr": q, "anlamli": anl,
+                "etiket": etiket, "not": not_, "kademe": kademe,
+                "dogrulanmadi": "evet" if kademe == 2 else "", "doi_1": "", "doi_2": "", **{
+                    k: META[k] for k in ("urun_surumu", "veri_seti_doi", "lisans")}}
     pd.DataFrame([
-        {"cift": "sicaklik_2m__MERRA2~toprak_nemi__GLDAS", "bolge": "ic_anadolu", "r": -0.41,
-         "etkin_n": 19.3, "p": 0.008, "etiket": "beklenen_yonde"},
-        {"cift": "yagis__GPM~toprak_nemi__GLDAS", "bolge": "ic_anadolu", "r": 0.57,
-         "etkin_n": 22.1, "p": 0.0005, "etiket": "beklenen_yonde"},
-        {"cift": "ndvi__MOD13C2~yagis__GPM", "bolge": "ic_anadolu", "r": 0.3, "etkin_n": 20.0,
-         "p": 0.1, "etiket": "anlamsiz"},
+        l4(2, "yagis__GPM~toprak_nemi__GLDAS", "mevsim_anomali", 0, "il", "42", "Konya",
+           0.57, 0.0005, 0.004, 1, "beklenen_yonde"),
+        l4(3, "toprak_nemi__GLDAS~ndvi__MOD13C2", "aylik_anomali_nis_eyl", 1, "il", "42", "Konya",
+           0.33, 0.04, 0.09, 1, "beklenen_yonde"),
+        l4(3, "toprak_nemi__GLDAS~ndvi__MOD13C2", "aylik_anomali_nis_eyl", 2, "il", "42", "Konya",
+           0.21, 0.2, 0.35, 0, "anlamsiz"),
+        l4(5, "sicaklik_2m__MERRA2~buharlasma__GLDAS", "yaz_JJA", 0, "il", "42", "Konya",
+           -0.38, 0.01, 0.06, 1, "ters_yonde", kademe=2, not_="Kurak bölgede buharlaşma su ile sınırlı."),
+        l4(4, "yagis__GPM~toplam_su_depolama__GRACE", "yillik", 0, "bolge", "ic_anadolu",
+           "İç Anadolu Bölgesi", 0.62, 0.003, None, 1, "beklenen_yonde"),
+        l4(4, "yagis__GPM~toplam_su_depolama__GRACE", "yillik", 0, "turkiye", "turkiye", "Türkiye",
+           0.5, 0.01, None, 1, "beklenen_yonde"),
+        l4(2, "yagis__GPM~toprak_nemi__GLDAS", "mevsim_anomali", 0, "bolge", "ic_anadolu",
+           "İç Anadolu Bölgesi", 0.49, 0.001, None, 1, "beklenen_yonde"),
+        l4(1, "sicaklik_2m__MERRA2~kar_ortusu__MOD10CM", "kis_DJF", 0, "il", "42", "Konya",
+           -0.3, 0.1, 0.2, 0, "anlamsiz"),
     ]).to_csv(p / "L4_iliski" / "ciftler.csv", index=False, encoding="utf-8-sig")
     return p
 
@@ -195,10 +216,34 @@ def test_collect_evidence(konya_plan, pkg):
     assert ids["trend__buharlasma__GLDAS"]["dogrulanmadi"] is True
     u = ids["uyum__yagis"]
     assert (u["k"], u["m"], u["label"]) == (0, 2, "uyumsuz")
-    rel = [a for a in r["analyses"] if a["type"] == "iliski"]
-    assert {a["pair"] for a in rel} == {"sicaklik_2m__MERRA2~toprak_nemi__GLDAS",
-                                        "yagis__GPM~toprak_nemi__GLDAS"}   # ndvi çifti planda yok
-    assert any("ic_anadolu" in w for w in r["warnings"])                  # L4 bölgeye düştü
+    rel = {a["id"]: a for a in r["analyses"] if a["type"] == "iliski"}
+    assert set(rel) == {
+        "iliski__yagis__GPM__toprak_nemi__GLDAS",
+        "iliski__toprak_nemi__GLDAS__ndvi__MOD13C2__g1",      # gecikme kimliğe girer, çakışmaz
+        "iliski__toprak_nemi__GLDAS__ndvi__MOD13C2__g2",
+        "iliski__sicaklik_2m__MERRA2__buharlasma__GLDAS",       # iki değişken de planda
+    }                                           # kar ve GRACE çiftleri bu planla ilgisiz -> yok
+    assert rel["iliski__yagis__GPM__toprak_nemi__GLDAS"]["region_level"] == "il"   # il varken bölge değil
+
+
+def test_relation_falls_back_per_pair(kb, regions, pkg):
+    """Yağış~GRACE yalnız bölge/Türkiye düzeyinde var: Konya sorusunda İç Anadolu satırı kullanılır,
+    aynı sorudaki yağış~toprak nemi ise il satırından gelir."""
+    plan = plan_question("Konya'da yeraltı suyu azalıyor mu?", kb, None, regions)
+    assert plan["card_id"] == "su_kaynaklari"
+    rel = {a["id"]: a for a in collect_evidence(plan, pkg)["analyses"] if a["type"] == "iliski"}
+    grace = rel["iliski__yagis__GPM__toplam_su_depolama__GRACE"]
+    assert (grace["region_level"], grace["region_key"]) == ("bolge", "ic_anadolu")
+    assert rel["iliski__yagis__GPM__toprak_nemi__GLDAS"]["region_level"] == "il"
+
+
+def test_relation_sentence_uses_q_for_il_and_p_for_bolge(kb, konya_plan, pkg):
+    r = collect_evidence(konya_plan, pkg)
+    text = template_explanation(konya_plan, r, kb)
+    assert "1 ay gecikmeli" in text and "FDR q = 0,004" in text
+    assert "Kurak bölgede" in text                                   # ters_yonde notu
+    assert "2 ay gecikmeli" in text and "Sonuç: ilişki anlamlı değil" in text
+    assert verify_text(text, r).ok
 
 
 def test_collect_evidence_without_package(konya_plan, tmp_path):
@@ -210,8 +255,8 @@ def test_collect_evidence_without_package(konya_plan, tmp_path):
 def test_verify_turkish_numbers(konya_plan, pkg):
     r = collect_evidence(konya_plan, pkg)
     good = ("Konya'da toprak nemi 2001–2025 döneminde on yılda −1,84 kg/m² azalmıştır (%95 GA −2,6 … −1,1; "
-            "q = 0,03) [ref:trend__toprak_nemi__GLDAS]. Toprak nemi ile sıcaklık arasında r = −0,41 "
-            "[ref:iliski__sicaklik_2m__MERRA2__toprak_nemi__GLDAS].")
+            "q = 0,03) [ref:trend__toprak_nemi__GLDAS]. Yağış ile toprak nemi arasında r = 0,57 "
+            "[ref:iliski__yagis__GPM__toprak_nemi__GLDAS].")
     assert verify_text(good, r).ok
     bad = verify_text("Toprak nemi on yılda −2,5 kg/m² azalmıştır [ref:trend__toprak_nemi__GLDAS].", r)
     assert not bad.ok and bad.unverified_numbers == ["−2,5"]
@@ -242,6 +287,15 @@ def test_answer_academic(kb, regions, pkg):
     assert any("Benjamini" in r for r in out["method_references"])
     assert "L3_ozet/toprak_nemi__GLDAS__il.csv" in out["files"]
     assert any("Kademe 2" in w for w in out["academic_warnings"])
+    assert "Benjamini-Hochberg düzeltmesi" in out["methods"] and "1 ve 2 ay gecikme" in out["methods"]
+    assert "p < 0,05" not in out["methods"]        # bu soruda bölge/Türkiye ilişki satırı kullanılmadı
+    assert any(c.startswith("MOD13C2") and "10.5067/MODIS/MOD13C2.061" in c for c in out["data_citations"])
+
+
+def test_answer_bolge_relation_uses_p(kb, regions, pkg):
+    out = answer("Konya'da yeraltı suyu azalıyor mu?", None, kb, None, regions, package=pkg)
+    assert out["verified"] and "p = 0,003" in out["explanation"]       # bölge satırı: p, q değil
+    assert "p < 0,05" in out["methods"] and any("GRACE" in w for w in out["academic_warnings"])
 
 
 def test_answer_retries_after_hallucination(kb, regions, pkg):
