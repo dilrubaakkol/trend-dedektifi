@@ -103,6 +103,11 @@ Her faz sentetik veriyle test edilir ve testler geçmeden sonraki faza geçilmez
   - İki serinin ortak dönemi
 - Kişi 2 mevsim ve anomali serilerini yayımlarsa onlarınki kullanılır; o zamana kadar bizimki
 
+**Durum (2026-11-14): ✅ bitti.** `physics/seriler.py` (mevsim, yıllık, anomali, gecikme, kar maskesi, alan ortalaması), `physics/ciftler.py` (6 çift tablosu ve `cift_serileri`), `tests/test_physics_seriler.py` (17 test).
+- Kış = Ara + Oca + Şub; ilk kış 2002, toplam 24 kış. Eski `_gecici_trend.winter_mean` (Ara–Mar) yalnızca rafa kalkan modüllerde kullanılıyor.
+- **GRACE kararı:** Yıllık GRACE ortalaması için en az 9 ay şartı var (`GRACE_MIN_AY`). Gerçek GRACE'te büyük boşluk dışında da dağınık eksik aylar bulunuyor; 12 ay şartı birçok yılı gereksiz yere atardı. Büyük boşluk yılları (2017: 6 ay, 2018: 7 ay) yine atılıyor. Yağış gibi toplam alınan değişkenlerde eksik ay hiçbir zaman kabul edilmiyor.
+- İkinci tuzak testi: aynı yaz–kış döngüsünü paylaşan ama ilgisiz iki değişken. Ham korelasyon 0,95'in üzerinde, anomali alınınca `anlamsiz`.
+
 ### Faz 3: Hücre haritaları (`L4_iliski/iliski__<d1>__<d2>.nc`)
 - Çift 4 hariç her çift için her 0,25° kara hücresinde şunlar hesaplanır: r, p, n_etkin, anlamli_fdr, etiket
 - Vektörleştirilmiş hesap (1.300 hücre birkaç saniyede)
