@@ -17,6 +17,7 @@ p < 0,05 → etiket `beklenen_yonde` / `ters_yonde` / `anlamsiz`.
 | `tablo.py`, `harita.py` | İl/bölge tablosu ve hücre haritası |
 | `run.py` | Bütün çiftler → `L4_iliski/` |
 | `tek_cift.py` | Tek çift komutu → ekran / JSON / `L4_iliski/ozel/` |
+| `sapma.py` | Beklentiden sapma haritası ve sulama izi → `L4_iliski/sapma/` |
 
 ## Komutlar
 
@@ -39,3 +40,16 @@ python -m physics.iliski --x yagis --y ndvi --bolge tum_iller --mevsim ilkbahar 
 Ekrandaki **ham r** trendi çıkarmadan, **r (trendsiz)** trendi çıkararak hesaplanır. İkisi çok farklıysa
 iki serinin aynı dönemdeki trendi ilişkiyi şişiriyor (sahte korelasyon) ya da gizliyor demektir; yorum
 trendsiz r ile yapılır ve komut bunu uyarı olarak yazar.
+
+## Beklentiden sapma haritası
+
+```bash
+python -m physics.sapma --surum v0.1            # L4_iliski/sapma/: harita (.nc), il tablosu, kümeler (~5 sn)
+python -m physics.sapma --surum v0.1 --goster   # ayrıca HTML harita yazar ve tarayıcıda açar
+```
+
+Önce `physics.run` çalışmış olmalı (L4 etiketleri okunur). Çıktı **doğrulanmamış** bir göstergedir:
+L4 etiketinin fiziksel beklentiden saptığı yerleri ve yazın yağışın açıkladığından yeşil/serin kalan
+hücreleri ("sulama izi") gösterir. Bunlar insan müdahalesiyle (sulama, baraj, yeraltı suyu çekimi)
+tutarlı olabilir; iklim rejimi ve veri/ürün sorunu da olası açıklamalardır. Yöntemde yer adı yoktur.
+
