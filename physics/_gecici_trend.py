@@ -125,3 +125,44 @@ def winter_mean(da, aylar=(12, 1, 2, 3)):
     ort = grup.mean("time", skipna=False)
     sayi = grup.count("time")
     return ort.where(sayi == len(aylar))
+
+
+def trend_map(kis_kup, alpha_fdr: float = 0.10, per: float = 10.0):
+    """Piksel başına Sen eğimi + Mann-Kendall p + FDR maskesi (vektörel, hızlı).
+
+    Girdi: (kis, lat, lon). Çıktı: Dataset ``slope`` (birim/10 yıl), ``p``, ``anlamli`` (FDR,
+    Benjamini-Hochberg, q = ``alpha_fdr``). Mann-Kendall burada otokorelasyon düzeltmesiz,
+    bağ düzeltmesizdir (normal yaklaşım) — GEÇİCİ: Kişi 2'nin ``trend_map``/``apply_fdr``'ı
+    gelince silinecek.
+    """
+    import xarray as xr
+    from scipy.stats import norm
+    k = kis_kup.transpose("kis", "lat", "lon")
+    y = k.values.reshape(k.sizes["kis"], -1).astype(float)            # (T, P)
+    x = k["kis"].values.astype(float)
+    i, j = np.triu_indices(len(x), 1)
+    dy = y[j] - y[i]                                                    # (çift, P)
+    slope = np.nanmedian(dy / (x[j] - x[i])[:, None], axis=0) * per
+    s = np.nansum(np.sign(dy), axis=0)
+    n = np.isfinite(y).sum(axis=0).astype(float)
+    var = n * (n - 1) * (2 * n + 5) / 18.0
+    zst = np.where(s > 0, s - 1, np.where(s < 0, s + 1, 0.0)) / np.sqrt(np.where(var > 0, var, np.nan))
+    p = 2 * norm.sf(np.abs(zst))
+    p[n < 8] = np.nan
+    # Benjamini-Hochberg
+    anl = np.zeros_like(p, dtype=bool)
+    ok = np.isfinite(p)
+    if ok.any():
+        ps = p[ok]
+        o = np.argsort(ps)
+        m = ps.size
+        esik = alpha_fdr * np.arange(1, m + 1) / m
+        gec = np.nonzero(ps[o] <= esik)[0]
+        if gec.size:
+            sinir = ps[o][gec.max()]
+            anl[ok] = ps <= sinir
+    shp = (k.sizes["lat"], k.sizes["lon"])
+    kw = dict(coords={"lat": k.lat, "lon": k.lon}, dims=("lat", "lon"))
+    return xr.Dataset({"slope": xr.DataArray(slope.reshape(shp), **kw),
+                       "p": xr.DataArray(p.reshape(shp), **kw),
+                       "anlamli": xr.DataArray(anl.reshape(shp), **kw)})

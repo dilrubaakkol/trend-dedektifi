@@ -342,5 +342,16 @@ verilirse `observed_shift_m_per_decade` + `label` eklenir (Kişi 5'in arayüzü 
 grafiği çizer). Geçici `winter_mean` `_gecici_trend.py`'de. Gerçek veride çalıştırma: MERRA-2 ve
 GLDAS `sicaklik_2m` + `rakim__SRTM.nc` (0,25°) gerekli; gözlenen kayma Adım 6'da gelir.
 
+**Adım 6 durumu (2026-11-14):** `physics/shift.py` (kar çizgisi serisi, gözlenen kayma,
+`boundary_shift` kaydı + etiket) ve `physics/run.py` (uçtan uca: `python -m physics.run <bolge> --yaz`)
+hazır. Sentetik küpte +50 m/10 yıl kayma 100 denemede %95 kapsanıyor. Kişi 1'in sentetik
+dosyalarıyla Doğu Anadolu zinciri çalıştı (etiket: uyumlu — YER TUTUCU) ve Kişi 5'in
+`load_results` fonksiyonu kaydı okuyup kayma grafiğini çiziyor.
+**Bekleyen:** gerçek veri. Kişi 1'in `cache/processed/turkiye/` dosyaları (kar_ortusu__MOD10CM__005,
+rakim__SRTM(__005), sicaklik_2m__MERRA2, sicaklik_2m__GLDAS) bu bilgisayara gelince aynı komut
+gerçek sonucu `cache/results/`'e yazar. Sentetik sonuç `cache/physics/`'e gider (Kişi 5'in testi
+`cache/results/`'te yer tutucu istemiyor). Duyarlılık kontrolü (hücre içi rakım std > 400 m)
+yapılmadı: Kişi 1 rakım std dosyası üretmiyor.
+
 **Ortam notu (Windows):** Kullanıcı klasörü adında Türkçe karakter olduğu için netCDF4 geçici
 klasöre yazamıyor. Testler `pytest --basetemp=D:/pytest_tmp` ile çalıştırılır.
