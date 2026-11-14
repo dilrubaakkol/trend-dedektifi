@@ -124,3 +124,13 @@ def test_ocean_variable_with_land_region():
 def test_list_regions():
     r = list_regions()
     assert len(r["il"]) == 81 and len(r["bolge"]) == 7 and len(r["deniz"]) == 5
+
+
+def test_il_adi_duzeltme_tablosu():
+    """Elâzığ (Natural Earth yazımı) → Elazığ; anahtar ve çözümleme değişmez."""
+    from data.regions import _iller, il_adi, list_regions, resolve_region
+    assert il_adi("Elâzığ") == "Elazığ" and il_adi("Erzurum") == "Erzurum"
+    assert _iller()["elazig"]["ad"] == "Elazığ"
+    assert ("elazig", "Elazığ") in list_regions()["il"]
+    assert resolve_region("Elâzığ")["label"] == "Elazığ" and resolve_region("il:Elazığ")["key"] == "elazig"
+    assert not any("â" in ad for _, ad in list_regions()["il"] if ad != "Hakkâri")

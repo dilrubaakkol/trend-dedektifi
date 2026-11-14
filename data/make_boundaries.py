@@ -66,7 +66,7 @@ def _download(name: str, folder: Path) -> dict:
 
 def build(out_dir: Path = OUT_DIR) -> None:
     """Natural Earth'ten il, kara ve deniz sınırlarını indirip sadeleştirerek yazar."""
-    from data.regions import normalize_name  # döngüsel içe aktarmayı önlemek için burada
+    from data.regions import il_adi, normalize_name  # döngüsel içe aktarmayı önlemek için burada
 
     out_dir.mkdir(parents=True, exist_ok=True)
     clip = box(*TURKIYE_BBOX).buffer(1.0)
@@ -85,7 +85,7 @@ def build(out_dir: Path = OUT_DIR) -> None:
     feats = []
     for f, g in sorted(zip(tr, geoms), key=lambda x: x[0]["properties"]["iso_3166_2"]):
         p = f["properties"]
-        ad = p["name_tr"]
+        ad = il_adi(p["name_tr"])  # il_adlari.yaml düzeltmeleri (ör. Elâzığ → Elazığ)
         feats.append({"type": "Feature",
                       "properties": {"plaka": int(p["iso_3166_2"].split("-")[1]), "ad": ad,
                                      "anahtar": normalize_name(ad), "iso_3166_2": p["iso_3166_2"]},

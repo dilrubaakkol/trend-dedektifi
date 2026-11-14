@@ -6,6 +6,7 @@
 | `kara.geojson` | Kutudaki tüm kara (komşu ülkeler dahil); deniz maskesi bunun tersidir | Natural Earth 10m Land + Minor Islands |
 | `denizler.geojson` | Karadeniz, Marmara (+ İstanbul ve Çanakkale boğazları), Ege (+ Girit Denizi), Akdeniz; karadan arındırılmış | Natural Earth 10m Marine Polygons |
 | `bolgeler.yaml` | 7 coğrafi bölge → il listesi (elle yazıldı) | 1941 Coğrafya Kongresi bölümlemesi, il bazında yaygın atama |
+| `il_adlari.yaml` | İl adı düzeltmeleri (NE `name_tr` → kullanılan yazım, ör. Elâzığ → Elazığ); `data.regions` okurken uygular, geojson elle değiştirilmez | Elle yazıldı |
 
 - **Lisans:** Natural Earth verisi kamu malıdır (public domain); atıf zorunlu değildir ama önerilir:
   "Made with Natural Earth. Free vector and raster map data @ naturalearthdata.com".
