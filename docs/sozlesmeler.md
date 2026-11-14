@@ -155,28 +155,86 @@ Ortak kurallar:
 
 ### 2.1 L2: hücre bazında trend (Kişi 2)
 
+Üretim: `python -m stats.l2 --surum v0.1`. Kod: `stats/l2.py`, motor `stats/trend_tests.py`, seriler
+`stats/preprocessing.py`. Girdi: `L1_kup/ICINDEKILER.csv`'deki bütün dosyalar (rakım hariç).
+
 - **Yol:** `L2_trend/<degisken>__<urun>__trend.nc`
-- **Boyutlar:** `lat`, `lon`. L1 ile aynı 28 × 78 ızgara ve aynı koordinatlar. Maskeli hücre `NaN`.
+- **Boyutlar:** `mevsim`, `lat`, `lon`. Izgara L1 ile aynı: 28 × 78 hücre, aynı koordinatlar.
+- **`mevsim`** (metin koordinatı, bu sırayla):
+  - `yillik`: Ocak–Aralık
+  - `kis`: Aralık(Y−1)–Şubat(Y); ilk kış 2002
+  - `ilkbahar`: Mart–Mayıs
+  - `yaz`: Haziran–Ağustos
+  - `sonbahar`: Eylül–Kasım
+- **Seri:** Her mevsim için yılda bir değer.
+  - Ortalama alınan değişkenlerde dönem ortalaması.
+  - Toplanan değişkenlerde (`yagis`, `buharlasma`, `yuzey_akisi`, `taban_akisi`) dönem toplamı.
+    Seri birimi yıllıkta `mm/yıl`, mevsimlikte `mm/mevsim` olur; eğim birimi `mm/dönem / 10 yıl`.
+    Her mevsimin seri birimi `seri_birimi` attr'ında yazılı.
+- **Eksik veri kuralı:**
+  - Bir yıl ya da mevsimde eksik ay oranı **> 0,20** ise o değer NaN olur. Yıllıkta en çok 2 ay
+    eksik olabilir; 3 aylık mevsimde tek eksik ay bile değeri düşürür.
+  - Toplanan değişkende eksik ay varsa toplam = geçerli ayların ortalaması × ay sayısı.
+  - Bir hücrede en az **12 geçerli yıl** yoksa trend hesaplanmaz (NaN).
+  - Örnekler: GPM'in 2025 yılı ve 2025 sonbaharı düşer (ürün 2025-09'da bitiyor). GRACE'in 2002 yılı
+    ve GRACE/GRACE-FO arasındaki boşluk yılları düşer.
 
 | Değişken | Tip | Birim | Anlam |
 | --- | --- | --- | --- |
-| `sen_egimi` | float32 | `<birim>/10 yıl` | Sen (Theil-Sen) eğimi |
-| `ga_alt`, `ga_ust` | float32 | `<birim>/10 yıl` | Eğimin %95 güven aralığı; etkin n ile genişletilmiş |
+| `sen_egimi` | float32 | `<seri birimi> / 10 yıl` | Sen (Theil-Sen) eğimi |
+| `ga_alt`, `ga_ust` | float32 | `<seri birimi> / 10 yıl` | Eğimin %95 güven aralığı; etkin n ve t dağılımıyla genişletilmiş (aşağıda) |
 | `p_mk` | float32 | 1 | Hamed-Rao düzeltmeli Mann-Kendall p değeri |
-| `p_fdr` | float32 | 1 | Benjamini-Hochberg ile düzeltilmiş p (q değeri), dosyadaki tüm geçerli hücreler üzerinden |
-| `anlamli` | int8 | — | `1` = `p_fdr ≤ 0,10` (BH, α_FDR = 0,10); `0` = değil; maskeli hücre `-1` |
-| `etkin_n` | float32 | yıl ya da ay | Otokorelasyona göre etkin örneklem büyüklüğü |
-| `gereken_yil` | float32 | yıl | Weatherhead vd. (1998): gözlenen eğimi ayırt etmek için gereken yıl sayısı (yıllık seride √12 düzeltmesi) |
+| `p_fdr` | float32 | 1 | Benjamini-Hochberg q değeri. Her mevsim için ayrı, yalnız Türkiye kara hücreleri üzerinden; diğer hücrelerde NaN |
+| `anlamli` | int8 | — | `1` = `p_fdr ≤ 0,10`; `0` = değil; `-1` = kara maskesi dışı ya da hesaplanamadı |
+| `etkin_n` | float32 | yıl | Etkin örneklem büyüklüğü |
+| `gereken_yil` | float32 | yıl | Weatherhead gereken yıl sayısı (aşağıda); eğim 0 ise NaN |
 
-- **attrs:** Ortak kurallardaki alanlar, ayrıca:
-  - `alfa_fdr = 0.10`, `fdr_yontemi = "Benjamini-Hochberg"`, `mk_yontemi = "Hamed-Rao 1998"`
-  - `ga_yontemi`: genişletme formülünün kısa tanımı
-- **Kaynak uyumu:** `L2_trend/<degisken>__kaynak_uyumu.nc`, boyutlar `lat`, `lon`.
-  - `k` (int16): Aynı yönde ve anlamlı trend veren ürün sayısı.
-  - `m` (int16): O hücrede veri olan ürün sayısı.
-  - attr `urunler`: Karşılaştırılan ürün kodları, ör. `GPM, GLDAS, MERRA2`.
-  - Site bunu "k/m kaynak aynı yönde" diye gösterir.
-  - Yalnız birden fazla ürünü olan değişkenler için üretilir: `yagis`, `sicaklik_2m`.
+- **Kara maskesi:** Türkiye kara sınırı, hücre merkezi kuralı (`data.regions.domain_mask("land")`).
+  `domain = all` değişkenlerde (ör. `sicaklik_2m__MERRA2`) eğim, GA ve p deniz hücrelerinde de
+  hesaplanır. Ama FDR ve `anlamli` yalnız kara hücrelerindedir.
+- **Genişletilmiş GA:**
+  - r1 = Sen artıklarının gecikme-1 otokorelasyonu, yalnız ardışık yıllardan.
+  - Küçük örneklem düzeltmesi: r1_düz = r1 + (1 + 4·r1)/n, en çok 0,95.
+  - n_etkin = n·(1 − r1_düz)/(1 + r1_düz). r1_düz ≤ 0 ise n; en az 3.
+  - Sen aralığının iki yarısı ayrı ayrı √(n/n_etkin) · t₀.₉₇₅(n_etkin − 2)/t₀.₉₇₅(n − 2) ile çarpılır.
+- **MK yedeği:** Güçlü negatif artık otokorelasyonunda Hamed-Rao varyans düzeltmesi negatif çıkabilir
+  ve p tanımsız olur. O hücrede düzeltmesiz MK kullanılır. Yedeğin kullanıldığı hücre sayısı
+  `mk_yedek_hucre` attr'ında yazılı.
+- **Weatherhead gereken yıl:**
+  - n* = [3,3 · σ_N/|ω0| · √((1 + φ)/(1 − φ))]^(2/3)
+  - ω0: yıllık eğim; σ_N: artıkların std'si; φ: artıkların ham gecikme-1 otokorelasyonu (±0,95).
+  - Formül aylık seri için türetilmiştir. Yılda bir değerli seride (yıllık ve mevsimlik) OLS eğim
+    varyansı 12 kat büyük olduğundan σ_N yerine **√12 · σ_N** kullanılır.
+- **attrs:**
+  - Kaynak L1 dosyasının bütün attrs'ı: `kademe`, `lisans`, `urun_surumu`, `veri_seti_doi`, `doi`,
+    `bilinen_sorunlar`, `dogrulanmadi` …
+  - Yöntem alanları: `mk_yontemi`, `egim_yontemi`, `ga_yontemi`, `fdr_yontemi`, `alfa_fdr = 0.10`,
+    `gereken_yil_yontemi`, `eksik_veri_kurali`, `min_yil`.
+  - Seri ve dönem alanları: `katman = "L2"`, `kaynak_dosya`, `birim`, `egim_birimi`, `seri_birimi`,
+    `seri_tanimi`, `donem` (mevsim başına geçerli ilk–son yıl), `mk_yedek_hucre`, `olusturma_tarihi`.
+
+#### Kaynak uyumu
+
+- **Yol:** `L2_trend/<degisken>__kaynak_uyumu.nc`. Boyutlar `mevsim`, `lat`, `lon`.
+- **Hangi değişkenler:** Yalnız birden fazla ürünü olan değişkenler:
+  - `yagis`: GPM, GLDAS, MERRA2
+  - `sicaklik_2m`: MERRA2, GLDAS
+- **Ortak dönem:** Ürünlerin veri dönemlerinin kesişimi. Her ürün bu döneme kırpılır, L2 (FDR dahil)
+  yeniden hesaplanır. Dönem `ortak_donem` attr'ında yazılı.
+- **`m`** (int16): Hücrede trendi hesaplanabilen ürün sayısı (`anlamli ≥ 0`).
+- **`k`** (int16): Anlamlı (`anlamli = 1`) ve aynı yönde trend veren en büyük ürün grubu:
+  max(anlamlı artan, anlamlı azalan). Kara maskesi dışında `k = m = -1`.
+- **attrs:** `urunler`, `ortak_donem`, `alfa_fdr`, `kaynak_doi`, `urun_surumu`, `veri_seti_doi`,
+  `lisans`. Site bunu "m kaynağın k tanesi aynı yönde anlamlı" diye gösterir.
+
+#### Özet tablo
+
+`L2_trend/OZET.csv` (UTF-8, BOM'lu). Bir satır = bir dosya × bir mevsim. Sütunlar:
+- `dosya`, `mevsim`
+- `kara_hucre`: trendi hesaplanan kara hücresi sayısı
+- `anlamli_artan_yuzde`, `anlamli_azalan_yuzde`: `kara_hucre`'ye göre yüzde
+- `medyan_egim`: kara hücrelerinde
+- `egim_birimi`
 
 ### 2.2 L3: il ve bölge özetleri (Kişi 2 / Kişi 3)
 
