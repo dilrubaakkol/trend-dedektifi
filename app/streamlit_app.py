@@ -13,6 +13,7 @@ tablolar gösterilir ve işaretlenir.
 from __future__ import annotations
 
 import html
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -31,7 +32,7 @@ import eposta  # noqa: E402
 import urun_io as U  # noqa: E402
 import veritabani as DB  # noqa: E402
 from charts import noise_experiment, province_trend_map, relation_map, source_comparison  # noqa: E402
-from formatting import fmt  # noqa: E402
+from formatting import fmt, fmt_p  # noqa: E402
 from hero import build_config, render_hero  # noqa: E402
 from theme import inject_theme, section  # noqa: E402
 
@@ -228,7 +229,7 @@ def page_kesfet() -> None:
                f'<span class="{cls}">{num(t["egim_10yil"])} {unit} {verb}</span>.')
     else:
         big = f"Türkiye'de {season_txt}{vname(var).lower()}"
-    small = (f"81 ilin <b class='up'>{up}</b>'inde gerçek bir artış, <b class='down'>{down}</b>'inde gerçek bir azalış "
+    small = (f"81 ilin <b class='up'>{up}</b> tanesinde gerçek bir artış, <b class='down'>{down}</b> tanesinde gerçek bir azalış "
              f"var. Gri iller: değişim henüz tesadüften ayırt edilemiyor. Dönem {str(df['donem'].iloc[0]).replace('-', '–')}.")
     answer(big, small)
 
@@ -307,7 +308,7 @@ def page_il() -> None:
 
 
 def page_iliski() -> None:
-    """Birlikte değişen değişkenler: sade soru → büyük cevap → harita."""
+    """Birlikte değişen değişkenler: sade soru → büyük cevap → harita (ciftler.csv, sözleşme 2.3)."""
     rel = tables["iliski"]
     pairs = [p for p in U.PAIRS if p[0] in set(rel["cift_no"])]
     no = st.pills("Hangi soruyu soralım?", [p[0] for p in pairs], default=pairs[0][0],
@@ -318,25 +319,55 @@ def page_iliski() -> None:
     if len(lags) > 1:
         lag = st.pills("Kaç ay sonra?", lags, default=lags[0], format_func=lambda x: f"{x} ay sonra",
                        key=f"r_lag_{no}") or lags[0]
-    d = rel[(rel["cift_no"] == no) & (rel["gecikme_ay"] == lag)]
-    c = d["kontrol_etiketi"].value_counts()
+    d_all = rel[(rel["cift_no"] == no) & (rel["gecikme_ay"] == lag)]
+    il_rows = U.pair_rows(d_all, "il")
+    # Çift 4 (GRACE) gibi il satırı olmayan çiftler bölge düzeyinde gösterilir.
+    level = "il" if len(il_rows) else "bolge"
+    d = il_rows if level == "il" else U.pair_rows(d_all, "bolge")
+    unit, unit_gen = ("il", "ilin") if level == "il" else ("bölge", "bölgenin")
+    done = d[d["etiket"] != ""]
+    c = done["etiket"].value_counts()
     yes, rev, none = int(c.get("beklenen_yonde", 0)), int(c.get("ters_yonde", 0)), int(c.get("anlamsiz", 0))
-    answer(f"81 ilin <span class='ok'>{yes}</span>'inde evet, <span class='ember'>{rev}</span>'inde tam tersi.",
-           f"{none} ilde henüz net bir ilişki yok. Fizik: “{html.escape(meta[6])}”. "
-           "Bu bir ilişki, kanıtlanmış bir neden değil.")
-    st.plotly_chart(relation_map(d, geojson), width="stretch", config=PLOT_CFG)
+    skipped = len(d) - len(done)
+    answer(f"{len(done)} {unit_gen} <span class='ok'>{yes}</span> tanesinde evet, "
+           f"<span class='ember'>{rev}</span> tanesinde tam tersi.",
+           f"{none} {unit}de henüz net bir ilişki yok"
+           + (f"; {skipped} ilde hesaplanamadı (ör. kar yok)" if skipped else "")
+           + f". Fizik: “{html.escape(meta[6])}”. Bu bir ilişki, kanıtlanmış bir neden değil.")
+    if level == "bolge":
+        st.markdown('<div class="td-callout">Bu çift yalnızca <b>7 bölge ve Türkiye</b> düzeyinde hesaplanır: GRACE '
+                    "uydusunun çözünürlüğü yüzlerce kilometre, il için fazla kaba. Haritada her il, bağlı olduğu bölgenin "
+                    "sonucuyla boyanmıştır.</div>", unsafe_allow_html=True)
+        il_meta = U.provinces()
+        region_of = {int(r.plaka): r.bolge for r in il_meta.itertuples()}
+        st.plotly_chart(relation_map(d, geojson, region_of), width="stretch", config=PLOT_CFG)
+    else:
+        st.plotly_chart(relation_map(d, geojson), width="stretch", config=PLOT_CFG)
     st.markdown('<div class="td-legend"><span><i style="background:#3ddc97"></i>fiziğin beklediği gibi</span>'
                 '<span><i style="background:#ff8a3d"></i>tam tersi · incelenmeli</span>'
-                '<span><i style="background:#2b3552"></i>net ilişki yok</span></div>', unsafe_allow_html=True)
-    rv = d[d["kontrol_etiketi"] == "ters_yonde"]
+                '<span><i style="background:#2b3552"></i>net ilişki yok</span>'
+                + ('<span><i style="background:#141b33;border:1px solid #2b3552"></i>hesaplanamadı</span>' if skipped
+                   else "") + "</div>", unsafe_allow_html=True)
+    tr = U.pair_rows(d_all, "turkiye")
+    if len(tr) and pd.notna(tr["r"].iloc[0]):
+        t = tr.iloc[0]
+        lab, cls = U.CONTROL_LABELS.get(t["etiket"], ("—", "info"))
+        st.markdown(f'<div class="td-mini-h">Türkiye geneli: r = {fmt(t["r"], digits=2)} · '
+                    f'<span class="td-badge {cls}">{lab}</span></div>', unsafe_allow_html=True)
+    rv = d[d["etiket"] == "ters_yonde"]
     if len(rv):
+        notes = {x for x in rv["not"] if x}
         st.markdown('<div class="td-callout"><b>En ilginç yerler:</b> '
-                    + ", ".join(html.escape(x) for x in rv["il"])
+                    + ", ".join(html.escape(x) for x in rv["bolge_adi"])
                     + ". Fiziğin tersi bir sonuç ya veri sorununa ya da sulama, baraj gibi bir insan etkisine işaret "
-                      "eder. Araştırmacılar için en değerli ipuçları bunlardır.</div>", unsafe_allow_html=True)
+                      "eder. Araştırmacılar için en değerli ipuçları bunlardır."
+                    + (f"<br><span style='color:var(--muted)'>Not: {html.escape('; '.join(sorted(notes)))}</span>"
+                       if notes else "") + "</div>", unsafe_allow_html=True)
     if academic:
-        with st.expander("Araştırmacı ayrıntısı · r, p, n_etkin"):
-            html_table(d[U.ILISKI_COLS].sort_values("r"))
+        with st.expander("Araştırmacı ayrıntısı · ciftler.csv satırları (il, bölge, Türkiye)"):
+            cols = ["bolge_turu", "bolge_kodu", "bolge_adi", "hucre_sayisi", "donem", "n", "r", "r1_1", "r1_2",
+                    "etkin_n", "p", "p_fdr", "anlamli", "etiket", "not"]
+            html_table(d_all[cols].sort_values(["bolge_turu", "r"]), max_rows=300)
 
 
 def page_indir() -> None:
@@ -441,6 +472,149 @@ def page_yontem() -> None:
             b.latex(r"n^{*} = \left[\frac{3.3\,\sqrt{12}\,\sigma}{|\omega|}\sqrt{\frac{1+\phi}{1-\phi}}\right]^{2/3}")
 
 
+# ---------------------------------------------------------------- soru sor (Kişi 4: llm.answer)
+EXAMPLE_QUESTIONS = [
+    "Erzurum'da kar azalıyor mu, ısınmayla ilişkili mi?",
+    "Konya'da toprak nemi azalıyor mu?",
+    "Doğu Anadolu ısınıyor mu?",
+]
+EVIDENCE_CLASS = {"anlamli_artis": "ok", "anlamli_azalis": "ok", "beklenen_yonde": "ok", "ters_yonde": "bad",
+                  "anlamsiz": "info", "yetersiz": "warn"}
+
+
+@st.cache_resource(show_spinner=False)
+def llm_package() -> tuple[str | None, bool]:
+    """LLM katmanının okuyacağı analiz paketi: gerçek paket varsa o, yoksa yer tutucu paket.
+
+    Dönüş: (paket yolu ya da None = llm kendi arasın, yer_tutucu_mu).
+    """
+    try:
+        from llm.evidence import find_package
+        real = find_package()
+        if real is not None and (Path(real) / "L3_ozet").exists():
+            return None, False
+    except Exception:  # noqa: BLE001
+        pass
+    return str(U.write_placeholder_package()), True
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def ask(question: str, kitle: str, package: str | None) -> dict:
+    """llm.answer() çağrısı (aynı soru 10 dk önbellekten gelir)."""
+    from llm import answer as llm_answer
+    return llm_answer(question, kitle=kitle, package=package)
+
+
+def render_explanation(text: str) -> str:
+    """Markdown açıklamayı güvenli HTML'e çevirir; [ref:id] → kanıt tablosundaki satıra bağlantı."""
+    out = []
+    for line in html.escape(text or "").splitlines():
+        line = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", line)
+        line = re.sub(r"\[ref:([^\]]+)\]", r'<a class="td-ref" href="#ev-\1">kanıt</a>', line)
+        if line.startswith("- "):
+            line = f'<div class="td-li">{line[2:]}</div>'
+        out.append(line)
+    return "<br>".join(x for x in out if x) .replace("</div><br>", "</div>")
+
+
+def evidence_html(rows: list[dict]) -> str:
+    """Kanıt tablosu (değerler ham sayı; Türkçe biçimde gösterilir)."""
+    body = []
+    for r in rows:
+        val = r.get("deger")
+        val = val if isinstance(val, str) else fmt(val, digits=3 if val is not None and abs(val) < 1 else 2)
+        if r.get("aralik_95") and None not in r["aralik_95"]:
+            val += f'<br><span class="muted">%95: {fmt(r["aralik_95"][0], digits=2)} … {fmt(r["aralik_95"][1], digits=2)}</span>'
+        # fmt_p "p = 0,013" / "p < 0,001" döndürür; q için aynı biçim, harf değişir
+        sig = " · ".join(x for x in (fmt_p(r["p"]) if r.get("p") is not None else "",
+                                     fmt_p(r["q"]).replace("p", "q", 1) if r.get("q") is not None else "") if x) or "—"
+        lab = r.get("etiket_sade") or r.get("etiket") or ""
+        cls = EVIDENCE_CLASS.get(r.get("etiket"), "info")
+        extra = ' <span class="td-badge warn">doğrulanmadı</span>' if r.get("dogrulanmadi") else ""
+        body.append(f'<tr id="ev-{html.escape(str(r.get("id")))}"><td><b>{html.escape(str(r.get("degisken") or ""))}</b>'
+                    f'<br><span class="muted">{html.escape(str(r.get("urun") or ""))} · '
+                    f'{html.escape(str(r.get("bolge") or ""))}</span></td>'
+                    f'<td class="num">{val} <span class="muted">{html.escape(str(r.get("birim") or ""))}</span></td>'
+                    f'<td class="num">{sig}</td><td><span class="td-badge {cls}">{html.escape(lab)}</span>{extra}</td></tr>')
+    return ('<div class="td-table-wrap"><table class="td-table"><thead><tr><th>Kanıt</th><th>Değer</th>'
+            '<th>Anlamlılık</th><th>Sonuç</th></tr></thead><tbody>' + "".join(body) + "</tbody></table></div>")
+
+
+def _pick_example() -> None:
+    """Örnek soru düğmesine basılınca metin kutusunu doldurur."""
+    if st.session_state.get("q_example"):
+        st.session_state["q_text"] = st.session_state["q_example"]
+
+
+def page_soru() -> None:
+    """Serbest soru → plan → NASA verisinden kanıt → doğrulanmış açıklama (Kişi 4'ün llm.answer katmanı)."""
+    kitle = "akademisyen" if academic else "genel"
+    answer("Sorunu yaz, <span class='ember'>kanıtı getirelim.</span>",
+           "Soru bir konuya ve bölgeye çevrilir, ilgili trend ve ilişki sonuçları analiz paketinden okunur. Metindeki "
+           "her sayı bir kanıt satırına bağlıdır ve doğrulayıcıdan geçer; yapay zekâ sayı uydurmaz.")
+    st.pills("Örnek sorular", EXAMPLE_QUESTIONS, key="q_example", on_change=_pick_example,
+             label_visibility="collapsed")
+    q = st.text_area("Soru", key="q_text", height=90, label_visibility="collapsed",
+                     placeholder="Örn. Erzurum'da kar azalıyor mu, ısınmayla ilişkili mi?")
+    go = st.button("Soruştur  →", type="primary", key="q_go")
+    if go and q.strip():
+        st.session_state["q_asked"] = q.strip()
+    asked = st.session_state.get("q_asked")
+    if not asked:
+        return
+    pkg, ph = llm_package()
+    try:
+        with st.spinner("Kanıtlar toplanıyor…"):
+            out = ask(asked, kitle, pkg)
+    except Exception as e:  # noqa: BLE001
+        st.error(f"Soru cevaplanamadı ({type(e).__name__}). Lütfen soruyu farklı yazmayı dene.")
+        return
+
+    plan = out.get("plan") or {}
+    chips = [f'<span class="td-badge {"ok" if out.get("verified") else "bad"}">'
+             f'{"✓ sayılar doğrulandı" if out.get("verified") else "doğrulanamadı"}</span>',
+             f'<span class="td-badge info">açıklama: {"yapay zekâ" if out.get("explainer") == "llm" else "şablon"}</span>']
+    if plan.get("method"):
+        chips.append(f'<span class="td-badge info">plan: {"yapay zekâ" if plan["method"] == "llm" else "anahtar kelime"}'
+                     "</span>")
+    if ph:
+        chips.append('<span class="td-badge warn">örnek veri · yer tutucu paket</span>')
+    st.markdown('<div style="display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 6px">' + "".join(chips) + "</div>",
+                unsafe_allow_html=True)
+
+    if out.get("message"):
+        st.info(out["message"])
+    if plan.get("gerekce"):
+        place = plan.get("region_name") or ""
+        st.markdown(f'<div class="td-callout"><b>Neden bu verilere baktık?</b> {html.escape(plan["gerekce"])}'
+                    + (f" <span style='color:var(--muted)'>· bölge: {html.escape(place)}</span>" if place else "")
+                    + "</div>", unsafe_allow_html=True)
+    if out.get("explanation"):
+        st.markdown(f'<div class="td-explain" style="margin-top:18px">{render_explanation(out["explanation"])}</div>',
+                    unsafe_allow_html=True)
+    if out.get("evidence"):
+        st.markdown('<div class="td-mini-h">Kanıt tablosu</div>', unsafe_allow_html=True)
+        st.markdown(evidence_html(out["evidence"]), unsafe_allow_html=True)
+
+    if academic and out.get("methods"):
+        with st.expander("📄  Veri ve yöntem paragrafı (makaleye hazır)"):
+            st.code(out["methods"], language=None, wrap_lines=True)
+        with st.expander("📚  Veri atıfları ve kaynakça"):
+            for c in out.get("data_citations") or []:
+                st.markdown(f"- {c}")
+            st.markdown("**Yöntem kaynakçası**")
+            for c in out.get("method_references") or []:
+                st.markdown(f"- {c}")
+        if out.get("files"):
+            with st.expander("🗂️  Kullanılan paket dosyaları"):
+                st.code("\n".join(out["files"]), language=None)
+    notes = (out.get("academic_warnings") or []) + (out.get("warnings") or [])
+    if notes:
+        with st.expander(f"⚠️  Dikkat edilecekler ({len(notes)})"):
+            for w in notes:
+                st.markdown(f"- {w}")
+
+
 STATUS = {"yayimlandi": ("Yayımlandı", "ok"), "degerlendirmede": ("Değerlendirmede", "warn"),
           "hazirlaniyor": ("Hazırlanıyor", "info")}
 
@@ -518,7 +692,7 @@ def page_makale() -> None:
         studies_list(others)
 
 
-PAGE_FUNCS = {"kesfet": page_kesfet, "il": page_il, "iliski": page_iliski, "indir": page_indir,
+PAGE_FUNCS = {"kesfet": page_kesfet, "soru": page_soru, "il": page_il, "iliski": page_iliski, "indir": page_indir,
               "makale": page_makale, "yontem": page_yontem}
 
 

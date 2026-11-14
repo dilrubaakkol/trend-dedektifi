@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 from scipy import stats
 
@@ -176,19 +177,33 @@ def province_trend_map(df, geojson: dict, units: str, highlight: str | None = No
     return _geo(fig)
 
 
-def relation_map(df, geojson: dict) -> go.Figure:
-    """Fizik kontrolü haritası: beklenen yönde yeşil, ters yönde turuncu, anlamsız gri."""
-    colors = {"beklenen_yonde": OK, "ters_yonde": EMBER, "anlamsiz": GREY}
+def relation_map(df, geojson: dict, region_of: dict | None = None) -> go.Figure:
+    """Fizik kontrolü haritası: beklenen yönde yeşil, ters yönde turuncu, anlamsız gri, hesaplanamadı koyu.
+
+    `df`: ciftler.csv satırları. İl düzeyinde `plaka` sütunu gerekir. Bölge düzeyinde `region_of`
+    ({plaka: bölge_kodu}) verilir; her il, bağlı olduğu bölgenin etiketiyle boyanır.
+    """
+    colors = {"beklenen_yonde": OK, "ters_yonde": EMBER, "anlamsiz": GREY, "": "#141b33"}
+    if region_of is not None:  # bölge satırlarını illere yay
+        by_code = {str(r["bolge_kodu"]): r for r in df.to_dict("records")}
+        rows = [(plaka, by_code[code]) for plaka, code in region_of.items() if code in by_code]
+    else:
+        rows = [(int(r["plaka"]), r) for r in df.to_dict("records") if pd.notna(r["plaka"])]
     fig = go.Figure()
     for lab, color in colors.items():
-        d = df[df["kontrol_etiketi"] == lab]
-        if not len(d):
+        sel = [(pl, r) for pl, r in rows if (r["etiket"] or "") == lab]
+        if not sel:
             continue
+        text = []
+        for _, r in sel:
+            if pd.isna(r["r"]):
+                text.append(f"<b>{r['bolge_adi']}</b><br>{r['not'] or 'hesaplanamadı'}")
+            else:
+                text.append(f"<b>{r['bolge_adi']}</b><br>r = {fmt(r['r'], digits=2)} · p = {fmt(r['p'], digits=3)}"
+                            f"<br>etkin n = {fmt(r['etkin_n'])}")
         fig.add_trace(go.Choropleth(
-            geojson=geojson, featureidkey="properties.plaka", locations=d["plaka"], z=[1] * len(d),
-            colorscale=[[0, color], [1, color]], showscale=False,
-            text=[f"<b>{r.il}</b><br>r = {fmt(r.r, digits=2)} · p = {fmt(r.p, digits=3)}<br>n_etkin = {fmt(r.n_etkin)}"
-                  for r in d.itertuples()],
+            geojson=geojson, featureidkey="properties.plaka", locations=[pl for pl, _ in sel], z=[1] * len(sel),
+            colorscale=[[0, color], [1, color]], showscale=False, text=text,
             hovertemplate="%{text}<extra></extra>", marker=dict(line=dict(color="rgba(3,5,15,.9)", width=0.6)),
         ))
     return _geo(fig, 480)
