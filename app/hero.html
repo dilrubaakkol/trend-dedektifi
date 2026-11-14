@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trend Dedektifi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@600;700;800;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #03050f;
+    --ink: #eaf0ff;
+    --muted: #8796bd;
+    --ice: #5cc8ff;
+    --ember: #ff8a3d;
+    --line: rgba(140, 170, 230, .28);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden;
+    font-family: Inter, system-ui, sans-serif; color: var(--ink); }
+
+  /* WebGL yoksa ya da dokular gelmezse görünen yedek arka plan */
+  .fallback { position: absolute; inset: 0;
+    background:
+      radial-gradient(1200px 1200px at 50% 165%, #0d1d45 0 58%, rgba(92,200,255,.55) 58.4%, rgba(92,200,255,.08) 61%, transparent 66%),
+      radial-gradient(900px 500px at 50% 0%, #121c4a 0%, transparent 70%),
+      var(--bg); }
+  #scene { position: absolute; inset: 0; opacity: 0; transition: opacity 1.6s ease; }
+  #scene.ready { opacity: 1; }
+  #scene canvas { display: block; }
+  .vignette { position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(ellipse 46% 40% at 50% 52%, rgba(3,5,15,.62), rgba(3,5,15,.25) 60%, transparent 100%),
+      radial-gradient(ellipse at 50% 40%, transparent 55%, rgba(0,0,0,.55) 100%); }
+
+  /* Köşe çerçeveleri ve telemetri */
+  .hud { position: absolute; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    letter-spacing: .16em; text-transform: uppercase; color: var(--muted); line-height: 1.85;
+    pointer-events: none; animation: fade 1.2s ease .6s both; }
+  .hud b { color: var(--ink); font-weight: 600; }
+  .hud .brand { color: var(--ink); font-family: 'Exo 2', sans-serif; font-weight: 800;
+    font-size: 16px; letter-spacing: .2em; }
+  .tl { top: 30px; left: 34px; } .tr { top: 30px; right: 34px; text-align: right; }
+  .bl { bottom: 30px; left: 34px; } .br { bottom: 30px; right: 34px; text-align: right; }
+  .corner { position: absolute; width: 30px; height: 30px; border-color: var(--line); border-style: solid; pointer-events: none; }
+  .c1 { top: 16px; left: 16px; border-width: 1px 0 0 1px; }
+  .c2 { top: 16px; right: 16px; border-width: 1px 1px 0 0; }
+  .c3 { bottom: 16px; left: 16px; border-width: 0 0 1px 1px; }
+  .c4 { bottom: 16px; right: 16px; border-width: 0 1px 1px 0; }
+  .live::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: #3ddc97; margin-right: 8px; vertical-align: 1px; box-shadow: 0 0 10px #3ddc97;
+    animation: blink 1.6s infinite; }
+  .warn { color: #f5c451; }
+
+  /* Orta metin */
+  .center { position: absolute; left: 50%; top: 13%; transform: translateX(-50%);
+    width: min(980px, 92%); text-align: center; }
+  .pill { display: inline-block; padding: 9px 20px; border: 1px solid var(--line); border-radius: 999px;
+    background: rgba(6, 10, 30, .55); backdrop-filter: blur(6px);
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: .22em; color: var(--muted);
+    animation: rise 1s ease .2s both; }
+  .pill em { font-style: normal; color: var(--ember); font-weight: 600; }
+  h1 { font-family: 'Exo 2', sans-serif; font-weight: 900; font-size: clamp(40px, 6.4vw, 96px);
+    line-height: 1.02; margin: 22px 0 22px; letter-spacing: -.01em;
+    text-shadow: 0 4px 40px rgba(0,0,0,.65); animation: rise 1.1s ease .35s both; }
+  h1 .ice { color: var(--ice); text-shadow: 0 0 40px rgba(92,200,255,.35); }
+  h1 .ember { color: var(--ember); text-shadow: 0 0 40px rgba(255,138,61,.35); }
+  .lead { max-width: 780px; margin: 0 auto; font-size: clamp(15px, 1.35vw, 20px); line-height: 1.65;
+    color: #c6d2ee; text-shadow: 0 2px 18px rgba(0,0,0,.9); animation: rise 1.1s ease .55s both; }
+  .btns { margin-top: 30px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
+    animation: rise 1.1s ease .75s both; }
+  .btn { font-family: 'Exo 2', sans-serif; font-weight: 700; font-size: 17px; letter-spacing: .04em;
+    padding: 17px 32px; border-radius: 999px; cursor: pointer; border: 1px solid var(--line);
+    background: rgba(6,10,30,.55); color: var(--ink); backdrop-filter: blur(6px);
+    transition: transform .2s ease, box-shadow .2s ease, background .2s ease; }
+  .btn:hover { transform: translateY(-2px); background: rgba(20,30,70,.7); }
+  .btn.primary { background: var(--ember); color: #1a0d05; border-color: transparent;
+    box-shadow: 0 10px 40px rgba(255,138,61,.35); }
+  .btn.primary:hover { box-shadow: 0 14px 50px rgba(255,138,61,.5); background: #ff9a55; }
+  .btn:focus-visible { outline: 2px solid var(--ice); outline-offset: 3px; }
+
+  /* Uydu etiketleri */
+  .sat-label { position: absolute; left: 0; top: 0; pointer-events: none; white-space: nowrap;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .14em; color: var(--ink);
+    transition: opacity .3s ease; will-change: transform; }
+  .sat-label::before { content: ""; position: absolute; left: -22px; top: 8px; width: 16px; height: 1px; background: var(--line); }
+  .sat-label small { display: block; color: var(--muted); font-size: 10px; }
+  .sat-label.main { color: var(--ember); }
+
+  .scroll-cue { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%);
+    width: 22px; height: 36px; border: 1px solid var(--line); border-radius: 12px; animation: fade 1s ease 1.4s both; }
+  .scroll-cue::after { content: ""; position: absolute; left: 50%; top: 7px; width: 3px; height: 7px;
+    margin-left: -1.5px; border-radius: 2px; background: var(--ice); animation: cue 1.8s infinite; }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes blink { 50% { opacity: .35; } }
+  @keyframes cue { 0% { opacity: 0; transform: translateY(0); } 40% { opacity: 1; } 100% { opacity: 0; transform: translateY(12px); } }
+
+  @media (max-width: 760px) {
+    .tr, .br, .scroll-cue { display: none; }
+    .tl { left: 18px; top: 22px; } .bl { left: 18px; bottom: 18px; }
+    .center { top: 15%; }
+    .lead { font-size: 15px; }
+    .btn { padding: 14px 22px; font-size: 15px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pill, h1, .lead, .btns, .hud { animation: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="fallback"></div>
+  <div id="scene"></div>
+  <div class="vignette"></div>
+  <div id="labels"></div>
+
+  <div class="corner c1"></div><div class="corner c2"></div>
+  <div class="corner c3"></div><div class="corner c4"></div>
+
+  <div class="hud tl">
+    <div class="brand">TREND DEDEKTİFİ</div>
+    <div id="case">—</div>
+  </div>
+  <div class="hud tr">
+    <div><b id="sat-name">TERRA · MODIS</b></div>
+    <div>İRTİFA <b>705 KM</b> · EĞİM <b>98,2°</b></div>
+    <div class="live">ALT NOKTA <b id="subpoint">—</b></div>
+  </div>
+  <div class="hud bl">
+    <div>BÖLGE <b id="bbox">—</b></div>
+    <div>DÖNEM <b id="period">—</b></div>
+  </div>
+  <div class="hud br">
+    <div>NASA SPACE APPS CHALLENGE 2026</div>
+    <div><b>AÇIK KAYNAK</b> · <span id="status">—</span></div>
+  </div>
+
+  <main class="center">
+    <div class="pill">NASA UYDU VERİSİYLE <em>SEBEP</em> SORUŞTURMASI</div>
+    <h1 id="headline">Uydular <span class="ice">karın</span><br>azaldığını gördü. <span class="ember">Neden?</span></h1>
+    <p class="lead" id="lead"></p>
+    <div class="btns">
+      <button class="btn primary" data-target="sorusturma">Soruşturmaya başla &nbsp;→</button>
+      <button class="btn" data-target="proje">Proje ne yapıyor?</button>
+    </div>
+  </main>
+  <div class="scroll-cue"></div>
+
+<script>window.TD = /*__TD_CONFIG__*/{};</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  const TD = window.TD || {};
+
+  // ---------- Yardımcılar ----------
+  // Ekrandaki koordinat metni: ondalık virgül, K/G ve D/B yönleri.
+  function fmtDeg(v, pos, neg) {
+    return Math.abs(v).toFixed(2).replace(".", ",") + "°" + (v >= 0 ? pos : neg);
+  }
+  function fmtNum(v) { return String(v).replace(".", ","); }
+
+  // HUD metinleri Python tarafından gelen yapılandırmadan dolar.
+  const $ = (id) => document.getElementById(id);
+  $("case").textContent = TD.case_label || "VAKA 01";
+  $("period").textContent = TD.period_label || "—";
+  if (TD.bbox) {
+    const [w, s, e, n] = TD.bbox;
+    $("bbox").textContent = `${fmtNum(w)}–${fmtNum(e)}°D · ${fmtNum(s)}–${fmtNum(n)}°K`;
+  }
+  const st = $("status");
+  st.textContent = TD.status_label || "";
+  if (TD.is_placeholder) st.classList.add("warn");
+  if (TD.headline_html) $("headline").innerHTML = TD.headline_html;
+  $("lead").textContent = TD.lead || "";
+
+  // Butonlar Streamlit sayfasındaki ilgili bölüme kaydırır.
+  document.querySelectorAll(".btn[data-target]").forEach((b) => {
+    b.addEventListener("click", () => {
+      try {
+        const el = window.parent.document.getElementById(b.dataset.target);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (err) { /* farklı köken: sessizce geç */ }
+    });
+  });
+
+  // ---------- Kayan yıldız imleci ----------
+  // Bu fonksiyon metin olarak ana Streamlit sayfasına enjekte edilir ve orada çalışır;
+  // böylece imleç yalnızca açılışta değil, sayfanın tamamında kayan yıldız olur.
+  function cometMain() {
+    if (window.__tdComet) return;
+    window.__tdComet = true;
+    const mm = (q) => window.matchMedia && window.matchMedia(q).matches;
+    if (mm("(pointer: coarse)") || mm("(prefers-reduced-motion: reduce)")) return; // dokunmatik / az hareket
+
+    const doc = document;
+    const style = doc.createElement("style");
+    style.textContent = "html, body, * { cursor: none !important; }";
+    doc.head.appendChild(style);
+    const c = doc.createElement("canvas");
+    c.id = "td-comet";
+    c.style.cssText = "position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:2147483647";
+    doc.body.appendChild(c);
+    const g = c.getContext("2d");
+    let W = 0, H = 0, dpr = 1;
+    function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = window.innerWidth; H = window.innerHeight;
+      c.width = W * dpr; c.height = H * dpr;
+    }
+    resize();
+    window.addEventListener("resize", resize);
+
+    const TAIL_MS = 600; // kuyruk uzunluğu (ms); büyütürsen kuyruk uzar
+    const trail = [], sparks = [];
+    let hx = -100, hy = -100, visible = false, hover = 0, hoverTarget = 0;
+    const CLICKABLE = "a,button,select,input,textarea,label,summary,[role=button],[role=tab],[role=option],[data-baseweb=select]";
+
+    window.__tdCometMove = function (x, y, overClickable) {
+      const now = performance.now();
+      const dx = x - hx, dy = y - hy, sp = Math.hypot(dx, dy);
+      hx = x; hy = y; visible = true; hoverTarget = overClickable ? 1 : 0;
+      trail.push({ x, y, t: now });
+      // Hızlı harekette kıvılcım saç
+      const n = Math.min(3, Math.floor(sp / 14));
+      for (let i = 0; i < n; i++) {
+        const a = Math.atan2(-dy, -dx) + (Math.random() - 0.5) * 1.1;
+        const v = 0.6 + Math.random() * 1.6;
+        sparks.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: now,
+          life: 380 + Math.random() * 420, s: 0.6 + Math.random() * 1.3, warm: Math.random() < 0.55 });
+      }
+    };
+    window.__tdCometHide = function () { visible = false; };
+    window.addEventListener("mousemove", (e) => {
+      window.__tdCometMove(e.clientX, e.clientY, !!(e.target.closest && e.target.closest(CLICKABLE)));
+    }, { passive: true });
+    doc.addEventListener("mouseleave", () => { visible = false; });
+
+    const mix = (a, b, k) => a + (b - a) * k;
+    function frame() {
+      const now = performance.now();
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.clearRect(0, 0, W, H);
+      g.globalCompositeOperation = "lighter";
+      g.lineCap = "round"; g.lineJoin = "round";
+      while (trail.length && now - trail[0].t > TAIL_MS) trail.shift();
+      hover += (hoverTarget - hover) * 0.2;
+
+      // Kuyruk: uçta turuncu ve ince, başa doğru buz mavisi ve kalın
+      for (let pass = 0; pass < 2; pass++) {
+        for (let i = 1; i < trail.length; i++) {
+          const p0 = trail[i - 1], p1 = trail[i];
+          const k = 1 - (now - p1.t) / TAIL_MS;           // 0 = eski, 1 = yeni
+          if (k <= 0) continue;
+          const r = Math.round(mix(255, 190, k)), gg = Math.round(mix(138, 230, k)), b = Math.round(mix(61, 255, k));
+          g.strokeStyle = `rgba(${r},${gg},${b},${pass ? k * 0.95 : k * 0.16})`;
+          g.lineWidth = pass ? 0.6 + k * 4.2 : 4 + k * 14;
+          g.beginPath(); g.moveTo(p0.x, p0.y); g.lineTo(p1.x, p1.y); g.stroke();
+        }
+      }
+
+      // Kıvılcımlar
+      for (let i = sparks.length - 1; i >= 0; i--) {
+        const s = sparks[i], age = (now - s.t) / s.life;
+        if (age >= 1) { sparks.splice(i, 1); continue; }
+        s.x += s.vx; s.y += s.vy; s.vx *= 0.97; s.vy *= 0.97;
+        g.fillStyle = s.warm ? `rgba(255,170,100,${1 - age})` : `rgba(180,225,255,${1 - age})`;
+        g.beginPath(); g.arc(s.x, s.y, s.s * (1 - age * 0.5), 0, Math.PI * 2); g.fill();
+      }
+
+      if (visible) {
+        // Baş: yumuşak hale + dört kollu yıldız parıltısı + beyaz çekirdek
+        const glowR = 16 + hover * 6;
+        const rg = g.createRadialGradient(hx, hy, 0, hx, hy, glowR);
+        rg.addColorStop(0, "rgba(255,255,255,0.95)");
+        rg.addColorStop(0.18, "rgba(170,220,255,0.55)");
+        rg.addColorStop(1, "rgba(92,200,255,0)");
+        g.fillStyle = rg; g.beginPath(); g.arc(hx, hy, glowR, 0, Math.PI * 2); g.fill();
+        const rot = now / 900, L = 9 + hover * 4 + Math.sin(now / 160) * 1.2;
+        g.strokeStyle = "rgba(235,245,255,0.85)"; g.lineWidth = 1.1;
+        for (let j = 0; j < 4; j++) {
+          const a = rot + j * Math.PI / 2, l = j % 2 ? L * 0.6 : L;
+          g.beginPath(); g.moveTo(hx, hy); g.lineTo(hx + Math.cos(a) * l, hy + Math.sin(a) * l); g.stroke();
+        }
+        g.globalCompositeOperation = "source-over";
+        g.fillStyle = "#ffffff"; g.beginPath(); g.arc(hx, hy, 2.4, 0, Math.PI * 2); g.fill();
+        if (hover > 0.02) { // tıklanabilir öğe üstünde turuncu halka
+          g.strokeStyle = `rgba(255,138,61,${0.85 * hover})`; g.lineWidth = 1.5;
+          g.beginPath(); g.arc(hx, hy, 13 + hover * 5, 0, Math.PI * 2); g.stroke();
+        }
+      }
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  (function installComet() {
+    let host = window, offset = null;
+    try {
+      if (window.parent !== window && window.parent.document && window.frameElement) {
+        host = window.parent; offset = window.frameElement;
+      }
+    } catch (err) { host = window; offset = null; }
+    if (!host.__tdComet) {
+      const s = host.document.createElement("script");
+      s.textContent = "(" + cometMain.toString() + ")();";
+      host.document.head.appendChild(s);
+    }
+    if (!offset) return;
+    // Hero bir iframe içinde: fare olaylarını ana sayfanın koordinatlarına çevirip ilet.
+    const own = document.createElement("style");
+    own.textContent = "html, body, * { cursor: none !important; }";
+    if (host.__tdComet && host.__tdCometMove) document.head.appendChild(own);
+    window.addEventListener("mousemove", (e) => {
+      if (!host.__tdCometMove) return;
+      const r = offset.getBoundingClientRect();
+      host.__tdCometMove(e.clientX + r.left, e.clientY + r.top, !!e.target.closest(".btn"));
+    }, { passive: true });
+  })();
+
+  if (!window.THREE) return; // three.js yüklenemediyse yedek arka plan kalır
+  const THREE = window.THREE;
+
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+  } catch (err) { return; }
+  const host = $("scene");
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setClearColor(0x03050f, 1);
+  host.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 300);
+  // Güneş arkadan-soldan: önde şehir ışıklı gece yüzü, solda aydınlık hilal (metin okunaklı kalır).
+  const SUN = new THREE.Vector3(-0.8, 0.42, -0.45).normalize();
+  const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Enlem/boylam → küre üzerindeki nokta (three.js SphereGeometry doku düzeniyle uyumlu).
+  function ll2v(lat, lon, r) {
+    const la = THREE.MathUtils.degToRad(lat), lo = THREE.MathUtils.degToRad(lon);
+    return new THREE.Vector3(r * Math.cos(la) * Math.cos(lo), r * Math.sin(la), -r * Math.cos(la) * Math.sin(lo));
+  }
+  function v2ll(p) {
+    const r = p.length();
+    return { lat: THREE.MathUtils.radToDeg(Math.asin(p.y / r)), lon: THREE.MathUtils.radToDeg(Math.atan2(-p.z, p.x)) };
+  }
+
+  // ---------- Yıldızlar ----------
+  (function stars() {
+    const N = 7000, pos = new Float32Array(N * 3), col = new Float32Array(N * 3),
+      size = new Float32Array(N), phase = new Float32Array(N);
+    const tints = [[1, 1, 1], [0.75, 0.85, 1], [1, 0.9, 0.75], [0.85, 0.9, 1]];
+    for (let i = 0; i < N; i++) {
+      const u = Math.random() * 2 - 1, t = Math.random() * Math.PI * 2, r = 80;
+      const s = Math.sqrt(1 - u * u);
+      pos.set([r * s * Math.cos(t), r * u, r * s * Math.sin(t)], i * 3);
+      col.set(tints[(Math.random() * tints.length) | 0], i * 3);
+      size[i] = Math.pow(Math.random(), 6) * 3.2 + 0.6;
+      phase[i] = Math.random() * 6.283;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    g.setAttribute("scol", new THREE.BufferAttribute(col, 3));
+    g.setAttribute("size", new THREE.BufferAttribute(size, 1));
+    g.setAttribute("phase", new THREE.BufferAttribute(phase, 1));
+    const m = new THREE.ShaderMaterial({
+      uniforms: { t: { value: 0 }, pr: { value: renderer.getPixelRatio() } },
+      vertexShader: `
+        attribute vec3 scol; attribute float size; attribute float phase;
+        uniform float t; uniform float pr; varying vec3 vC; varying float vA;
+        void main(){
+          vC = scol; vA = 0.6 + 0.4 * sin(t * (0.6 + phase * 0.25) + phase);
+          gl_PointSize = size * pr;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: `
+        varying vec3 vC; varying float vA;
+        void main(){
+          float d = length(gl_PointCoord - 0.5);
+          float a = smoothstep(0.5, 0.0, d);
+          gl_FragColor = vec4(vC, a * vA);
+        }`,
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    const pts = new THREE.Points(g, m);
+    pts.userData.mat = m;
+    scene.add(pts);
+    scene.userData.stars = pts;
+  })();
+
+  // ---------- Dünya ----------
+  const tilt = new THREE.Group();
+  tilt.rotation.x = 0.16;
+  scene.add(tilt);
+  const spin = new THREE.Group();
+  tilt.add(spin);
+
+  const target = TD.target || { lat: 39.5, lon: 41.0 };
+  // Çalışılan bölge açılışta kameraya dönük başlasın.
+  const spin0 = THREE.MathUtils.degToRad(-(90 + target.lon));
+  spin.rotation.y = spin0;
+
+  function solid(r, g, b) {
+    const t = new THREE.DataTexture(new Uint8Array([r, g, b, 255]), 1, 1, THREE.RGBAFormat);
+    t.needsUpdate = true;
+    return t;
+  }
+  const uniforms = {
+    dayMap: { value: solid(18, 40, 90) },
+    nightMap: { value: solid(0, 0, 0) },
+    specMap: { value: solid(255, 255, 255) },
+    sunDir: { value: SUN },
+  };
+  const earthMat = new THREE.ShaderMaterial({
+    uniforms,
+    vertexShader: `
+      varying vec2 vUv; varying vec3 vN; varying vec3 vP;
+      void main(){
+        vUv = uv;
+        vN = normalize(mat3(modelMatrix) * normal);
+        vec4 wp = modelMatrix * vec4(position, 1.0); vP = wp.xyz;
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }`,
+    fragmentShader: `
+      uniform sampler2D dayMap, nightMap, specMap; uniform vec3 sunDir;
+      varying vec2 vUv; varying vec3 vN; varying vec3 vP;
+      void main(){
+        vec3 n = normalize(vN);
+        vec3 v = normalize(cameraPosition - vP);
+        float ndl = dot(n, sunDir);
+        float dayAmt = smoothstep(-0.06, 0.26, ndl);
+        vec3 day = texture2D(dayMap, vUv).rgb;
+        day = pow(day, vec3(1.08)) * 1.15;
+        vec3 nightTex = texture2D(nightMap, vUv).rgb;
+        float lum = dot(nightTex, vec3(0.3, 0.59, 0.11));
+        // Black Marble: şehir ışıklarını ayır, karayı soğuk laciverte çek
+        vec3 night = vec3(1.0, 0.8, 0.5) * smoothstep(0.07, 0.55, lum) * 1.7 + nightTex * vec3(0.10, 0.16, 0.32);
+        float water = texture2D(specMap, vUv).r;
+        vec3 h = normalize(sunDir + v);
+        float spec = pow(max(dot(n, h), 0.0), 55.0) * water * 0.9;
+        vec3 lit = day * (max(ndl, 0.0) * 1.15 + 0.035) + vec3(1.0, 0.88, 0.7) * spec * dayAmt;
+        // Gece yüzü: şehir ışıkları + hafif mavi ay ışığı
+        vec3 dark = night + vec3(0.006, 0.012, 0.03);
+        vec3 col = mix(dark, lit, dayAmt);
+        // Gün batımı çizgisinde turuncu ton
+        float term = exp(-pow(ndl * 6.0, 2.0));
+        col += vec3(1.0, 0.42, 0.12) * term * 0.10;
+        // Kenar ışıması (atmosferin iç tarafı)
+        float fres = pow(1.0 - max(dot(n, v), 0.0), 3.0);
+        col += vec3(0.28, 0.58, 1.0) * fres * (0.35 + 1.1 * smoothstep(-0.3, 0.6, ndl));
+        gl_FragColor = vec4(col, 1.0);
+      }`,
+  });
+  const earth = new THREE.Mesh(new THREE.SphereGeometry(1, 192, 128), earthMat);
+  spin.add(earth);
+
+  // Bulutlar: Dünya'dan biraz daha hızlı döner.
+  const cloudU = { cloudMap: { value: solid(0, 0, 0) }, sunDir: { value: SUN } };
+  const clouds = new THREE.Mesh(
+    new THREE.SphereGeometry(1.006, 160, 110),
+    new THREE.ShaderMaterial({
+      uniforms: cloudU,
+      vertexShader: `
+        varying vec2 vUv; varying vec3 vN;
+        void main(){ vUv = uv; vN = normalize(mat3(modelMatrix) * normal);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: `
+        uniform sampler2D cloudMap; uniform vec3 sunDir; varying vec2 vUv; varying vec3 vN;
+        void main(){
+          float c = texture2D(cloudMap, vUv).r;
+          float ndl = dot(normalize(vN), sunDir);
+          float light = max(ndl, 0.0) * 0.95 + 0.04;
+          float a = c * 0.85 * (0.12 + 0.88 * smoothstep(-0.2, 0.3, ndl));
+          gl_FragColor = vec4(vec3(light), a);
+        }`,
+      transparent: true, depthWrite: false,
+    })
+  );
+  spin.add(clouds);
+
+  // Enlem/boylam ızgarası (her 15°)
+  (function graticule() {
+    const pts = [], r = 1.0025, step = 15, seg = 2;
+    for (let lat = -75; lat <= 75; lat += step)
+      for (let lon = -180; lon < 180; lon += seg)
+        pts.push(ll2v(lat, lon, r), ll2v(lat, lon + seg, r));
+    for (let lon = -180; lon < 180; lon += step)
+      for (let lat = -88; lat < 88; lat += seg)
+        pts.push(ll2v(lat, lon, r), ll2v(lat + seg, lon, r));
+    const g = new THREE.BufferGeometry().setFromPoints(pts);
+    spin.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({
+      color: 0x6f9cff, transparent: true, opacity: 0.11, blending: THREE.AdditiveBlending, depthWrite: false })));
+  })();
+
+  // Çalışılan bölge kutusu + nabız halkası
+  let pulse = null;
+  if (TD.bbox) {
+    const [w, s, e, n] = TD.bbox, r = 1.004, pts = [];
+    const edge = (a, b, c, d) => { for (let i = 0; i <= 24; i++) { const t = i / 24; pts.push(ll2v(a + (c - a) * t, b + (d - b) * t, r)); } };
+    edge(s, w, s, e); edge(s, e, n, e); edge(n, e, n, w); edge(n, w, s, w);
+    const g = new THREE.BufferGeometry().setFromPoints(pts);
+    spin.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xff8a3d, transparent: true, opacity: 0.95 })));
+    const fillPts = [];
+    // Kutunun içini çok hafif doldur
+    for (let la = s; la < n; la += 0.25) fillPts.push(ll2v(la, w, r), ll2v(la, e, r));
+    spin.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(fillPts),
+      new THREE.LineBasicMaterial({ color: 0xff8a3d, transparent: true, opacity: 0.12 })));
+
+    const c = ll2v((s + n) / 2, (w + e) / 2, 1.005);
+    pulse = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.0, 64),
+      new THREE.MeshBasicMaterial({ color: 0xff8a3d, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }));
+    pulse.position.copy(c);
+    pulse.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), c.clone().normalize());
+    spin.add(pulse);
+    const dot = new THREE.Mesh(new THREE.CircleGeometry(0.006, 24), new THREE.MeshBasicMaterial({ color: 0xffd2b0 }));
+    dot.position.copy(c.clone().multiplyScalar(1.0005));
+    dot.quaternion.copy(pulse.quaternion);
+    spin.add(dot);
+  }
+
+  // Atmosfer halesi (arka yüz, toplamalı karışım)
+  const atmo = new THREE.Mesh(
+    new THREE.SphereGeometry(1.045, 128, 96),
+    new THREE.ShaderMaterial({
+      uniforms: { sunDir: { value: SUN } },
+      vertexShader: `
+        varying vec3 vN; varying vec3 vP;
+        void main(){ vN = normalize(mat3(modelMatrix) * normal);
+          vec4 wp = modelMatrix * vec4(position, 1.0); vP = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp; }`,
+      fragmentShader: `
+        uniform vec3 sunDir; varying vec3 vN; varying vec3 vP;
+        void main(){
+          vec3 v = normalize(cameraPosition - vP);
+          float d = -dot(vN, v);
+          float glow = pow(smoothstep(0.0, 0.42, d), 1.6);
+          float sd = dot(vN, sunDir);
+          vec3 col = mix(vec3(0.06, 0.16, 0.45), vec3(0.38, 0.7, 1.0), smoothstep(-0.45, 0.5, sd));
+          col += vec3(1.0, 0.5, 0.2) * exp(-pow(sd * 4.0, 2.0)) * 0.35;
+          gl_FragColor = vec4(col * glow * 1.25, 1.0);
+        }`,
+      side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    })
+  );
+  scene.add(atmo);
+
+  // Dokular: NASA Blue Marble / Black Marble (kamu malı görüntüler; three-globe ve three.js örnek
+  // paketleri üzerinden CDN). Gelmezse düz renk kalır.
+  const loader = new THREE.TextureLoader();
+  loader.setCrossOrigin("anonymous");
+  const GLOBE = "https://unpkg.com/three-globe@2.31.0/example/img/";
+  const PLANETS = "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/";
+  const maxAniso = renderer.capabilities.getMaxAnisotropy();
+  let pending = 4;
+  function done() { if (--pending <= 0) host.classList.add("ready"); }
+  function load(url, slot) {
+    loader.load(url, (t) => { t.anisotropy = maxAniso; slot.value = t; done(); }, undefined, done);
+  }
+  load(GLOBE + "earth-blue-marble.jpg", uniforms.dayMap);   // 4096×2048
+  load(GLOBE + "earth-night.jpg", uniforms.nightMap);       // 4096×2048
+  load(GLOBE + "earth-water.png", uniforms.specMap);
+  load(PLANETS + "earth_clouds_1024.png", cloudU.cloudMap);
+  // Doku gecikirse sahneyi yine de göster
+  setTimeout(() => host.classList.add("ready"), 3500);
+
+  // ---------- Uydular ----------
+  scene.add(new THREE.AmbientLight(0x6070a0, 0.55));
+  const sunLight = new THREE.DirectionalLight(0xffffff, 1.6);
+  sunLight.position.copy(SUN).multiplyScalar(10);
+  scene.add(sunLight);
+
+  function makeSat(panelColor) {
+    const g = new THREE.Group();
+    const foil = new THREE.MeshStandardMaterial({ color: 0xd9b25c, metalness: 0.85, roughness: 0.3 });
+    const white = new THREE.MeshStandardMaterial({ color: 0xe8ecf5, metalness: 0.2, roughness: 0.5 });
+    const panel = new THREE.MeshStandardMaterial({ color: panelColor, metalness: 0.6, roughness: 0.35, emissive: 0x081638 });
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1.7), foil));
+    const boom = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.08, 0.08), white);
+    g.add(boom);
+    for (const sx of [-1, 1]) {
+      const p = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.04, 1.1), panel);
+      p.position.x = sx * 1.9; g.add(p);
+    }
+    const dish = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.3, 24, 1, true), white);
+    dish.position.set(0, 0.5, 0.95); dish.rotation.x = Math.PI / 2; g.add(dish);
+    g.scale.setScalar(0.011);
+    return g;
+  }
+
+  // Uyduların uzaktan da seçilmesi için yumuşak parlama noktası
+  const glowTex = (function () {
+    const c = document.createElement("canvas"); c.width = c.height = 64;
+    const x = c.getContext("2d"), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(0.25, "rgba(200,225,255,.55)");
+    gr.addColorStop(1, "rgba(120,170,255,0)");
+    x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  })();
+  function makeGlow(color) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color, transparent: true,
+      depthWrite: false, blending: THREE.AdditiveBlending }));
+    s.scale.setScalar(0.05);
+    return s;
+  }
+
+  // Yörüngeler: görselleştirme için yörünge düzlemleri kameradan görünecek biçimde seçildi;
+  // irtifalar gerçek oranlıdır (Dünya yarıçapı = 6371 km).
+  const R_E = 6371;
+  const SATS = [
+    { name: "TERRA", sub: "MODIS · KAR ÖRTÜSÜ", alt: 705, n: [0.22, -0.52, 0.82], period: 46, phase: 0.2, main: true },
+    { name: "AQUA", sub: "MODIS · AIRS", alt: 705, n: [-0.34, -0.6, 0.72], period: 52, phase: 2.7 },
+    { name: "GPM", sub: "YAĞIŞ", alt: 407, n: [0.58, -0.38, 0.72], period: 38, phase: 4.4 },
+    { name: "GRACE-FO", sub: "SU DEPOLAMA", alt: 490, n: [0.93, 0.12, 0.34], period: 42, phase: 1.1 },
+  ];
+  const labelsHost = $("labels");
+  SATS.forEach((s) => {
+    s.r = 1 + s.alt / R_E;
+    const n = new THREE.Vector3(...s.n).normalize();
+    const a = new THREE.Vector3(0, 1, 0).cross(n);
+    if (a.lengthSq() < 1e-4) a.set(1, 0, 0);
+    a.normalize();
+    const b = new THREE.Vector3().crossVectors(n, a).normalize();
+    s.a = a; s.b = b;
+    // Yörünge çizgisi
+    const pts = [];
+    for (let i = 0; i <= 360; i++) {
+      const u = i / 360 * Math.PI * 2;
+      pts.push(a.clone().multiplyScalar(Math.cos(u) * s.r).add(b.clone().multiplyScalar(Math.sin(u) * s.r)));
+    }
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineDashedMaterial({ color: s.main ? 0xffb07a : 0x9cbcff, dashSize: 0.012, gapSize: 0.01,
+        transparent: true, opacity: s.main ? 0.45 : 0.22, depthWrite: false }));
+    line.computeLineDistances();
+    scene.add(line);
+    s.mesh = makeSat(s.main ? 0x23479e : 0x1f3a80);
+    scene.add(s.mesh);
+    s.glow = makeGlow(s.main ? 0xffb07a : 0xbfd6ff);
+    scene.add(s.glow);
+    const el = document.createElement("div");
+    el.className = "sat-label" + (s.main ? " main" : "");
+    el.innerHTML = `${s.name}<small>${s.sub}</small>`;
+    labelsHost.appendChild(el);
+    s.el = el;
+  });
+
+  // Terra'nın MODIS tarama ışını ve yerdeki izi
+  const main = SATS.find((s) => s.main);
+  const beamGeo = new THREE.CylinderGeometry(0.0004, 0.045, 1, 48, 1, true);
+  beamGeo.translate(0, -0.5, 0);
+  const beam = new THREE.Mesh(beamGeo, new THREE.ShaderMaterial({
+    uniforms: { t: { value: 0 } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `
+      uniform float t; varying vec2 vUv;
+      void main(){
+        float a = mix(0.32, 0.03, vUv.y);
+        float bands = 0.75 + 0.25 * sin(vUv.y * 60.0 + t * 6.0);
+        gl_FragColor = vec4(vec3(1.0, 0.55, 0.25) * bands, a);
+      }`,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+  }));
+  scene.add(beam);
+  const foot = new THREE.Mesh(new THREE.CircleGeometry(0.05, 48), new THREE.ShaderMaterial({
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `varying vec2 vUv; void main(){ float d = length(vUv - 0.5) * 2.0;
+      gl_FragColor = vec4(vec3(1.0, 0.6, 0.3), smoothstep(1.0, 0.0, d) * 0.55); }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  }));
+  scene.add(foot);
+
+  // ---------- Yerleşim ----------
+  let D = 1.42;
+  const mouse = { x: 0, y: 0, tx: 0, ty: 0 };
+  function layout() {
+    const w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h);
+    camera.aspect = w / h;
+    // Dar ekranda kamerayı geri çek, yatay ekranda ufuk çizgisi ekranı boydan boya geçsin.
+    D = w / h < 1 ? 1.9 : (w / h < 1.4 ? 1.6 : 1.42);
+    camera.fov = w / h < 1 ? 55 : 45;
+    camera.updateProjectionMatrix();
+    scene.userData.stars.userData.mat.uniforms.pr.value = renderer.getPixelRatio();
+  }
+  function placeCamera(introK) {
+    const d = D + introK * 0.9;
+    camera.position.set(0, 0, d);
+    const limb = Math.asin(1 / d);
+    const halfV = THREE.MathUtils.degToRad(camera.fov / 2);
+    // Ufkun tepesi ekran ortasının biraz üstünde dursun (başlığın arkasında).
+    const want = Math.atan(Math.tan(halfV) * 0.1);
+    camera.rotation.set(limb - want + mouse.y * 0.015, mouse.x * 0.03, 0, "YXZ");
+  }
+  window.addEventListener("resize", layout);
+  window.addEventListener("pointermove", (e) => {
+    mouse.tx = e.clientX / window.innerWidth - 0.5;
+    mouse.ty = e.clientY / window.innerHeight - 0.5;
+  });
+  layout();
+
+  // ---------- Döngü ----------
+  const clock = new THREE.Clock();
+  const tmp = new THREE.Vector3(), ray = new THREE.Ray(), sph = new THREE.Sphere(new THREE.Vector3(), 1), hit = new THREE.Vector3();
+  const speed = reduceMotion ? 0.25 : 1;
+  // Etiketler başlık bloğunun üstüne gelince soluklaşsın
+  const centerEl = document.querySelector(".center");
+  let centerRect = centerEl.getBoundingClientRect();
+  window.addEventListener("resize", () => { centerRect = centerEl.getBoundingClientRect(); });
+  const EARTH_PERIOD = 240; // saniyede bir tam tur (görsel)
+  let lastHud = 0;
+
+  function frame() {
+    const t = clock.getElapsedTime();
+    const introK = Math.pow(Math.max(0, 1 - t / 3.2), 3);
+    mouse.x += (mouse.tx - mouse.x) * 0.04;
+    mouse.y += (mouse.ty - mouse.y) * 0.04;
+    placeCamera(introK);
+
+    spin.rotation.y = spin0 + (t * speed) / EARTH_PERIOD * Math.PI * 2;
+    clouds.rotation.y = (t * speed) * 0.004;
+    scene.userData.stars.rotation.y = t * 0.002;
+    scene.userData.stars.userData.mat.uniforms.t.value = t;
+    if (pulse) {
+      const k = (t * 0.55) % 1;
+      pulse.scale.setScalar(0.012 + k * 0.05);
+      pulse.material.opacity = 0.85 * (1 - k);
+    }
+
+    camera.updateMatrixWorld();
+    const w = window.innerWidth, h = window.innerHeight;
+    SATS.forEach((s) => {
+      const u = s.phase + (t * speed) / s.period * Math.PI * 2;
+      const p = s.a.clone().multiplyScalar(Math.cos(u) * s.r).add(s.b.clone().multiplyScalar(Math.sin(u) * s.r));
+      s.mesh.position.copy(p);
+      s.mesh.lookAt(0, 0, 0);
+      s.glow.position.copy(p);
+      s.glow.material.opacity = 0.75 + 0.25 * Math.sin(t * 3 + s.phase);
+      s.pos = p;
+      // Etiket: ekran izdüşümü; Dünya'nın arkasındaysa gizle
+      tmp.copy(p).project(camera);
+      const camPos = camera.position;
+      ray.set(camPos, p.clone().sub(camPos).normalize());
+      const blocked = ray.intersectSphere(sph, hit) && hit.distanceTo(camPos) < p.distanceTo(camPos) - 1e-3;
+      const onScreen = tmp.z < 1 && Math.abs(tmp.x) < 1.05 && Math.abs(tmp.y) < 1.05;
+      const x = (tmp.x * 0.5 + 0.5) * w + 26, y = (-tmp.y * 0.5 + 0.5) * h - 8;
+      s.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+      const overText = x > centerRect.left - 40 && x < centerRect.right && y > centerRect.top && y < centerRect.bottom;
+      s.el.style.opacity = blocked || !onScreen ? 0 : (overText ? 0.18 : 1);
+    });
+
+    // Tarama ışını Terra'dan alt noktaya
+    const mp = main.pos, dir = mp.clone().normalize();
+    beam.position.copy(mp);
+    beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir.clone().negate());
+    beam.scale.set(1, mp.length() - 1.0, 1);
+    beam.material.uniforms.t.value = t;
+    foot.position.copy(dir.clone().multiplyScalar(1.0065));
+    foot.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+
+    // Canlı telemetri: Terra'nın Dünya'ya göre alt noktası
+    if (t - lastHud > 0.25) {
+      lastHud = t;
+      spin.updateMatrixWorld();
+      const ll = v2ll(spin.worldToLocal(mp.clone()));
+      $("subpoint").textContent = `${fmtDeg(ll.lat, "K", "G")} ${fmtDeg(ll.lon, "D", "B")}`;
+    }
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
