@@ -74,6 +74,25 @@ def test_export_package(src, tmp_path):
     assert rows[0]["donem"] == "2001-01 … 2001-12" and rows[-1]["donem"] == "sabit"
 
 
+def test_known_issue_attr_carried(src, tmp_path):
+    p = src / "yagis__GLDAS.nc"
+    with xr.open_dataset(p) as ds:
+        ds = ds.load()
+    ds.attrs["bilinen_sorunlar"] = "test notu"
+    write_netcdf(ds, p)
+    out = export.export("v0.1", src_dir=src, out_root=tmp_path / "outputs")
+    with xr.open_dataset(out / "yagis__GLDAS.nc") as d:
+        assert d.attrs["bilinen_sorunlar"] == "test notu"
+    with xr.open_dataset(out / "yagis__GPM.nc") as d:
+        assert "bilinen_sorunlar" not in d.attrs
+
+
+def test_catalog_known_issue_gldas_precip():
+    from data.catalog import variable
+    assert "2025-12" in variable("yagis", "GLDAS")["bilinen_sorunlar"]
+    assert "bilinen_sorunlar" not in variable("yagis", "GPM")
+
+
 def test_kademe_mapping():
     assert export.kademe("ndvi", "MOD13C2") == 1 and export.kademe("evi", "MOD13C2") == 2
     assert export.kademe("toplam_su_depolama", "GRACE") == 1 and export.kademe("rakim", "SRTM") == "-"
