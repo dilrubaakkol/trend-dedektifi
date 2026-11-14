@@ -435,8 +435,12 @@ yeni çift = yeni bir madde (`python -m physics.run --ciftler <yaml>` ile başka
 | `kar_maskesi_esik` | hayır | Kış ortalaması kar örtüsü bu yüzdenin altındaki hücreler dışarıda (x ya da y `kar_ortusu` olmalı) |
 | `etiket_notlari` | hayır | `{beklenen_yonde, ters_yonde, anlamsiz: metin}`: etikete göre ek not (çift 5). Yoksa `ters_yonde` satırına genel "incelenmeli" notu |
 | `kalite_kontrolu` | hayır | `true`: güçlü ilişki çıkmazsa "veri sorunu olabilir" notu (çift 6) |
+| `rejime_bagli` | hayır | `true`: beklenen yön iklim rejimine bağlı (çift 5). Sapma haritasında su sınırlı yerdeki ters sonuç "rejimle açıklanabilir" sayılır. `true` iken `rejim_gerekcesi` zorunlu |
+| `rejim_gerekcesi` | koşullu | Rejime bağlılığın bir paragraflık fiziksel açıklaması |
 
-Ayrıca dosyanın başında `urun_onceligi: {degisken: [urun, …]}` durur; tek çift komutunda ürün verilmezse
+Dosyanın başında ayrıca `rejim:` bölümü durur: kuraklık göstergesinin girdileri (`yagis`, `buharlasma`:
+`{degisken, urun}`, varsayılan GLDAS) ve `su_sinirli_esik` (E/P ≥ eşik → su sınırlı; 0,7). Yer adı ya da yere
+özel eşik yazılmaz. Ayrıca dosyanın başında `urun_onceligi: {degisken: [urun, …]}` durur; tek çift komutunda ürün verilmezse
 bu sıra (Kademe 1 ana ürünü önce) kullanılır. Değişkene bağlı kurallar kodda kalır: GRACE yıllık ortalaması
 için en az 9 ay, birikimli değişkenlerde mevsim toplamı.
 
@@ -460,4 +464,53 @@ Yöntem `ciftler.csv` ile aynıdır. `cift_no` 0 ise seçim ciftler.yaml'daki bi
 geliyorsa o çiftin numarası ve ayarları (kar maskesi, aylar, notlar) kullanılır. Anlamlılık: `tum_iller`'de
 81 il üzerinde BH-FDR (`p_fdr ≤ 0,10`); tek il, bölge ve Türkiye satırında `p < 0,05` (`p_fdr` boş).
 Beklenen yön verilmezse anlamlı satırın `etiket`'i boştur. GRACE (`toplam_su_depolama`) il için hesaplanmaz.
+
+**Beklentiden sapma `L4_iliski/sapma/`** (2026-11-15, `python -m physics.sapma --surum v0.1`). L4 ve L1'den
+türetilir; L4 dosyalarını değiştirmez. **Doğrulanmamış bir göstergedir; nedensellik göstermez.** Sonuçlar
+"fiziksel beklentiden sapma" diye okunur; olası açıklamalar iklim rejimi, veri/ürün sorunu ve insan müdahalesidir
+(sulama, baraj, yeraltı suyu çekimi).
+
+| Yol | İçerik |
+| --- | --- |
+| `sapma/sapma_haritasi.nc` | (lat, lon) 28 × 78 harita, değişkenler aşağıda |
+| `sapma/sapma_iller.csv` | 81 il satırı (sapma: `ciftler.csv` il etiketlerinden; sulama izi: il alanının cos(enlem) ağırlıklı ortalaması) |
+| `sapma/sulama_izi_kumeleri.csv` | En yüksek tepe `sulama_izi` değerli en çok 10 küme |
+| `sapma/sapma_haritasi.html` | İsteğe bağlı (`--goster`): sunum için iki panelli harita, il sınırları ve küme numaraları |
+
+Yöntem:
+- **Sapma skoru.** Her çiftin L4 etiketi: `ters_yonde` = 1, `beklenen_yonde` / `anlamsiz` = 0, hesaplanamadı = boş.
+  Birden çok gecikmeli çiftte bir gecikmede beklenen yön varsa 0, yoksa herhangi bir gecikmede ters ise 1.
+  `rejime_bagli` çiftin su sınırlı (E/P ≥ `su_sinirli_esik`) yerdeki tersi `rejimle_aciklanan`'a yazılır ve
+  sapma sayılmaz (paydada kalır). `sapma_orani = sapma_sayisi / degerlendirilen`. Haritasız çift (GRACE) hücrede
+  ve ilde yer almaz.
+- **Kuraklık göstergesi.** GLDAS uzun dönem yıllık buharlaşma / yağış (E/P). GLDAS-2.1 Noah sulamayı simüle etmez.
+- **Sulama izi.** 2001–2025 iklimsel yaz (Haz–Ağu) değerleri bütün kara hücrelerinde
+  `değer ~ log(1 + yaz yağışı) + log(1 + kış + ilkbahar yağışı) + rakım/1000` EKK regresyonuyla açıklanır (yağış:
+  GPM; rakım: SRTM); artık, artıkların standart sapmasına bölünür. `z_yesil`: yaz NDVI (MOD13C2) artığı.
+  `z_serin`: yaz (gündüz LST − T2M) artığının eksi işaretlisi (MOD11C3, MERRA-2). `sulama_izi` = mevcut z'lerin
+  ortalaması, `n_bilesen` = kullanılan bileşen sayısı. Toprak nemi kullanılmaz (GLDAS model çıktısı, sulama yok).
+  Trend değil iklimsel seviye kullanıldığı için MODIS L2 trend uyarısı bu göstergeyi doğrudan etkilemez (not düşülür).
+- **Kümeler.** Kara hücrelerinde `sulama_izi`'nin 90. yüzdeliği üstündeki hücreler 8 komşulukla birleştirilir;
+  tepe değere göre sıralanır. Yöntemde hiçbir yer adı, kutu ya da yere özel eşik yoktur.
+
+`sapma_haritasi.nc` değişkenleri:
+
+| Değişken | Tip | Anlam |
+| --- | --- | --- |
+| `sapma_sayisi`, `degerlendirilen`, `sapma_orani` | float32 | Yukarıdaki gibi (deniz ve etiketsiz hücre boş) |
+| `rejimle_aciklanan`, `sapma_sayisi_rejim_oncesi` | float32 | Rejimle açıklanan ters sayısı; ayrım yapılmadan ters sayısı |
+| `ters_ciftler`, `rejimle_aciklanan_ciftler` | int32 | Bit maskesi: bit (no − 1) = o çift (attrs `flag_masks`, `flag_meanings`) |
+| `kuraklik_gostergesi`, `su_sinirli` | float32, int8 | E/P ve `1` = su sınırlı |
+| `sulama_izi`, `z_yesil`, `z_serin`, `n_bilesen` | float32, int8 | Sulama izi ve bileşenleri |
+
+attrs: `yontem`, `uyari` ("Doğrulanmadı; neden göstermez. …"), `not` (MODIS ve toprak nemi notu), `girdiler`,
+`lisans`, `urun_surumu`, `veri_seti_doi`.
+
+`sapma_iller.csv` sütunları: `bolge_kodu`, `il`, `sapma_sayisi`, `degerlendirilen_cift`, `sapma_orani`,
+`ters_ciftler` (ör. `3,5`), `rejimle_aciklanan`, `rejimle_aciklanan_ciftler`, `sapma_sayisi_rejim_oncesi`,
+`kuraklik_gostergesi`, `su_sinirli`, `sulama_izi`, `z_yesil`, `z_serin`, `sulama_izi_hucre_en_yuksek`,
+`en_yuksek_bilesen`, `not`, `urun_surumu`, `veri_seti_doi`, `lisans`, `uyari`.
+
+`sulama_izi_kumeleri.csv` sütunları: `kume`, `hucre_sayisi`, `tepe_sulama_izi`, `ortalama_sulama_izi`, `tepe_lat`,
+`tepe_lon`, `merkez_lat`, `merkez_lon` (skor ağırlıklı), `il` (tepe hücrenin ili), `iller`, `esik`.
 
