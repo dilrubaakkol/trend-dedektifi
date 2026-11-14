@@ -1,4 +1,4 @@
-"""Açılış ekranı: dönen Dünya, yörüngedeki uydular ve vaka başlığı (hero.html + three.js)."""
+"""Açılış ekranı: dönen Dünya, yörüngedeki uydular ve veri setinin başlığı (hero.html + three.js)."""
 
 from __future__ import annotations
 
@@ -10,40 +10,36 @@ import streamlit.components.v1 as components
 
 HERO_HTML = Path(__file__).with_name("hero.html")
 
-# Karta göre açılış metni. Yeni kart eklenince buraya bir satır eklemek yeterli; yoksa genel metin kullanılır.
-HERO_COPY = {
-    "kar_isinma": {
-        "case_label": "VAKA 01 · KAR ÇİZGİSİ",
-        "headline_html": 'Uydular <span class="ice">karın</span><br>azaldığını gördü. <span class="ember">Neden?</span>',
-    },
-    "kuraklik_su_butcesi": {
-        "case_label": "VAKA 02 · SU BÜTÇESİ",
-        "headline_html": 'Uydular <span class="ice">suyun</span><br>çekildiğini gördü. <span class="ember">Neden?</span>',
-    },
-}
-DEFAULT_COPY = {
-    "case_label": "YENİ VAKA",
-    "headline_html": 'Uydular bir <span class="ice">değişim</span><br>gördü. <span class="ember">Neden?</span>',
-}
+HEADLINE_HTML = 'NASA verisi, <span class="ice">Türkiye</span><br>için analize <span class="ember">hazır.</span>'
+PILL_HTML = "NASA UYDU VE MODEL VERİSİ · <em>ATIF YAPILABİLİR</em> TREND VERİ SETİ"
 LEAD = (
-    "Trend Dedektifi, NASA uydularının kaydettiği bir değişimin yalnızca ne olduğunu göstermez. "
-    "O değişimin bir sebeple gerçekten tutarlı olup olmadığını fizik kurallarıyla sınar. "
-    "Vatandaş, çiftçi ve bilim insanı aynı kanıta kendi sorusuyla bakar."
+    "Sıcaklık, yağış, kar, toprak nemi, bitki örtüsü ve yer altı suyu: 25 yıllık NASA verisi Türkiye'ye "
+    "kesildi, aynı ızgaraya getirildi, trendi ölçüldü ve tesadüfler ayıklandı. "
+    "Merak eden okur, araştıran indirir ve makalesinde atıf yapar."
 )
 
 
-def build_config(card_id: str | None, bbox, period_label: str, placeholder: bool) -> dict:
-    """hero.html'e aktarılacak yapılandırmayı hazırlar (yalnızca metin ve bölge sınırları)."""
-    copy = HERO_COPY.get(card_id or "", DEFAULT_COPY)
+def build_config(bbox, period_label: str, version: str, placeholder: bool, logged_in: bool = False,
+                 mode: str = "hero") -> dict:
+    """hero.html'e aktarılacak yapılandırmayı hazırlar (yalnızca metin, düğmeler ve kutu sınırları).
+
+    `mode="bg"`: giriş ekranının arka planı; orta başlık ve düğmeler gizlenir, yalnız Dünya ve köşe bilgileri kalır.
+    """
     w, s, e, n = bbox
+    first = ({"label": "Haritaya git  →", "target": "panel", "primary": True} if logged_in
+             else {"label": "Başla  →", "target": "giris", "primary": True})
     return {
-        **copy,
+        "case_label": f"VERİ SETİ · {version.upper()} ÖN SÜRÜM",
+        "headline_html": HEADLINE_HTML,
+        "pill_html": PILL_HTML,
         "lead": LEAD,
         "bbox": [w, s, e, n],
         "target": {"lat": (s + n) / 2, "lon": (w + e) / 2},
         "period_label": period_label,
         "is_placeholder": placeholder,
-        "status_label": "YER TUTUCU SONUÇ" if placeholder else "DOĞRULANMIŞ SONUÇ",
+        "status_label": "YER TUTUCU VERİ" if placeholder else "YAYINDA",
+        "buttons": [first, {"label": "Nasıl çalışır?", "target": "proje"}],
+        "mode": mode,
     }
 
 
