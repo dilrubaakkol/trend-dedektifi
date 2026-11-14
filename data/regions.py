@@ -100,12 +100,26 @@ def _read_geojson(name: str) -> dict:
 
 
 @lru_cache(maxsize=1)
+def _il_ad_duzeltmeleri() -> dict[str, str]:
+    """data/boundaries/il_adlari.yaml: Natural Earth yazımı → kullanılacak il adı (yoksa boş)."""
+    path = BOUNDARY_DIR / "il_adlari.yaml"
+    if not path.exists():
+        return {}
+    return dict((yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("duzeltmeler") or {})
+
+
+def il_adi(ad: str) -> str:
+    """İl adını düzeltme tablosundan geçirir (ör. "Elâzığ" → "Elazığ"); tabloda yoksa aynen döner."""
+    return _il_ad_duzeltmeleri().get(ad, ad)
+
+
+@lru_cache(maxsize=1)
 def _iller() -> dict[str, dict]:
-    """anahtar → {"ad", "plaka", "geom"} (81 il)."""
+    """anahtar → {"ad", "plaka", "geom"} (81 il). Ad, il_adlari.yaml düzeltmelerinden geçer."""
     out = {}
     for f in _read_geojson("iller.geojson")["features"]:
         p = f["properties"]
-        out[p["anahtar"]] = {"ad": p["ad"], "plaka": p["plaka"],
+        out[p["anahtar"]] = {"ad": il_adi(p["ad"]), "plaka": p["plaka"],
                              "geom": shapely.make_valid(shape(f["geometry"]))}
     return out
 

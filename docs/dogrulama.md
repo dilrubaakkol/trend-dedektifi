@@ -83,6 +83,32 @@ kısmı). Diğer Kademe 1 dosyaları (`sicaklik_2m__GLDAS`, `yagis__MERRA2`, `to
 `kar_ortusu__MOD10CM`, `kar_su_esdegeri__GLDAS`, `ndvi__MOD13C2`, `toplam_su_depolama__GRACE`) için
 Giovanni karşılaştırması henüz yapılmadı.
 
+## Bilinen boşluklar
+
+### Kar örtüsü (`kar_ortusu__MOD10CM`): 5 tamamen NaN ay
+
+Şu 5 ayda Türkiye kutusunun tamamı NaN: **2001-06, 2002-03, 2003-12, 2016-02, 2022-10**.
+
+- **Kaynak arşivde, işlemede değil:**
+  - NASA CMR'de (`earthaccess.search_data`, `MOD10CM` sürüm 61) bu 5 ayın hiçbiri için granül yok
+    (2026-11-14). Karşılaştırma için 2016-03'te granül var.
+  - Yerel ham kesitlerde (`cache/raw/MOD10CM/`) de bu aylar yok.
+  - Yani ay, işleme sırasında düşmedi; NSIDC'de o ay için aylık ürün üretilmemiş.
+- **Olası neden:** O aylarda MODIS Terra'nın veri kesintileri. **Doğrulanmadı**, ama aylık ürünün hiç
+  olmaması bununla uyumlu.
+- **Etkisi:**
+  - L1'de bu aylar NaN; değer uydurulmadı ya da doldurulmadı.
+  - L2/L3'te eksik veri kuralı (mevsimde 1 eksik ay → NaN) 2003-12 yüzünden **2004 kışını**, 2016-02
+    yüzünden **2016 kışını** ve 2002-03 yüzünden **2002 ilkbaharını** düşürüyor.
+  - Yıllık seriler etkilenmiyor (yılda 1 eksik ay < 3).
+  - Kar örtüsü trendleri o kış ve ilkbaharlar olmadan hesaplanıyor.
+
+### Diğer beklenen boşluklar
+
+- **`yagis__GPM`:** 2025-10 … 2025-12 NaN. IMERG Final ürünü yaklaşık 3,5 ay gecikmeyle yayımlanıyor.
+- **`toplam_su_depolama__GRACE`:** 35 tamamen NaN ay. GRACE batarya yönetimi kaynaklı eksik aylar ve
+  2017-07 … 2018-05 GRACE → GRACE-FO boşluğu. Eksik ay eşiği için bkz. sözleşme 2.1.
+
 ## L2 akıl kontrolü (2026-11-14, ilk sürüm)
 
 > Bu bölümdeki anlamlılık sayıları **eski kurala** (yalnız `p_fdr ≤ 0,10`) ve GRACE için eski eksik veri

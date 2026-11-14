@@ -1,0 +1,5 @@
+# İl adı düzeltmeleri: Natural Earth `name_tr` yazımı → kullanılacak yazım.
+# iller.geojson elle değiştirilmez; data.regions okurken (ve make_boundaries yazarken) bu tabloyu uygular.
+# İl anahtarı (normalize edilmiş ad, ör. "elazig") değişmez.
+duzeltmeler:
+  Elâzığ: Elazığ   # resmî ve yaygın yazım; NE'de eski şapkalı yazım
