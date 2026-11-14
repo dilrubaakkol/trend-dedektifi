@@ -11,6 +11,8 @@ from pathlib import Path
 
 import yaml
 
+from .evidence import norm_key
+
 KB_DIR = Path(__file__).resolve().parent.parent / "kb"
 
 
@@ -45,53 +47,57 @@ class KnowledgeBase:
         return cls(cards, variables, places)
 
     # ------------------------------------------------------------------ yerler
-    def resolve_place(self, text: str, available: set[str] | None = None) -> dict:
-        """Metindeki yer adını analiz bölgesine çevirir.
+    def _il_names(self) -> list[tuple[str, str, str]]:
+        """(metinde aranacak ad, il anahtarı, bölge anahtarı) üçlüleri; takma adlar dahil."""
+        out = []
+        for bolge, iller in self.places["iller"].items():
+            for il in iller:
+                out.append((il, norm_key(il), bolge))
+        resmi = {il: (k, b) for il, k, b in out}
+        for kisa, tam in self.places.get("il_takma_adlari", {}).items():
+            if tam in resmi:
+                out.append((kisa, *resmi[tam]))
+        return out
 
-        Sıra: özel bölge (ör. Konya Ovası) -> il -> coğrafi bölge adı.
-        available: veri hattında gerçekten bulunan bölge kimlikleri (data/regions.py). Verilirse
-        önerilen bölge orada yoksa `missing=True` döner, böylece arayüz kullanıcıya söyler.
-        Dönen: {"region": id|None, "matched": "metindeki ad", "via": "ozel|il|bolge", "missing": bool}
+    def resolve_place(self, text: str, available: set[str] | None = None) -> dict:
+        """Metindeki yer adını analiz bölgesine çevirir (anahtarlar data/regions.py ile aynı).
+
+        Önce il (uzun adlar önce: "Kahramanmaraş" "Maraş"tan önce), sonra coğrafi bölge, sonra Türkiye.
+        available: veri tarafında tanımlı bölge anahtarları; verilirse ve bölge yoksa missing=True.
+        Dönen: {"region", "level" ("il"|"bolge"|"turkiye"), "bolge" (ilin bölgesi), "matched", "missing"}
         """
         q = tr_lower(text)
         hit = None
-        for rid, r in self.places.get("ozel", {}).items():
-            if any(_starts_word(tr_lower(a), q) for a in r["takma_adlar"]):
-                hit = {"region": rid, "matched": r["ad"], "via": "ozel"}
+        for name, key, bolge in sorted(self._il_names(), key=lambda t: -len(t[0])):
+            if _starts_word(tr_lower(name), q):
+                resmi = next(n for n, k, _ in self._il_names() if k == key)
+                hit = {"region": key, "level": "il", "bolge": bolge, "matched": resmi}
                 break
         if hit is None:
-            # Uzun adlar önce: "Kahramanmaraş" "Maraş"tan önce denenir.
-            pairs = [(il, rid) for rid, iller in self.places["iller"].items() for il in iller]
-            for il, rid in sorted(pairs, key=lambda p: -len(p[0])):
-                if _starts_word(tr_lower(il), q):
-                    special = self.places.get("il_ozel", {}).get(il)
-                    if special and (available is None or special in available):
-                        rid = special
-                    hit = {"region": rid, "matched": il, "via": "il"}
-                    break
-        if hit is None:
-            for rid, r in self.places["bolgeler"].items():
+            for key, r in self.places["bolgeler"].items():
                 if any(_starts_word(tr_lower(a), q) for a in r["takma_adlar"]):
-                    hit = {"region": rid, "matched": r["ad"], "via": "bolge"}
+                    level = "turkiye" if key == "turkiye" else "bolge"
+                    hit = {"region": key, "level": level, "bolge": None, "matched": r["ad"]}
                     break
         if hit is None:
-            return {"region": None, "matched": None, "via": None, "missing": False}
+            return {"region": None, "level": None, "bolge": None, "matched": None, "missing": False}
         hit["missing"] = available is not None and hit["region"] not in available
         return hit
 
-    def region_name(self, region_id: str) -> str:
-        """Bölge kimliğinin okunur adı."""
-        for group in ("ozel", "bolgeler"):
-            if region_id in self.places.get(group, {}):
-                return self.places[group][region_id]["ad"]
-        return region_id
+    def region_name(self, region_key: str) -> str:
+        """Bölge ya da il anahtarının okunur adı."""
+        if region_key in self.places["bolgeler"]:
+            return self.places["bolgeler"][region_key]["ad"]
+        for name, key, _ in self._il_names():
+            if key == region_key:
+                return name
+        return region_key
 
     # ------------------------------------------------------------------ eşleştirme (yedek)
     def _strip_places(self, q: str) -> str:
         """Yer adlarını sorudan çıkarır: "Karadeniz" içindeki "kar" kar kartını tetiklemesin."""
-        names = [a for g in ("ozel", "bolgeler") for r in self.places.get(g, {}).values()
-                 for a in r["takma_adlar"]]
-        names += [il for iller in self.places["iller"].values() for il in iller]
+        names = [a for r in self.places["bolgeler"].values() for a in r["takma_adlar"]]
+        names += [n for n, _, _ in self._il_names()]
         for n in sorted((tr_lower(x) for x in names), key=len, reverse=True):
             q = re.sub(r"(?<![0-9a-zçğıöşü])" + re.escape(n) + r"[\w']*", " ", q)
         return q
