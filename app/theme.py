@@ -299,6 +299,8 @@ button[data-testid="stBaseButton-tertiary"]:hover p {{ text-decoration:underline
   margin-right:6px; }}
 .td-topbar .who {{ margin-left:auto; color:#c6d2ee; }}
 .td-topbar .who .meta {{ color:var(--muted); font-size:13px; margin-left:8px; }}
+.td-li {{ padding-left:18px; position:relative; margin:6px 0; }}
+.td-li::before {{ content:'•'; position:absolute; left:2px; color:var(--ember); }}
 .td-foot {{ margin-top:90px; padding-top:22px; border-top:1px solid var(--line); color:var(--muted); font-size:13px; line-height:1.8; }}
 .td-foot code {{ color:#c6d2ee; background:transparent; }}
 </style>

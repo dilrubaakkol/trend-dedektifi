@@ -23,7 +23,7 @@ import urun_io as U
 DB_NAME = os.environ.get("TD_MSSQL_DB", "TrendDedektifi")
 SERVER = os.environ.get("TD_MSSQL_SERVER", "localhost")
 DRIVER = os.environ.get("TD_MSSQL_DRIVER", "ODBC Driver 18 for SQL Server")
-TABLES = {"il": ("trend_iller", U.TREND_COLS), "bolge": ("trend_bolgeler", None), "iliski": ("iliski_iller", U.ILISKI_COLS)}
+TABLES = {"il": ("trend_iller", U.TREND_COLS), "bolge": ("trend_bolgeler", None), "iliski": ("ciftler", U.CIFTLER_COLS)}
 # pandas, pyodbc bağlantısını SQLAlchemy olmadığı için uyarıyla kabul ediyor; okuma doğru çalışır.
 warnings.filterwarnings("ignore", message="pandas only supports SQLAlchemy")
 BOLGE_COLS = ["bolge"] + [c for c in U.TREND_COLS if c not in ("il", "plaka", "bolge")]
@@ -93,10 +93,15 @@ def load_tables() -> dict | None:
                     df[c] = df[c].astype("Int64").fillna(0).astype(int)
             if "kaynak_uyumu" in df:
                 df["kaynak_uyumu"] = df["kaynak_uyumu"].fillna("")
+            if key == "iliski":  # ciftler: bölge kodu metin, boş etiket/not boş metin, yön '+'/'-'
+                df["bolge_kodu"] = df["bolge_kodu"].astype(str)
+                for c in ("etiket", "not", "dogrulanmadi"):
+                    df[c] = df[c].fillna("")
+                df["beklenen_yon"] = df["beklenen_yon"].map(U.norm_sign)
             out[key] = df
-    src = {"trend_iller.csv": None, "trend_bolgeler.csv": None, "iliski_iller.csv": None} if placeholder else \
+    src = {"trend_iller.csv": None, "trend_bolgeler.csv": None, "ciftler.csv": None} if placeholder else \
         {"trend_iller.csv": f"mssql:{DB_NAME}.dbo.trend_iller", "trend_bolgeler.csv": f"mssql:{DB_NAME}.dbo.trend_bolgeler",
-         "iliski_iller.csv": f"mssql:{DB_NAME}.dbo.iliski_iller"}
+         "ciftler.csv": f"mssql:{DB_NAME}.dbo.ciftler"}
     return {**out, "yer_tutucu": placeholder, "kaynak": src}
 
 
@@ -114,7 +119,8 @@ def replace_tables(tables: dict, version: str = U.VERSION) -> dict:
             df["veri_surumu"], df["yer_tutucu"] = version, ph
             names = list(df.columns)
             cur.execute(f"DELETE FROM dbo.{table}")  # noqa: S608
-            cur.executemany(f"INSERT INTO dbo.{table} ({', '.join(names)}) VALUES ({', '.join('?' * len(names))})",
+            cols_sql = ", ".join(f"[{c}]" for c in names)  # 'not' gibi ayrılmış sözcükler için köşeli parantez
+            cur.executemany(f"INSERT INTO dbo.{table} ({cols_sql}) VALUES ({', '.join('?' * len(names))})",
                             [tuple(r) for r in df.itertuples(index=False)])
             counts[table] = len(df)
     return counts

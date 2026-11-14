@@ -22,7 +22,7 @@ ROLES = {
             "Türkiye haritasında sıcaklık, yağış, kar, su",
             "Her sonuç sade bir cümleyle",
         ],
-        "sayfalar": ["kesfet", "il", "iliski", "indir", "yontem"],
+        "sayfalar": ["kesfet", "soru", "il", "iliski", "indir", "yontem"],
     },
     "akademisyen": {
         "ad": "Araştırmacıyım",
@@ -33,11 +33,12 @@ ROLES = {
             "Seçtiğin veriyi tek tıkla indir (CSV + NetCDF)",
             "Hazır atıf metni (APA / BibTeX)",
         ],
-        "sayfalar": ["kesfet", "il", "iliski", "indir", "makale", "yontem"],
+        "sayfalar": ["kesfet", "soru", "il", "iliski", "indir", "makale", "yontem"],
     },
 }
 PAGES = {
     "kesfet": "🗺️  Türkiye haritası",
+    "soru": "💬  Soru sor",
     "il": "📍  İlimi bul",
     "iliski": "🔗  Birlikte değişenler",
     "indir": "⬇️  Veriyi indir",

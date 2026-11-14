@@ -80,15 +80,25 @@ CREATE TABLE dbo.trend_bolgeler (
 );
 GO
 
-IF OBJECT_ID('dbo.iliski_iller') IS NULL
-CREATE TABLE dbo.iliski_iller (
+-- Eski taslak tablo (iliski_iller) sözleşme 2.3 ile ciftler oldu; yalnız yer tutucu veri taşıyordu.
+IF OBJECT_ID('dbo.iliski_iller') IS NOT NULL DROP TABLE dbo.iliski_iller;
+GO
+-- L4_iliski/ciftler.csv ile aynı sütunlar (docs/sozlesmeler.md 2.3). İl, bölge ve Türkiye satırları birlikte.
+IF OBJECT_ID('dbo.ciftler') IS NULL
+CREATE TABLE dbo.ciftler (
     id INT IDENTITY(1,1) PRIMARY KEY,
-    il NVARCHAR(60) NOT NULL, plaka TINYINT NOT NULL, cift_no TINYINT NOT NULL,
-    degisken_1 VARCHAR(60) NOT NULL, degisken_2 VARCHAR(60) NOT NULL, zaman_olcegi VARCHAR(30) NULL,
-    gecikme_ay TINYINT NULL, r FLOAT NULL, p FLOAT NULL, n_etkin FLOAT NULL, anlamli_fdr BIT NULL,
-    beklenen_yon VARCHAR(10) NULL, kontrol_etiketi VARCHAR(20) NULL,
+    cift_no TINYINT NOT NULL, cift VARCHAR(160) NULL, degisken_1 VARCHAR(60) NOT NULL, degisken_2 VARCHAR(60) NOT NULL,
+    seri VARCHAR(40) NULL, gecikme_ay TINYINT NULL, beklenen_yon VARCHAR(2) NULL,
+    bolge_turu VARCHAR(10) NOT NULL, bolge_kodu NVARCHAR(40) NOT NULL, bolge_adi NVARCHAR(80) NULL,
+    hucre_sayisi INT NULL, donem VARCHAR(20) NULL, n INT NULL, r FLOAT NULL, r1_1 FLOAT NULL, r1_2 FLOAT NULL,
+    etkin_n FLOAT NULL, p FLOAT NULL, p_fdr FLOAT NULL, anlamli TINYINT NULL, etiket VARCHAR(20) NULL,
+    [not] NVARCHAR(400) NULL, urun_surumu NVARCHAR(40) NULL, veri_seti_doi NVARCHAR(120) NULL, lisans NVARCHAR(40) NULL,
+    kademe TINYINT NULL, dogrulanmadi NVARCHAR(10) NULL, doi_1 NVARCHAR(160) NULL, doi_2 NVARCHAR(160) NULL,
     veri_surumu VARCHAR(20) NOT NULL, yer_tutucu BIT NOT NULL
 );
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ciftler_secim')
+CREATE INDEX ix_ciftler_secim ON dbo.ciftler (cift_no, gecikme_ay, bolge_turu);
 GO
 
 IF OBJECT_ID('dbo.sifre_sifirlama') IS NULL

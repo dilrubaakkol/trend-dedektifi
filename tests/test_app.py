@@ -1,5 +1,6 @@
 """Arayüz yardımcılarının testleri (Kişi 5). Gerçek veri gerektirmez."""
 
+import codecs
 import sys
 from pathlib import Path
 
@@ -105,10 +106,11 @@ def test_provinces_have_regions():
 def test_synthetic_tables_follow_columns():
     il, bolge, rel = U.synthetic_tables()
     assert list(il.columns) == U.TREND_COLS
-    assert list(rel.columns) == U.ILISKI_COLS
+    assert list(rel.columns) == U.CIFTLER_COLS
     assert set(il["mevsim"]) == set(U.SEASONS) and il["plaka"].nunique() == 81
     assert "turkiye" in set(bolge["bolge"])
-    assert set(rel["kontrol_etiketi"]) <= set(U.CONTROL_LABELS)
+    assert set(rel["etiket"]) <= set(U.CONTROL_LABELS) | {""}
+    assert set(rel["beklenen_yon"]) <= {"+", "-"} and set(rel["bolge_turu"]) == {"il", "bolge", "turkiye"}
     assert (il["ci_alt"] <= il["egim_10yil"]).all() and (il["egim_10yil"] <= il["ci_ust"]).all()
 
 
@@ -121,6 +123,12 @@ def test_bundle_marks_placeholder():
     assert name.startswith("YER_TUTUCU_")
     z = zipfile.ZipFile(io.BytesIO(data))
     assert "YER_TUTUCU_trend_iller.csv" in z.namelist() and "CITATION.bib" in z.namelist()
+    pairs = z.read("YER_TUTUCU_ciftler.csv")
+    assert pairs.startswith(codecs.BOM_UTF8)  # BOM'lu UTF-8, sözleşmedeki dosya gibi
+    import pandas as pd
+    pdf = pd.read_csv(io.BytesIO(pairs), encoding="utf-8-sig", dtype={"bolge_kodu": str})
+    assert set(pdf.loc[pdf["bolge_turu"] == "il", "bolge_adi"]) == {"Erzurum"}
+    assert {"dogu_anadolu", "turkiye"} <= set(pdf.loc[pdf["bolge_turu"] != "il", "bolge_kodu"])
     csv = z.read("YER_TUTUCU_trend_iller.csv").decode("utf-8").splitlines()
     assert csv[0].split(",") == U.TREND_COLS and all(",Erzurum," in "," + line for line in csv[1:])
     assert "SENTETİK YER TUTUCU" in z.read("BENIOKU.txt").decode("utf-8")
@@ -198,3 +206,48 @@ def test_signup_validation_by_role():
 def test_hero_background_mode():
     cfg = build_config((25.5, 35.5, 45.0, 42.5), "2001–2025", "v0.1", True, mode="bg")
     assert cfg["mode"] == "bg"
+
+
+# ---------------------------------------------------------------- L4 ciftler.csv (sözleşme 2.3)
+def test_norm_sign_accepts_all_forms():
+    assert [U.norm_sign(x) for x in ("+", "-", "−", "pozitif", "negatif")] == ["+", "-", "-", "+", "-"]
+    assert U.control_label(-0.4, "−", 1) == "beklenen_yonde" and U.control_label(0.4, "-", 1) == "ters_yonde"
+
+
+def test_pair4_is_region_only():
+    _, _, rel = U.synthetic_tables()
+    p4 = rel[rel["cift_no"] == 4]
+    assert (p4["bolge_turu"] != "il").all() and len(p4) == 8  # 7 bölge + Türkiye
+    assert rel.loc[rel["bolge_turu"] != "il", "p_fdr"].isna().all()  # FDR yalnız il satırlarında
+
+
+def test_bh_qvalues_match_reference():
+    import numpy as np
+    q = U.bh_qvalues([0.01, 0.04, 0.03, 0.2])
+    assert np.allclose(q, [0.04, 0.0533333, 0.0533333, 0.2], atol=1e-6)
+
+
+def test_load_tables_reads_bom_ciftler(tmp_path, monkeypatch):
+    """Yayın klasörüne BOM'lu ciftler.csv konunca site onu okur (yer tutucu yerine)."""
+    _, _, rel = U.synthetic_tables()
+    (tmp_path / "L4_iliski").mkdir()
+    rel.assign(beklenen_yon=rel["beklenen_yon"].replace({"-": "−"})).to_csv(
+        tmp_path / "L4_iliski" / "ciftler.csv", index=False, encoding="utf-8-sig")
+    monkeypatch.setattr(U, "SEARCH_DIRS", [tmp_path])
+    t = U.load_tables()
+    assert t["kaynak"]["ciftler.csv"] is not None and list(t["iliski"].columns) == U.CIFTLER_COLS
+    assert set(t["iliski"]["beklenen_yon"]) == {"+", "-"}  # Unicode eksi de '-' olur
+    il = U.pair_rows(t["iliski"], "il")
+    assert il["plaka"].min() == 1 and il["plaka"].max() == 81
+
+
+# ---------------------------------------------------------------- Kişi 4 katmanı bağlantısı
+def test_placeholder_package_feeds_llm_answer(tmp_path):
+    """Yer tutucu paket sözleşme biçiminde yazılır ve llm.answer() onunla uçtan uca çalışır (LLM'siz şablon)."""
+    from llm import answer
+    pkg = U.write_placeholder_package(tmp_path / "paket")
+    assert (pkg / "L4_iliski" / "ciftler.csv").exists() and (pkg / "L3_ozet" / "kar_ortusu__MOD10CM__il.csv").exists()
+    out = answer("Erzurum'da kar azalıyor mu, ısınmayla ilişkili mi?", client=None, kitle="akademisyen", package=pkg)
+    assert out["verified"] and out["evidence"] and not out.get("message")
+    assert "/10 yıl/10 yıl" not in out["explanation"]  # birim tek kez
+    assert any(e["id"].startswith("trend__kar_ortusu") for e in out["evidence"])
