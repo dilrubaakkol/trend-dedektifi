@@ -1,0 +1,132 @@
+# Bu dosya GitHub'daki "Cite this repository" düğmesini besler. Biçim: https://citation-file-format.github.io
+# DOLDURULACAK: Esra dışındaki ekip üyelerinin soyadları (family-names) ve yayınlandığında veri paketi DOI'si.
+# Yazar sırası ekibin rol numarasına göredir (Kişi 1 → Kişi 5); ekip farklı bir sıra isterse değiştirilir.
+cff-version: 1.2.0
+message: >-
+  Bu yazılımı ya da veri paketini kullanırsanız lütfen aşağıdaki bilgiyle atıf yapın. Kullandığınız NASA
+  ürünlerine de ayrıca atıf yapın (references listesi ve her veri dosyasındaki doi alanı).
+type: software
+title: "Trend Dedektifi: Türkiye için NASA yer bilimi verilerinde trend ve ilişki analizi"
+abstract: >-
+  Türkiye'nin 81 ili, 7 coğrafi bölgesi ve ülke geneli için NASA uydu ve model ürünlerinden (MERRA-2,
+  GLDAS, GPM IMERG, MODIS, OMI, GRACE/GRACE-FO) aylık 0,25° ortak ızgarada veri küpleri; hücre, il ve
+  bölge düzeyinde Theil-Sen eğimi, otokorelasyon düzeltmeli Mann-Kendall testi ve Benjamini-Hochberg
+  FDR ile trend analizi; değişken çiftleri arasında trendi giderilmiş korelasyon; ve her sayısı analiz
+  çıktısına bağlı, doğrulanmış açıklamalar üreten açık kaynaklı araç. NASA Space Apps Challenge 2026,
+  "Be An Earth System Trend Detective!" için geliştirilmiştir.
+authors:
+  - given-names: Dilruba      # Kişi 1 — Veri
+  - given-names: Halime       # Kişi 2 — İstatistik
+  - given-names: Sümeyra      # Kişi 3 — Mekân/Fizik
+  - given-names: Esra         # Kişi 4 — Bilgi tabanı/LLM
+    family-names: Kaya
+  - given-names: Merve        # Kişi 5 — Arayüz/Doğrulama
+version: "v0.1"
+license: MIT
+repository-code: "https://github.com/dilrubaakkol/trend-dedektifi"
+keywords:
+  - NASA Space Apps Challenge
+  - trend analysis
+  - Mann-Kendall
+  - Theil-Sen
+  - false discovery rate
+  - Earth observation
+  - Türkiye
+  - explainable AI
+references:
+  - type: data
+    title: "M2TMNXSLV"
+    version: "5.12.4"
+    doi: "10.5067/AP1B0BA5PD2K"
+    authors:
+      - name: "NASA GES DISC"
+    publisher:
+      name: "NASA GES DISC"
+  - type: data
+    title: "M2TMNXFLX"
+    version: "5.12.4"
+    doi: "10.5067/0JRLVL8YV2Y4"
+    authors:
+      - name: "NASA GES DISC"
+    publisher:
+      name: "NASA GES DISC"
+  - type: data
+    title: "M2TMNXRAD"
+    version: "5.12.4"
+    doi: "10.5067/OU3HJDS973O0"
+    authors:
+      - name: "NASA GES DISC"
+    publisher:
+      name: "NASA GES DISC"
+  - type: data
+    title: "M2TMNXAER"
+    version: "5.12.4"
+    doi: "10.5067/FH9A0MLJPC7N"
+    authors:
+      - name: "NASA GES DISC"
+    publisher:
+      name: "NASA GES DISC"
+  - type: data
+    title: "GPM_3IMERGM"
+    version: "07"
+    doi: "10.5067/GPM/IMERG/3B-MONTH/07"
+    authors:
+      - name: "NASA GES DISC"
+    publisher:
+      name: "NASA GES DISC"
+  - type: data
+    title: "GLDAS_NOAH025_M"
+    version: "2.1"
+    doi: "10.5067/SXAVCZFAQLNO"
+    authors:
+      - name: "NASA GES DISC"
+    publisher:
+      name: "NASA GES DISC"
+  - type: data
+    title: "MOD10CM"
+    version: "61"
+    doi: "10.5067/MODIS/MOD10CM.061"
+    authors:
+      - name: "NASA NSIDC DAAC"
+    publisher:
+      name: "NASA NSIDC DAAC"
+  - type: data
+    title: "MOD13C2"
+    version: "061"
+    doi: "10.5067/MODIS/MOD13C2.061"
+    authors:
+      - name: "NASA LP DAAC"
+    publisher:
+      name: "NASA LP DAAC"
+  - type: data
+    title: "MOD11C3"
+    version: "061"
+    doi: "10.5067/MODIS/MOD11C3.061"
+    authors:
+      - name: "NASA LP DAAC"
+    publisher:
+      name: "NASA LP DAAC"
+  - type: data
+    title: "OMNO2d"
+    version: "004"
+    doi: "10.5067/AURA/OMI/DATA3407"
+    authors:
+      - name: "NASA GES DISC"
+    publisher:
+      name: "NASA GES DISC"
+  - type: data
+    title: "TELLUS_GRAC-GRFO_MASCON_CRI_GRID_RL06.3_V4"
+    version: "RL06.3Mv04"
+    doi: "10.5067/TEMSC-3JC634"
+    authors:
+      - name: "NASA PO.DAAC"
+    publisher:
+      name: "NASA PO.DAAC"
+  - type: data
+    title: "SRTMGL30"
+    version: "002"
+    doi: "10.5067/MEASURES/SRTM/SRTMGL30.002"
+    authors:
+      - name: "NASA LP DAAC"
+    publisher:
+      name: "NASA LP DAAC"
