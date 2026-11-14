@@ -1,8 +1,7 @@
 # Proje bağlamı (Claude Code için)
 
 Bu repo NASA Space Apps Challenge 2026 "Earth System Trend Detective" için 5 kişilik bir ekibin
-projesi: **Trend Dedektifi**. Kullanıcı bir soru sorar ("Doğu Anadolu'da kar nasıl değişiyor ve bu
-ısınmayla tutarlı mı?"), araç belirti ve şüpheli değişkenleri seçer, NASA verisini çeker, trend ve
+projesi: **Trend Dedektifi**. Kullanıcı bir soru sorar , araç belirti ve şüpheli değişkenleri seçer, NASA verisini çeker, trend ve
 anlamlılık testleri yapar, fiziksel tahminlerle karşılaştırır ve her sayısı analiz çıktısına bağlı
 bir kanıt tablosu üretir.
 
