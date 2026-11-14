@@ -174,10 +174,27 @@ Ortak kurallar:
 - **Eksik veri kuralı:**
   - Bir yıl ya da mevsimde eksik ay oranı **> 0,20** ise o değer NaN olur. Yıllıkta en çok 2 ay
     eksik olabilir; 3 aylık mevsimde tek eksik ay bile değeri düşürür.
+  - **Ürüne göre eşik:** GRACE için yıllıkta en az 6 geçerli ay (eksik oran ≤ 0,50), mevsimde en az
+    2/3 ay. Kod: `stats/preprocessing.py` içinde `EKSIK_ESIK_URUN`. Gerekçe:
+    - Yaklaşık 2011–2017 arasında uydu bataryası yönetimi yüzünden birkaç ayda bir ay eksik.
+    - 2017-07 … 2018-05 arasında GRACE → GRACE-FO boşluğu var.
+    - 0,20 eşiğiyle 2011 ve 2013–2018 düşüyor, seri 16 yıla iniyordu. Yeni eşikle 22 yıl kalıyor;
+      yalnız 2017 ve 2018 düşüyor.
+    - Su depolama yavaş değişir; 6 aylık ortalama yıllık düzeyi temsil eder.
+  - Kullanılan eşik dosyanın `eksik_veri_kurali` attr'ında yazılı.
   - Toplanan değişkende eksik ay varsa toplam = geçerli ayların ortalaması × ay sayısı.
   - Bir hücrede en az **12 geçerli yıl** yoksa trend hesaplanmaz (NaN).
-  - Örnekler: GPM'in 2025 yılı ve 2025 sonbaharı düşer (ürün 2025-09'da bitiyor). GRACE'in 2002 yılı
-    ve GRACE/GRACE-FO arasındaki boşluk yılları düşer.
+  - Örnekler: GPM'in 2025 yılı ve 2025 sonbaharı düşer (ürün 2025-09'da bitiyor). GRACE'in 2017 ve
+    2018 yılları düşer.
+- **Anlamlılık kuralı** (tek tanım: `stats/trend_tests.py` içinde `anlamli_kural`; L2 hücreleri, L3
+  il/bölge satırları ve kaynak uyumu `k` aynı kuralı kullanır):
+  - `anlamli = 1` ⇔ `p_fdr ≤ 0,10` **ve** %95 genişletilmiş GA sıfırı dışlıyor (`ga_alt > 0` ya da
+    `ga_ust < 0`).
+  - `anlamli = 0` ⇔ `p_fdr` hesaplanmış ama koşullardan biri sağlanmıyor.
+  - `anlamli = -1` ⇔ `p_fdr` NaN.
+  - Gerekçe: MK testi ile genişletilmiş Sen GA'sı farklı yöntemlerdir. Yalnız `p_fdr` kullanıldığında
+    GA'sı sıfırı kapsayan trendler de "anlamlı" görünüyordu. İkisinin birlikte sağlanması temkinli
+    taraftır. Kural `anlamlilik_kurali` attr'ında yazılı.
 
 | Değişken | Tip | Birim | Anlam |
 | --- | --- | --- | --- |
@@ -185,7 +202,7 @@ Ortak kurallar:
 | `ga_alt`, `ga_ust` | float32 | `<seri birimi> / 10 yıl` | Eğimin %95 güven aralığı; etkin n ve t dağılımıyla genişletilmiş (aşağıda) |
 | `p_mk` | float32 | 1 | Hamed-Rao düzeltmeli Mann-Kendall p değeri |
 | `p_fdr` | float32 | 1 | Benjamini-Hochberg q değeri. Her mevsim için ayrı, yalnız Türkiye kara hücreleri üzerinden; diğer hücrelerde NaN |
-| `anlamli` | int8 | — | `1` = `p_fdr ≤ 0,10`; `0` = değil; `-1` = kara maskesi dışı ya da hesaplanamadı |
+| `anlamli` | int8 | — | Anlamlılık kuralı (yukarıda): `1` = `p_fdr ≤ 0,10` ve GA sıfırı dışlıyor; `0` = değil; `-1` = kara maskesi dışı ya da hesaplanamadı |
 | `etkin_n` | float32 | yıl | Etkin örneklem büyüklüğü |
 | `gereken_yil` | float32 | yıl | Weatherhead gereken yıl sayısı (aşağıda); eğim 0 ise NaN |
 
@@ -223,8 +240,11 @@ Ortak kurallar:
     - **MOD13C2** `ndvi`, `evi`: yalnız `[kis]`. Kar ve bulut yüzünden kış serisi seyrek; hücre sayısı
       metne yazılır.
   - Var olan dosyalara trendi yeniden hesaplamadan eklemek için:
-    `python -m stats.l2 --surum v0.1 --yalniz-isaretler`. Bu komut kaynak uyumunu ve OZET'i de yeniden
-    yazar.
+    `python -m stats.l2 --surum v0.1 --yalniz-isaretler`.
+    - Bu komut `anlamli`'yı da `p_fdr` ve GA'dan yeniden türetir; eğim, GA, p ve `p_fdr` değişmez.
+    - Kaynak uyumunu ve OZET'i de yeniden yazar.
+    - `--dosyalar` ile yalnız bazı dosyalar yeniden hesaplandığında bu adım tüm dosyalar için
+      kendiliğinden çalışır.
 
 #### Kaynak uyumu
 
@@ -279,6 +299,11 @@ dosyaları.
     - Sonra L2 ile aynı mevsim serisi, aynı eksik veri kuralı ve aynı trend motoru kullanılır.
     - BH-FDR (α = 0,10) her dosya × mevsim × düzey içinde uygulanır: iller kendi içinde, bölgeler
       kendi içinde.
+    - `anlamli` bölüm 2.1'deki anlamlılık kuralıyla belirlenir.
+  - **Türkiye satırı:** Bölge CSV'sinde `bolge_anahtari = "turkiye"`, `duzey = "ulke"` satırları
+    bulunur (tüm Türkiye kara hücreleri, mevsim başına bir satır).
+    - Ayrı bir düzeydir: FDR'ye girmez. Tek satırlık grup olduğundan `p_fdr = p_mk`.
+    - Kaynak uyumu bölge CSV'sinde de bulunur.
   - **(B) L2 hücre özeti:** Bölgedeki L2 hücrelerinin özeti.
 
 | Sütun | Anlam |
@@ -286,12 +311,12 @@ dosyaları.
 | `bolge_kodu` | İl: iki haneli plaka (`"25"`, `"01"`); bölge: anahtar (`dogu_anadolu`) |
 | `bolge_anahtari` | ASCII anahtar (`erzurum`, `dogu_anadolu`); `iller.geojson` içindeki `anahtar` ile aynı |
 | `bolge_adi` | Türkçe ad |
-| `duzey` | `il` ya da `bolge` |
+| `duzey` | `il`, `bolge` ya da `ulke` (Türkiye satırı, bölge CSV'sinde) |
 | `ust_bolge` | İl için bağlı olduğu bölgenin anahtarı; bölgede boş |
 | `mevsim` | `yillik`, `kis`, `ilkbahar`, `yaz`, `sonbahar` |
 | `hucre_sayisi` | Bölgeye giren 0,25° hücre sayısı |
 | `sen_egimi`, `ga_alt`, `ga_ust` | (A) Alan ortalaması serisinin Sen eğimi ve genişletilmiş %95 GA (`egim_birimi`) |
-| `p_mk`, `p_fdr`, `anlamli` | (A) Hamed-Rao p; BH q (düzey içinde); `1` / `0`, hesaplanamadıysa `-1` |
+| `p_mk`, `p_fdr`, `anlamli` | (A) Hamed-Rao p; BH q (düzey içinde; `ulke` satırında `p_fdr = p_mk`); `anlamli` bölüm 2.1'deki kuralla `1` / `0`, hesaplanamadıysa `-1` |
 | `etkin_n`, `gereken_yil` | (A) L2 ile aynı tanım |
 | `mk_yedek` | (A) `1` = Hamed-Rao tanımsız, düzeltmesiz MK kullanıldı |
 | `anlamli_hucre_orani` | (B) Bölgede trendi hesaplanan L2 hücrelerinden `anlamli = 1` olanların oranı (0–1) |
