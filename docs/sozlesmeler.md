@@ -52,35 +52,37 @@ da = load("ndvi", region="turkiye", sentetik=False)               # yalnız ger�
 
 Ayrıntılı kayıtlar (sürüm, DOI, dosyadaki değişken adı, dönüşüm): [`data/catalog.yaml`](../data/catalog.yaml).
 Dosya adındaki ürün kodu parantez içindedir (ör. `sicaklik_2m__MERRA2.nc`). ⏸ = katalogda var, henüz üretilmiyor.
+Domain: `land` = Türkiye kara maskeli, `ocean` = deniz maskeli, `all` = kutunun tamamı (kara + deniz).
+`all` değişkenlerde de `region="turkiye"` yalnız Türkiye kara hücrelerini verir; deniz için `deniz_*` bölgelerini kullanın.
 
-| Değişken adı | Birim | Ana ürün | İkincil ürünler |
-| --- | --- | --- | --- |
-| `sicaklik_2m` | °C | M2TMNXSLV 5.12.4 (MERRA2) | GLDAS_NOAH025_M 2.1 (GLDAS) |
-| `ozgul_nem_2m` | kg/kg | M2TMNXSLV (MERRA2) | — |
-| `ruzgar_u_10m`, `ruzgar_v_10m` | m/s | M2TMNXSLV (MERRA2) | — |
-| `ruzgar_hizi` | m/s | GLDAS_NOAH025_M (GLDAS) | — |
-| `deniz_seviyesi_basinci` | hPa | M2TMNXSLV (MERRA2) | — |
-| `su_buhari_kolon` | kg/m² | M2TMNXSLV `TQV` (MERRA2) | AIRS3STM 7.0 (AIRS) ⏸ |
-| `bulut_orani` | % | M2TMNXRAD (MERRA2) | MOD08_M3 ⏸ |
-| `yagis` | mm/ay | GPM_3IMERGM V07 (GPM) | GLDAS_NOAH025_M (GLDAS), M2TMNXFLX (MERRA2) |
-| `buharlasma` | mm/ay | GLDAS_NOAH025_M (GLDAS) | — |
-| `yuzey_akisi` | mm/ay | GLDAS_NOAH025_M (GLDAS) | — |
-| `taban_akisi` | mm/ay | GLDAS_NOAH025_M (GLDAS) | — |
-| `toprak_nemi` (0–10 cm) | kg/m² | GLDAS_NOAH025_M (GLDAS) | — |
-| `kok_bolgesi_nemi` | kg/m² | GLDAS_NOAH025_M (GLDAS) | — |
-| `toplam_su_depolama` | cm | JPL GRACE/GRACE-FO Mascon CRI RL06.3Mv04 (GRACE) | — |
-| `kar_ortusu` | % | MOD10CM 61 (MOD10CM) | — |
-| `kar_su_esdegeri` | mm | GLDAS_NOAH025_M (GLDAS) | — |
-| `ndvi`, `evi` | 1 (birimsiz) | MOD13C2 061 (MOD13C2) | — |
-| `yuzey_sicakligi_gunduz`, `yuzey_sicakligi_gece` | °C | MOD11C3 061 (MOD11C3) | — |
-| `yanan_alan` | % | MCD64A1 061 ⏸ | — |
-| `aerosol_optik_derinlik` | 1 | M2TMNXAER (MERRA2) | MOD08_M3 ⏸ |
-| `ozon_kolon` | DU | M2TMNXSLV `TO3` (MERRA2) | OMTO3e 004 ⏸ |
-| `no2` (troposferik) | 10^15 molekül/cm² | OMNO2d 004 (OMI) ⏸ | — |
-| `so2` | DU | OMSO2e 004 (OMI) ⏸ | — |
-| `deniz_yuzey_sicakligi` | °C | MODISA_L3m_SST ⏸ | — |
-| `klorofil` | mg/m³ | MODISA_L3m_CHL ⏸ | — |
-| `rakim` | m | SRTMGL30 002 (SRTM) | — |
+| Değişken adı | Birim | Domain | Ana ürün | İkincil ürünler |
+| --- | --- | --- | --- | --- |
+| `sicaklik_2m` | °C | all (MERRA2), land (GLDAS) | M2TMNXSLV 5.12.4 (MERRA2) | GLDAS_NOAH025_M 2.1 (GLDAS) |
+| `ozgul_nem_2m` | kg/kg | all | M2TMNXSLV (MERRA2) | — |
+| `ruzgar_u_10m`, `ruzgar_v_10m` | m/s | all | M2TMNXSLV (MERRA2) | — |
+| `ruzgar_hizi` | m/s | land | GLDAS_NOAH025_M (GLDAS) | — |
+| `deniz_seviyesi_basinci` | hPa | all | M2TMNXSLV (MERRA2) | — |
+| `su_buhari_kolon` | kg/m² | all | M2TMNXSLV `TQV` (MERRA2) | AIRS3STM 7.0 (AIRS) ⏸ |
+| `bulut_orani` | % | all | M2TMNXRAD (MERRA2) | MOD08_M3 ⏸ |
+| `yagis` | mm/ay | land | GPM_3IMERGM V07 (GPM) | GLDAS_NOAH025_M (GLDAS), M2TMNXFLX (MERRA2) |
+| `buharlasma` | mm/ay | land | GLDAS_NOAH025_M (GLDAS) | — |
+| `yuzey_akisi` | mm/ay | land | GLDAS_NOAH025_M (GLDAS) | — |
+| `taban_akisi` | mm/ay | land | GLDAS_NOAH025_M (GLDAS) | — |
+| `toprak_nemi` (0–10 cm) | kg/m² | land | GLDAS_NOAH025_M (GLDAS) | — |
+| `kok_bolgesi_nemi` | kg/m² | land | GLDAS_NOAH025_M (GLDAS) | — |
+| `toplam_su_depolama` | cm | land | JPL GRACE/GRACE-FO Mascon CRI RL06.3Mv04 (GRACE) | — |
+| `kar_ortusu` | % | land | MOD10CM 61 (MOD10CM) | — |
+| `kar_su_esdegeri` | mm | land | GLDAS_NOAH025_M (GLDAS) | — |
+| `ndvi`, `evi` | 1 (birimsiz) | land | MOD13C2 061 (MOD13C2) | — |
+| `yuzey_sicakligi_gunduz`, `yuzey_sicakligi_gece` | °C | land | MOD11C3 061 (MOD11C3) | — |
+| `yanan_alan` | % | land | MCD64A1 061 ⏸ | — |
+| `aerosol_optik_derinlik` | 1 | all | M2TMNXAER (MERRA2) | MOD08_M3 ⏸ |
+| `ozon_kolon` | DU | all | M2TMNXSLV `TO3` (MERRA2) | OMTO3e 004 ⏸ |
+| `no2` (troposferik) | 10^15 molekül/cm² | all | OMNO2d 004 (OMI) ⏸ | — |
+| `so2` | DU | all | OMSO2e 004 (OMI) ⏸ | — |
+| `deniz_yuzey_sicakligi` | °C | ocean | MODISA_L3m_SST ⏸ | — |
+| `klorofil` | mg/m³ | ocean | MODISA_L3m_CHL ⏸ | — |
+| `rakim` | m | land | SRTMGL30 002 (SRTM) | — |
 
 ## 2. Sonuç sözleşmesi (Kişi 2, 3 → Kişi 4, 5)
 
