@@ -246,6 +246,34 @@ urunler:
     valid_start: "2000-02"
     durum: aktif
     not: "SRTMGL3 (90 m, ~100 karo) yerine 30″ sürüm; 0,05°/0,25° ortalama için yeterli, 2 karo."
+  MCD12C1:
+    short_name: MCD12C1
+    version: "061"
+    daac: LP DAAC
+    provider: LPCLOUD
+    doi: 10.5067/MODIS/MCD12C1.061
+    dosya_kodu: MCD12C1
+    erisim: download
+    okuyucu: ozel                # data/arazi.py (IGBP yüzde katmanı, sınıf boyutu); fetch/harmonize toplu akışına girmez
+    zaman: yillik
+    mekansal_cozunurluk: [0.05, 0.05]
+    valid_start: "2001-01"
+    durum: aktif
+    not: "CMR'de doğrulandı (2026-11-15): 25 yıllık granül 2001–2025, ~1,2 GB/yıl, Cloud OPeNDAP yok (tam HDF4 indirilir). Ürün: tarim_orani (sabit, kademe 2) = (%IGBP 12 + ½·%14)/100, son 5 yıl ortalaması. Komut: python -m data.arazi --surum v0.1"
+  GFSAD1KCM:
+    short_name: GFSAD1KCM
+    version: "001"
+    daac: LP DAAC
+    provider: LPCLOUD
+    doi: 10.5067/MEASURES/GFSAD/GFSAD1KCM.001
+    dosya_kodu: GFSAD1KCM
+    erisim: download
+    okuyucu: ozel                # data/arazi.py (GeoTIFF, rasterio)
+    zaman: sabit
+    mekansal_cozunurluk: [0.008928, 0.008928]
+    valid_start: "2007-01"
+    durum: aktif
+    not: "CMR'de doğrulandı (2026-11-15): tek granül (2010 nominal, 2007–2012), 33 MB GeoTIFF. Sınıflar (User Guide v1, 2.2.4): 1 Irrigation major, 2 Irrigation minor, 3 Rainfed, 4 Rainfed minor fragments, 5 Rainfed very minor fragments, 9 Non-cropland, 0 veri yok. YALNIZ DOĞRULAMA: sulanan_oran → <paket>/dogrulama/; sulama izi hesabına girmez."
   MODISA_SST:
     short_name: MODISA_L3m_SST
     version: R2019.0
