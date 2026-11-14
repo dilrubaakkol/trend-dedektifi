@@ -259,21 +259,59 @@ Ortak kurallar:
 
 ### 2.2 L3: il ve bölge özetleri (Kişi 2 / Kişi 3)
 
-- **Yollar:** `L3_ozet/<degisken>__<urun>__il.csv` ve `L3_ozet/<degisken>__<urun>__bolge.csv`
-- **Bölgeler:** İller Natural Earth, coğrafi bölgeler `data/boundaries/bolgeler.yaml`. Hücre seçimi
-  `data.regions` hücre merkezi kuralıyla yapılır.
-- Bir satır = bir il ya da bölge.
+Üretim: `python -m stats.l3 --surum v0.1` (`stats/l3.py`). Girdi: L1 küpleri (rakım hariç) ve L2 trend
+dosyaları.
+
+- **Yollar:**
+  - `L3_ozet/<degisken>__<urun>__il.csv` (81 il)
+  - `L3_ozet/<degisken>__<urun>__bolge.csv` (7 bölge)
+  - `L3_ozet/<degisken>__kaynak_uyumu__{il,bolge}.csv` (`yagis`, `sicaklik_2m`)
+  - `L3_ozet/ICINDEKILER.csv`
+- **Bölgeler:** İller Natural Earth, coğrafi bölgeler `data/boundaries/bolgeler.yaml`.
+  - Hücre seçimi `data.regions.subset` ile, hücre merkezi kuralına göre yapılır.
+  - Hiçbir hücre merkezi düşmeyen küçük bölgede, sınıra değen hücreler alınır ve `not` sütununa yazılır.
+- **Satır:** Bir il ya da bölge × bir mevsim (`yillik`, `kis`, `ilkbahar`, `yaz`, `sonbahar`).
+  CSV'ler UTF-8 (BOM'lu). `bolge_kodu` metin olarak okunmalı (`"01"`).
+- **İki tür sonuç:**
+  - **(A) Alan ortalaması serisinin trendi:**
+    - Bölge hücrelerinin cos(enlem) ağırlıklı ortalaması alınır (`data.regions.area_mean`; NaN hücreler
+      atlanır).
+    - Sonra L2 ile aynı mevsim serisi, aynı eksik veri kuralı ve aynı trend motoru kullanılır.
+    - BH-FDR (α = 0,10) her dosya × mevsim × düzey içinde uygulanır: iller kendi içinde, bölgeler
+      kendi içinde.
+  - **(B) L2 hücre özeti:** Bölgedeki L2 hücrelerinin özeti.
 
 | Sütun | Anlam |
 | --- | --- |
-| `bolge_kodu` | İl: plaka (`25`); bölge: anahtar (`dogu_anadolu`) |
+| `bolge_kodu` | İl: iki haneli plaka (`"25"`, `"01"`); bölge: anahtar (`dogu_anadolu`) |
+| `bolge_anahtari` | ASCII anahtar (`erzurum`, `dogu_anadolu`); `iller.geojson` içindeki `anahtar` ile aynı |
 | `bolge_adi` | Türkçe ad |
-| `hucre_sayisi` | Ortalamaya giren 0,25° hücre sayısı |
-| `sen_egimi`, `ga_alt`, `ga_ust` | Alan ortalaması serisinin trendi (`<birim>/10 yıl`) |
-| `p_mk`, `p_fdr`, `anlamli` | L2 ile aynı tanım. FDR, dosyadaki tüm iller ya da tüm bölgeler üzerinden |
-| `etkin_n`, `gereken_yil` | L2 ile aynı tanım |
-| `anlamli_hucre_orani` | Bölgedeki L2 hücrelerinden `anlamli = 1` olanların oranı (0–1) |
-| `birim`, `donem`, `seri`, `kademe`, `dogrulanmadi` | Ortak alanlar |
+| `duzey` | `il` ya da `bolge` |
+| `ust_bolge` | İl için bağlı olduğu bölgenin anahtarı; bölgede boş |
+| `mevsim` | `yillik`, `kis`, `ilkbahar`, `yaz`, `sonbahar` |
+| `hucre_sayisi` | Bölgeye giren 0,25° hücre sayısı |
+| `sen_egimi`, `ga_alt`, `ga_ust` | (A) Alan ortalaması serisinin Sen eğimi ve genişletilmiş %95 GA (`egim_birimi`) |
+| `p_mk`, `p_fdr`, `anlamli` | (A) Hamed-Rao p; BH q (düzey içinde); `1` / `0`, hesaplanamadıysa `-1` |
+| `etkin_n`, `gereken_yil` | (A) L2 ile aynı tanım |
+| `mk_yedek` | (A) `1` = Hamed-Rao tanımsız, düzeltmesiz MK kullanıldı |
+| `anlamli_hucre_orani` | (B) Bölgede trendi hesaplanan L2 hücrelerinden `anlamli = 1` olanların oranı (0–1) |
+| `anlamli_artan_orani`, `anlamli_azalan_orani` | (B) Aynı paydayla, anlamlı ve artan / azalan hücre oranı |
+| `medyan_hucre_egimi` | (B) Bölgedeki L2 hücre eğimlerinin medyanı |
+| `birim` | Mevsim serisinin birimi (ör. `°C`, `mm/yıl`, `mm/mevsim`) |
+| `egim_birimi` | Eğim birimi (ör. `°C / 10 yıl`, `mm/dönem / 10 yıl`) |
+| `donem_baslangic`, `donem_bitis` | Alan ortalaması serisinde geçerli ilk ve son yıl |
+| `trend_uyarisi` | L2 dosyasındaki uyarıdan o mevsime düşen metin (bölüm 2.1); yoksa boş |
+| `not` | `az hücre` (`hucre_sayisi < 3`) ve/veya `merkezi düşen hücre yok; değen hücreler` |
+| `kademe`, `dogrulanmadi`, `urun_surumu`, `veri_seti_doi`, `lisans`, `doi` | Ortak alanlar (L1 attrs) |
+
+- **Kaynak uyumu CSV'si:**
+  - L2 kaynak uyumuyla aynı tanım, ama hücreler yerine alan ortalaması serileri üzerinden.
+  - Ortak dönem L2'dekiyle aynıdır. Her ürün o döneme kırpılır, bölge trendi ve FDR yeniden hesaplanır.
+  - Sütunlar: `bolge_kodu`, `bolge_anahtari`, `bolge_adi`, `duzey`, `mevsim`, `k`, `m`, `isaret_uyumu`,
+    her ürün için `egim_<urun>` ve `anlamli_<urun>`, ayrıca `egim_birimi`, `ortak_donem`, `urunler`.
+- **`ICINDEKILER.csv`:** `dosya`, `tur` (`trend` | `kaynak_uyumu`), `degisken`, `urun`, `duzey`,
+  `satir`, `kademe`, `trend_uyarisi` (`evet` / boş), `l2_ozeti` (`evet` ya da L2 bulunamadıysa açıklama),
+  `olusturma_tarihi`.
 
 ### 2.3 L4: değişken çiftleri arasındaki ilişki (Kişi 3)
 
