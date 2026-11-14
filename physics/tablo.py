@@ -32,6 +32,13 @@ SUTUNLAR = [
 
 NOT_TERS = "İncelenmeli: veri sorunu ya da insan etkisi (sulama, baraj vb.) olabilir."
 NOT_KALITE = "Kalite kontrolü beklenen güçlü ilişkiyi vermedi: veri sorunu olabilir."
+NOT_CIFT5 = {
+    "ters_yonde": ("Su sınırlı yaz: sıcak yazlar kurak yazlardır, toprakta su kalmadığı için "
+                   "buharlaşma azalır. Veri hatası değil, kurak iklimin beklenen işaretidir."),
+    "beklenen_yonde": ("Enerji sınırlı yaz: toprakta su yeterli, sıcaklık arttıkça buharlaşma "
+                       "artar."),
+    "anlamsiz": ("Enerji ve su sınırı arasında geçiş: iki etki birbirini dengeliyor olabilir."),
+}
 
 
 def bolge_listesi(iller: bool = True) -> list[dict]:
@@ -40,7 +47,7 @@ def bolge_listesi(iller: bool = True) -> list[dict]:
     out = []
     if iller:
         il = sorted(_iller().items(), key=lambda kv: int(kv[1]["plaka"]))
-        out += [{"bolge_turu": "il", "bolge_kodu": str(int(v["plaka"])), "bolge_adi": v["ad"],
+        out += [{"bolge_turu": "il", "bolge_kodu": f"{int(v['plaka']):02d}", "bolge_adi": v["ad"],
                  "anahtar": f"il:{k}"} for k, v in il]
     out += [{"bolge_turu": "bolge", "bolge_kodu": k, "bolge_adi": ad, "anahtar": f"bolge:{k}"}
             for k, ad in list_regions()["bolge"]]
@@ -82,7 +89,9 @@ def _ortak_alanlar(c: Cift, a: xr.DataArray, b: xr.DataArray) -> dict:
 
 def _not(c: Cift, et: str | None) -> str:
     parca = [c.not_] if c.not_ else []
-    if et == "ters_yonde" and c.no != 5:          # çift 5'in açıklaması zaten notta
+    if c.no == 5 and et in NOT_CIFT5:             # çift 5: yön kuraklığa bağlı (fiziksel)
+        parca.append(NOT_CIFT5[et])
+    elif et == "ters_yonde":
         parca.append(NOT_TERS)
     if c.no == 6 and et in ("ters_yonde", "anlamsiz"):
         parca.append(NOT_KALITE)
