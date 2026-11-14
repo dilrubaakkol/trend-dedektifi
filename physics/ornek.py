@@ -1,3 +1,5 @@
+# YOL HARİTASI (2026-11-14): v0.1 kapsamında kullanılmıyor (bkz. physics/KISI3_PLAN.md, bölüm 2).
+# Kod ve testleri ileride kullanılmak üzere duruyor; silmeyin.
 """Kişi 4 ve 5 için ÖRNEK sonuç dosyası üretir (sentetik veri — YER TUTUCU).
 
     python -m physics.ornek          → physics/ornekler/ornek_sonuclar.json

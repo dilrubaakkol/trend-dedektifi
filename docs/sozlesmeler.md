@@ -198,21 +198,71 @@ Ortak kurallar:
 
 ### 2.3 L4: değişken çiftleri arasındaki ilişki (Kişi 3)
 
-- **Yol:** `L4_iliski/ciftler.csv`. Bir satır = bir çift × bir bölge.
-- **Çiftler:** 6 değişken çifti. Listeyi ve her çiftin beklenen işaretini Kişi 3 buraya ekleyecek.
+> Kişi 3 doldurdu (2026-11-14). Çift listesi ekip belgesindeki ("Veri Ürünü Tanımı") 6 çifttir; ek çift
+> yok. Kış = Aralık (Y−1) + Ocak + Şubat (Y); Mart dahil değil.
+
+**Dosyalar** (paket kökü altında):
+
+| Yol | İçerik |
+| --- | --- |
+| `L4_iliski/ciftler.csv` | Tek tablo. Bir satır = bir çift × bir bölge (× bir gecikme). İller, 7 bölge ve `turkiye` aynı dosyada, `bolge_turu` sütunuyla ayrılır |
+| `L4_iliski/iliski__<degisken1>__<degisken2>.nc` | Bir çiftin 0,25° hücre haritası. Çift 3 iki gecikme için iki dosyadır: `…__gecikme1.nc`, `…__gecikme2.nc`. Çift 4 (GRACE) için harita **yoktur** |
+
+Ayrı bir `iliski_iller.csv` dosyası yoktur; il satırları `ciftler.csv` içindedir (`bolge_turu = il`).
+
+**Çiftler** (beklenen işaret: `+` aynı yönde, `−` zıt yönde):
+
+| `cift_no` | `cift` | `seri` | Beklenen | Kademe | Kapsam |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `sicaklik_2m__MERRA2~kar_ortusu__MOD10CM` | `kis_DJF` | − | 1 | Yalnız kış ortalaması kar örtüsü ≥ %10 olan hücreler |
+| 2 | `yagis__GPM~toprak_nemi__GLDAS` | `mevsim_anomali` | + | 1 | Tüm kara |
+| 3 | `toprak_nemi__GLDAS~ndvi__MOD13C2` | `aylik_anomali_nis_eyl` | + | 1 | Tüm kara; gecikme 1 ve 2 ay (NDVI, toprak neminden sonra) |
+| 4 | `yagis__GPM~toplam_su_depolama__GRACE` | `yillik` | + | 1 | Yalnız 7 bölge ve `turkiye` (GRACE çözünürlüğü kaba); GRACE boşluk yılları atılır |
+| 5 | `sicaklik_2m__MERRA2~buharlasma__GLDAS` | `yaz_JJA` | + | 2 | Tüm kara; kurak yerde zayıf ya da ters çıkabilir (`not` sütununda açıklanır) |
+| 6 | `sicaklik_2m__MERRA2~yuzey_sicakligi_gunduz__MOD11C3` | `aylik_anomali` | + | 2 | Tüm kara; kalite kontrolü (güçlü pozitif beklenir) |
+
+`seri` değerleri:
+- `kis_DJF`, `yaz_JJA`, `yillik`: her yıla bir değer. Birikimli değişkenlerde (yağış, buharlaşma) toplam, ötekilerde ortalama. Mevsimin bir ayı eksikse değer `NaN`.
+- `mevsim_anomali`: dört mevsimin değerleri art arda dizilir, her mevsimden kendi uzun dönem ortalaması çıkarılır.
+- `aylik_anomali`: her aydan o ayın 12 aylık klimatolojisi çıkarılır. `_nis_eyl`: yalnız Nisan–Eylül ayları (NDVI tarafı).
+- Her seriden korelasyondan önce doğrusal trend çıkarılır.
+
+**`ciftler.csv` sütunları:**
 
 | Sütun | Anlam |
 | --- | --- |
-| `cift` | `<degisken1>__<urun1>~<degisken2>__<urun2>`, ör. `sicaklik_2m__MERRA2~kar_ortusu__MOD10CM` |
-| `bolge` | L3 `bolge_kodu` ya da `turkiye` |
-| `r` | Trendi giderilmiş (ya da anomali) seriler arasındaki Pearson korelasyonu |
-| `etkin_n` | Bretherton vd. (1999): n·(1 − r₁·r₂)/(1 + r₁·r₂); r₁, r₂ = iki serinin gecikme-1 otokorelasyonu |
-| `p` | `etkin_n` ile hesaplanmış iki yönlü p değeri |
-| `etiket` | `beklenen_yonde` (anlamlı ve işaret beklenenle aynı) · `ters_yonde` (anlamlı ve işaret ters) · `anlamsiz` (anlamlı değil) |
+| `cift_no`, `cift`, `degisken_1`, `degisken_2`, `seri` | Yukarıdaki tablo |
+| `gecikme_ay` | Çift 3'te 1 ya da 2; ötekilerde 0 |
+| `beklenen_yon` | `+` ya da `-` |
+| `bolge_turu` | `il`, `bolge` ya da `turkiye` |
+| `bolge_kodu`, `bolge_adi` | L3 ile aynı: il plakası / bölge anahtarı (`dogu_anadolu`), Türkçe ad |
+| `hucre_sayisi` | Bölge serisine giren 0,25° hücre sayısı (çift 1'de kar maskesinden sonra) |
+| `donem`, `n` | İki serinin ortak dönemi; kullanılan değer sayısı |
+| `r` | Trendi giderilmiş seriler arasındaki Pearson korelasyonu |
+| `r1_1`, `r1_2` | İki serinin gecikme-1 otokorelasyonu |
+| `etkin_n` | Bretherton vd. (1999): n·(1 − r₁·r₂)/(1 + r₁·r₂) |
+| `p` | `etkin_n − 2` serbestlik dereceli t testiyle iki yönlü p değeri |
+| `p_fdr` | Yalnız `bolge_turu = il` satırlarında: aynı çiftin 81 il p değerleri üzerinden Benjamini-Hochberg. Ötekilerde boş |
+| `anlamli` | `1` / `0`. İl: `p_fdr ≤ 0,10`. Bölge ve Türkiye: `p < 0,05` |
+| `etiket` | `beklenen_yonde` · `ters_yonde` · `anlamsiz` (hesaplanamadıysa boş) |
+| `not` | Kısa açıklama (ör. çift 5 kurak bölge, `ters_yonde` satırları için olası nedenler) |
+| `urun_surumu`, `veri_seti_doi`, `lisans` | Ortak alanlar |
+| `kademe` | İki girdinin büyüğü (çift 5 ve 6 = 2) |
+| `dogrulanmadi` | Kademe 2 çiftlerde `evet`, ötekilerde boş |
+| `doi_1`, `doi_2` | İki NASA kaynak ürününün DOI'si |
+
+**Harita dosyası (`iliski__*.nc`) içeriği:** Boyutlar `lat`, `lon` (L1 ile aynı 28 × 78 ızgara).
+
+| Değişken | Tip | Anlam |
+| --- | --- | --- |
+| `r`, `etkin_n`, `p`, `p_fdr` | float32 | Yukarıdaki gibi; FDR, Türkiye kara hücreleri üzerinden (α_FDR = 0,10) |
+| `anlamli` | int8 | `1` = `p_fdr ≤ 0,10`, `0` = değil, `-1` = maskeli ya da hesaplanamadı |
+| `etiket` | int8 | `1` = beklenen_yonde, `-1` = ters_yonde, `0` = anlamsiz, `-99` = maskeli ya da hesaplanamadı (attrs: `flag_values`, `flag_meanings`) |
+
+attrs: ortak alanlar, ayrıca `cift`, `cift_no`, `seri`, `gecikme_ay`, `beklenen_yon`, `donem`, `alfa_fdr = 0.10`, `doi_1`, `doi_2`.
 
 - **Etiketler yalnız bu üç değerdir.** Hiçbiri nedensellik anlamına gelmez; "ilişki beklenen yönde"
   diye okunur.
-- **Açık sorular (ekip kararı):**
-  - L4 anlamlılık eşiği (α) ve çoklu test düzeltmesi.
-  - `seri` tanımı: yıllık ya da mevsimlik anomali.
-  - Bölge listesi: tüm iller mi, yalnız bölgeler mi?
+- **Anlamlılık eşikleri:**
+  - Haritalar ve il satırları: FDR (α_FDR = 0,10). Bu, belgedeki ve L2'deki eşikle aynıdır.
+  - Bölge ve Türkiye satırları: p < 0,05. Bu satırlar az sayıda olduğu için çoklu test düzeltmesi yapılmaz.

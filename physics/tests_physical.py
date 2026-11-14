@@ -1,3 +1,5 @@
+# YOL HARİTASI (2026-11-14): v0.1 kapsamında kullanılmıyor (bkz. physics/KISI3_PLAN.md, bölüm 2).
+# Kod ve testleri ileride kullanılmak üzere duruyor; silmeyin.
 """Fiziksel testler: hipotezden türetilen tahmini gözlemle karşılaştırıp etiket verir.
 
 Sade anlatım: "Isınma sorumluysa ne görmeliydik?" sorusunu sayıya döker ve gözlenenle
