@@ -103,7 +103,7 @@ def _l3_row(pkg: Path, degisken: str, urun: str, region: dict) -> tuple[dict | N
             continue
         hit = df[(df["bolge_kodu"].map(norm_key) == key) | (df["bolge_adi"].map(norm_key) == key)]
         if len(hit):
-            return hit.iloc[0].to_dict(), str(f.relative_to(pkg)), "turkiye" if key == "turkiye" else level
+            return hit.iloc[0].to_dict(), f.relative_to(pkg).as_posix(), "turkiye" if key == "turkiye" else level
     return None, None, region["level"]
 
 
@@ -171,7 +171,7 @@ def _relation_evidence(pkg: Path, variables: set[str], targets: set[str], region
                              "pair": r["cift"], "variables": [v1, v2], "products": [u1, u2],
                              "region_key": key, "r": _num(r.get("r")), "p": _num(r.get("p")),
                              "etkin_n": _num(r.get("etkin_n")), "label": r.get("etiket"),
-                             "file": str(f.relative_to(pkg))})
+                             "file": f.relative_to(pkg).as_posix()})
         if rows:
             return rows, key
     return [], None
