@@ -86,6 +86,11 @@ Her faz sentetik veriyle test edilir ve testler geçmeden sonraki faza geçilmez
   - **Tuzak testi:** İkisi de artan ama birbiriyle ilgisiz iki seri `anlamsiz` çıkıyor (trend çıkarılmasaydı "anlamlı" çıkardı)
   - İşaret ters verilirse etiket `ters_yonde` oluyor
 
+**Durum (2026-11-14): ✅ bitti.** `physics/iliski.py`, `tests/test_physics_iliski.py` (20 test).
+- Sahte alarm oranı (ilişkisiz seriler, 1000 deneme): %4–5,5 aralığında, hedef %3–7.
+- Küçük örneklem düzeltmesi (r₁ + (1+4r₁)/n) açık. Kapalıyken 24 kışlık hafızalı serilerde oran %8,9'a çıkıyor; bu da bir testle belgelendi.
+- Tuzak testi geçti: ortak trendli seriler arasında ham korelasyon 0,8'in üzerinde, trend çıkarılınca tesadüf düzeyine iniyor.
+
 ### Faz 2: Serilerin hazırlanması (`physics/seriler.py`)
 - Mevsim serileri:
   - Kış Ara(Y−1)+Oca+Şub(Y), ilkbahar, yaz, sonbahar, yıllık
