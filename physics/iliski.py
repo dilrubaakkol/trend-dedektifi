@@ -74,11 +74,16 @@ def p_degeri(r: float, n_etkin: float) -> float:
 
 
 def etiket(r: float, anlamli: bool, beklenen: int) -> str | None:
-    """Etiket: anlamlı değilse ``anlamsiz``; anlamlıysa işaret beklenenle aynı mı?"""
+    """Etiket: anlamlı değilse ``anlamsiz``; anlamlıysa işaret beklenenle aynı mı?
+
+    ``beklenen = 0`` (beklenti yok): anlamlı ilişkide etiket verilmez (None); yalnız r, p ve yön okunur.
+    """
     if not np.isfinite(r):
         return None
     if not anlamli:
         return "anlamsiz"
+    if beklenen == 0:
+        return None
     return "beklenen_yonde" if np.sign(r) == np.sign(beklenen) else "ters_yonde"
 
 
@@ -142,3 +147,13 @@ def iliski_1d(x, y, beklenen: int, t=None, alfa: float = ALFA, min_n: int = 8,
     anlamli = bool(np.isfinite(p) and p < alfa)
     return {"r": r, "r1_1": a, "r1_2": b, "n": n, "etkin_n": ne, "p": p,
             "anlamli": anlamli, "etiket": etiket(r, anlamli, beklenen)}
+
+
+def main(argv=None) -> None:
+    """``python -m physics.iliski``: tek çift ilişki komutu (ayrıntı: ``physics/tek_cift.py``)."""
+    from physics.tek_cift import main as _main  # geç içe aktarma: döngüsel bağımlılık olmasın
+    _main(argv)
+
+
+if __name__ == "__main__":
+    main()
