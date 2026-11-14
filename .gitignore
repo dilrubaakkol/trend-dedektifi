@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+.pytest_cache/
+
+# Gizli bilgiler — asla repoya girmez
+.env
+.netrc
+_netrc
+*.key
+
+# İndirilen ve üretilen veri
+cache/
+outputs/
+*.nc
+*.nc4
+*.hdf
+*.he5
+*.h5
+*.tif
+
+# Editör / işletim sistemi
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

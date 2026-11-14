@@ -1,0 +1,23 @@
+# Örnek süreç kartı (Kişi 4 geliştirir). Yeni süreç = bu klasöre yeni bir YAML dosyası.
+id: kar_isinma
+baslik: Kar örtüsü azalımı ve ısınma
+sade_tanim: Isınan bir dağda kar çizgisi yukarı çekilir.
+belirti:
+  - degisken: kar_ortusu
+    urun: MOD10CM
+    beklenen_yon: azalis
+supheliler:
+  - degisken: sicaklik_2m
+    urunler: [MERRA2, GLDAS, AIRS]
+    neden: "Sıcaklık artınca kar erken erir ve yağış kar yerine yağmur olarak düşer."
+  - degisken: yagis
+    urunler: [GPM, MERRA2]
+    neden: "Kış yağışı azalırsa daha az kar birikir."
+fiziksel_test:
+  tip: sinir_kaymasi
+  eksen: rakim
+  surucu: sicaklik_2m
+alternatifler:
+  - "Kış yağışı azalımı"
+  - "Toz/kurum kaynaklı albedo düşüşü"
+kaynaklar: []

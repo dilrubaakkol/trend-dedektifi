@@ -1,0 +1,32 @@
+{
+  "_not": "Bu dosyadaki sayilar YER TUTUCUDUR, gercek sonuc degildir.",
+  "run_id": "dogu_anadolu_kar_2001_2025",
+  "question": "Dogu Anadolu'da kar nasil degisiyor ve bu degisim isinmayla tutarli mi?",
+  "region": {"name": "dogu_anadolu", "bbox": [38.0, 37.5, 44.0, 41.5]},
+  "period": ["2001-01", "2025-12"],
+  "card_id": "kar_isinma",
+  "analyses": [
+    {
+      "id": "trend_kar_ortusu_MOD10CM",
+      "type": "trend",
+      "variable": "kar_ortusu",
+      "product": "MOD10CM",
+      "units": "%",
+      "sen_slope_per_decade": -2.1,
+      "ci95": [-3.0, -1.2],
+      "mk_p": 0.003,
+      "ttest_p": 0.01,
+      "fdr_fraction_significant": 0.41,
+      "years_needed": null,
+      "label": "uyumlu"
+    },
+    {
+      "id": "sinir_rakim_kar",
+      "type": "boundary_shift",
+      "axis": "rakim",
+      "observed_shift_m_per_decade": [40, 95],
+      "predicted_shift_m_per_decade": [55, 110],
+      "label": "uyumlu"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+# Veri (Kişi 1)
+earthaccess>=0.9
+xarray>=2024.1
+netCDF4
+h5netcdf
+dask
+rioxarray
+pyyaml
+
+# İstatistik (Kişi 2) ve fizik (Kişi 3)
+numpy
+pandas
+scipy
+statsmodels
+pymannkendall
+
+# Arayüz (Kişi 5)
+streamlit
+plotly
+leafmap
+
+# Test
+pytest
