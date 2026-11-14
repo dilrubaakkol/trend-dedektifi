@@ -299,7 +299,7 @@ degiskenler:
     urun: MERRA2_SLV
     ana: true
     kategori: atmosfer
-    domain: land
+    domain: all
     dosya_degiskeni: T2M
     long_name: 2 m hava sıcaklığı
     birim_orijinal: K
@@ -318,7 +318,7 @@ degiskenler:
     urun: MERRA2_SLV
     ana: true
     kategori: atmosfer
-    domain: land
+    domain: all
     dosya_degiskeni: QV2M
     long_name: 2 m özgül nem
     birim_orijinal: kg kg-1
