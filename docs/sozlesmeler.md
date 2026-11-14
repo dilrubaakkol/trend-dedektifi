@@ -24,6 +24,10 @@ Modüller birbirleriyle yalnızca bu iki biçim üzerinden konuşur. Değişikli
   `domain` (`land` | `ocean` | `all`), `valid_start` (gerçek başlangıç ayı; sabit alanda `sabit`).
 - Sentetik dosyalar ürün kodu `SENTETIK` taşır; attrs'ta `synthetic_truth` (gerçek parametreler,
   JSON) ve `yer_tutucu` bulunur. Gerçek analizde kullanılmaz.
+- **Kutu notu:** İçeride (`cache/processed/`) `TURKIYE_BBOX` kullanılır. Yayın paketi
+  (`python -m data.export`) 25,5°D–45,0°D, 35,5°K–42,5°K kutusuna kırpılır (0,25°'de 28 × 78 hücre).
+- **İl sınırları:** Natural Earth 10m Admin-1 (kamu malı). geoBoundaries TUR ADM1, lisansı
+  CC BY-SA 2.0 olduğu için seçilmedi. Ayrıntı: [`data/boundaries/README.md`](../data/boundaries/README.md).
 
 ### Kullanım
 
