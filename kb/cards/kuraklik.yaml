@@ -1,0 +1,30 @@
+id: kuraklik
+baslik: Toprakta kuraklık
+konu: Kuraklık ve su
+sade_tanim: Toprak, bitkilerin kullanabileceği suyu tutan bir depo gibidir; depo boşalıyorsa kuraklık artıyordur.
+soru_kaliplari: ["kurak", "kuraklık", "kuruyor", "toprak nemi", "tarım", "susuz", "ekin"]
+ornek_sorular:
+  - "Konya'da kuraklık artıyor mu?"
+  - "Ege'de toprak kuruyor mu?"
+belirti:
+  - degisken: toprak_nemi
+    urun: GLDAS_NOAH025_M
+    beklenen_yon: azalis
+supheliler:
+  - degisken: yagis
+    urunler: [GPM, MERRA2, GLDAS]
+    neden: "Depoya daha az su giriyorsa toprak kurur."
+  - degisken: sicaklik_2m
+    urunler: [MERRA2, GLDAS]
+    neden: "Sıcak hava topraktan daha çok su çeker."
+  - degisken: buharlasma
+    urunler: [GLDAS]
+    neden: "Topraktan ve bitkilerden havaya giden su artarsa depo boşalır."
+fiziksel_test:
+  tip: su_dengesi
+  aciklama: "Yağış − buharlaşma − akış ≈ depodaki değişim; toprak nemi trendiyle aynı yönde olmalı."
+alternatifler:
+  - "Yoğun sulama ve yeraltı suyu çekimi (uydu doğrudan görmez)"
+  - "Arazi kullanımı değişimi"
+kaynaklar:
+  - "IPCC AR6 WG1 (2021), Bölüm 8: Su döngüsü değişiklikleri"

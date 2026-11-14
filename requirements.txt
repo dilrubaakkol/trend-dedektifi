@@ -18,6 +18,9 @@ scipy
 statsmodels
 pymannkendall
 
+# LLM katmanı (Kişi 4)
+requests
+
 # Arayüz (Kişi 5)
 streamlit
 plotly

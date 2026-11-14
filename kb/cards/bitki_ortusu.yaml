@@ -1,0 +1,25 @@
+id: bitki_ortusu
+baslik: Bitki örtüsündeki değişim
+konu: Bitki örtüsü ve tarım
+sade_tanim: Uydu, bitkilerin ne kadar yeşil ve gür olduğunu ölçer (NDVI); azalma bitki stresine işaret edebilir.
+soru_kaliplari: ["bitki", "yeşil", "orman", "ndvi", "mera", "çölleş"]
+ornek_sorular:
+  - "Güneydoğu'da bitki örtüsü azalıyor mu?"
+belirti:
+  - degisken: ndvi
+    urun: MOD13C2
+    beklenen_yon: belirsiz
+supheliler:
+  - degisken: yagis
+    urunler: [GPM, MERRA2]
+    neden: "Bitkiler büyümek için suya ihtiyaç duyar."
+  - degisken: toprak_nemi
+    urunler: [GLDAS]
+    neden: "Kökler suyu topraktan alır."
+  - degisken: sicaklik_2m
+    urunler: [MERRA2]
+    neden: "Aşırı sıcak bitkiyi strese sokar; soğuk bölgelerde ise ısınma büyüme mevsimini uzatabilir."
+alternatifler:
+  - "Sulamalı tarımın yayılması (yeşillenme)"
+  - "Orman yangınları, kentleşme"
+kaynaklar: []
