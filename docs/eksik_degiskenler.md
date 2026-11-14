@@ -1,5 +1,7 @@
 # kb/degiskenler.yaml'da eksik değişkenler
 
+> **Tamamlandı (2026-11-14): tüm değişkenler `kb/degiskenler.yaml`'da.** Katalogdaki değişkenlerin hepsinin kartı var; aşağıdaki liste geçmiş kayıt olarak duruyor.
+
 `data/catalog.yaml`'da kaydı olup `kb/degiskenler.yaml`'da kartı olmayan değişkenler (2026-11-14).
 Kişi 4 ve 5 sitenin "Değişken" sayfası için bu değişkenlerin kartlarını yazmalı. Kartlarda şu alanlar
 olmalı: `baslik`, `sade_tanim`, `dikkat`, `ana_urun`.
