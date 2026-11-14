@@ -212,6 +212,19 @@ Ortak kurallar:
     `gereken_yil_yontemi`, `eksik_veri_kurali`, `min_yil`.
   - Seri ve dönem alanları: `katman = "L2"`, `kaynak_dosya`, `birim`, `egim_birimi`, `seri_birimi`,
     `seri_tanimi`, `donem` (mevsim başına geçerli ilk–son yıl), `mk_yedek_hucre`, `olusturma_tarihi`.
+- **`trend_uyarisi`** (attr, isteğe bağlı): Trendin güvenilirliğiyle ilgili bilinen bir sorun varsa
+  bulunur. Değerler silinmez; uyarı yalnız işarettir. Site ve L3 bu metni kullanıcıya göstermelidir.
+  - Biçim: Birden fazla uyarı ` | ` ile ayrılır. Tüm mevsimler için geçerli uyarı düz metindir;
+    yalnız bir mevsime ait uyarı `[mevsim] metin` biçimindedir.
+  - Uyarılar (kaynak: `stats/l2.py` içinde `TREND_UYARILARI`):
+    - **GLDAS** `sicaklik_2m`, `yagis`, `taban_akisi`, `yuzey_akisi`: zorlama verisi homojen
+      olmayabilir; trend için MERRA2/GPM tercih edilmeli.
+    - **MOD11C3** `yuzey_sicakligi_gunduz` / `_gece`: Terra sensör kayması olasılığı doğrulanmadı.
+    - **MOD13C2** `ndvi`, `evi`: yalnız `[kis]`. Kar ve bulut yüzünden kış serisi seyrek; hücre sayısı
+      metne yazılır.
+  - Var olan dosyalara trendi yeniden hesaplamadan eklemek için:
+    `python -m stats.l2 --surum v0.1 --yalniz-isaretler`. Bu komut kaynak uyumunu ve OZET'i de yeniden
+    yazar.
 
 #### Kaynak uyumu
 
@@ -224,8 +237,14 @@ Ortak kurallar:
 - **`m`** (int16): Hücrede trendi hesaplanabilen ürün sayısı (`anlamli ≥ 0`).
 - **`k`** (int16): Anlamlı (`anlamli = 1`) ve aynı yönde trend veren en büyük ürün grubu:
   max(anlamlı artan, anlamlı azalan). Kara maskesi dışında `k = m = -1`.
-- **attrs:** `urunler`, `ortak_donem`, `alfa_fdr`, `kaynak_doi`, `urun_surumu`, `veri_seti_doi`,
-  `lisans`. Site bunu "m kaynağın k tanesi aynı yönde anlamlı" diye gösterir.
+- **`isaret_uyumu`** (float32, 0–1): Anlamlılığa bakmadan aynı işaretli eğim veren en büyük ürün
+  grubu / `m`.
+  - Örnek: 3 üründen 2'sinin eğimi negatifse 0,67; üçü de aynı işaretliyse 1.
+  - Kara maskesi dışında ya da `m = 0` ise NaN.
+  - Her zaman `isaret_uyumu ≥ k/m` olur.
+- **attrs:** `urunler`, `ortak_donem`, `alfa_fdr`, `tanim`, `kaynak_doi`, `urun_surumu`,
+  `veri_seti_doi`, `lisans`.
+- Site bunu "m kaynağın k tanesi aynı yönde anlamlı; yön uyumu %…" diye gösterir.
 
 #### Özet tablo
 
@@ -235,6 +254,8 @@ Ortak kurallar:
 - `anlamli_artan_yuzde`, `anlamli_azalan_yuzde`: `kara_hucre`'ye göre yüzde
 - `medyan_egim`: kara hücrelerinde
 - `egim_birimi`
+- `trend_uyarisi`: O mevsime düşen uyarılar, tüm-mevsim uyarıları dahil. Uyarı yoksa boş.
+- `mk_yedek_hucre`: O mevsimde MK yedeğinin kullanıldığı hücre sayısı.
 
 ### 2.2 L3: il ve bölge özetleri (Kişi 2 / Kişi 3)
 
