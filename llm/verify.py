@@ -10,10 +10,11 @@ import math
 import re
 from dataclasses import dataclass, field
 
+from .format_tr import NUMBER as NUM, parse_tr
+
 REF = re.compile(r"\[ref:([^\]\s]+)\]")
-NUM = re.compile(r"(?<![\w.])[-−+]?\d+(?:[.,]\d+)?")
-# Yıl ve sabitler dışındaki serbest sayılar: on yıl, %95 güven, olağan anlamlılık eşikleri.
-DEFAULT_ALLOWED = {10.0, 95.0, 100.0, 0.05, 0.01, 0.001}
+# Yıl ve sabitler dışındaki serbest sayılar: on yıl, %95 güven, anlamlılık/FDR eşikleri.
+DEFAULT_ALLOWED = {10.0, 95.0, 100.0, 0.05, 0.01, 0.001, 0.10}
 
 
 @dataclass
@@ -51,11 +52,23 @@ def _numbers_in(obj) -> list[float]:
 
 
 def _years(results: dict) -> set[float]:
-    try:
-        y0, y1 = (int(str(p)[:4]) for p in results.get("period", []))
-        return {float(y) for y in range(y0, y1 + 1)}
-    except (ValueError, TypeError):
-        return set()
+    """Analiz dönemindeki yıllar ("2001-01 … 2025-12", ["2001-01", "2025-12"] ya da analizlerin
+    "donem" alanları). Metinde bu yıllar serbestçe geçebilir."""
+    texts = [str(results.get("period", ""))] + [str(a.get("donem", "")) for a in results.get("analyses", [])]
+    years = [int(y) for t in texts for y in re.findall(r"(?<!\d)(1[89]\d\d|20\d\d)(?!\d)", t)]
+    return {float(y) for y in range(min(years), max(years) + 1)} if years else set()
+
+
+def _ok_number(tok: str, candidates: set[float], allowed: set[float]) -> bool:
+    """Belirteç, gösterilen basamağa yuvarlanmış haliyle bir sonuç sayısına (ya da serbest sabite) eşit mi?"""
+    for x, decimals in parse_tr(tok):
+        x = abs(x)
+        if any(abs(x - a) < 1e-12 for a in allowed):
+            return True
+        tol = 0.5 * 10 ** (-decimals) + 1e-12
+        if any(abs(x - c) <= tol for c in candidates):
+            return True
+    return False
 
 
 def verify_text(text: str, results: dict, extra_allowed: set[float] | None = None) -> VerifyResult:
@@ -69,24 +82,15 @@ def verify_text(text: str, results: dict, extra_allowed: set[float] | None = Non
         candidates.update({abs(r), abs(r) * 100})
     allowed = DEFAULT_ALLOWED | _years(results) | (extra_allowed or set())
 
-    bad = []
     plain = REF.sub(" ", text)
-    for tok in NUM.findall(plain):
-        t = tok.replace("−", "-").replace(",", ".")
-        x = abs(float(t))
-        if x in allowed:
-            continue
-        decimals = len(t.split(".")[1]) if "." in t else 0
-        tol = 0.5 * 10 ** (-decimals) + 1e-9
-        if not any(abs(x - c) <= tol for c in candidates):
-            bad.append(tok)
+    bad = [tok for tok in NUM.findall(plain) if not _ok_number(tok, candidates, allowed)]
 
     # Cümle bölme: nokta + boşluk; hemen ardından gelen [ref:..] önceki cümleye aittir.
+    # Yalnız serbest sabit/yıl içeren cümle (ör. "%95 güven", "2001-2025") kaynak gerektirmez.
     sentences = re.split(r"(?<=[.!?])\s+(?!\[ref:)|\n+", text)
     uncited = [s.strip() for s in sentences
-               if NUM.search(REF.sub(" ", s)) and not REF.search(s)
-               and any(not abs(float(n.replace("−", "-").replace(",", "."))) in allowed
-                       for n in NUM.findall(REF.sub(" ", s)))]
+               if not REF.search(s)
+               and any(not _ok_number(n, set(), allowed) for n in NUM.findall(REF.sub(" ", s)))]
 
     return VerifyResult(ok=not (bad or unknown or uncited), unverified_numbers=bad,
                         unknown_refs=unknown, uncited_sentences=uncited)

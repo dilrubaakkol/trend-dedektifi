@@ -86,3 +86,128 @@
   sade_tanim: Bir yerin deniz seviyesinden yüksekliği.
   anahtar_kelimeler: ["rakım", "yükseklik"]
   dikkat: Analiz ekseni olarak kullanılır, trendi incelenmez.
+
+# ---- docs/eksik_degiskenler.md ile eklenenler (2026-11-14) ----
+- ad: ruzgar_u_10m
+  baslik: Doğu-batı rüzgâr bileşeni (10 m)
+  birim: m/s
+  ana_urun: M2TMNXSLV
+  sade_tanim: Rüzgârın doğu-batı yönündeki bileşeni; pozitif değer batıdan doğuya esen rüzgâr demektir.
+  anahtar_kelimeler: ["doğu-batı rüzgâr", "zonal rüzgâr", "u bileşeni"]
+  dikkat: Yön bileşenidir. Aylık ortalaması rüzgâr hızının ortalaması değildir; hız için ruzgar_hizi kullanılır.
+- ad: ruzgar_v_10m
+  baslik: Kuzey-güney rüzgâr bileşeni (10 m)
+  birim: m/s
+  ana_urun: M2TMNXSLV
+  sade_tanim: Rüzgârın kuzey-güney yönündeki bileşeni; pozitif değer güneyden kuzeye esen rüzgâr demektir.
+  anahtar_kelimeler: ["kuzey-güney rüzgâr", "meridyonel rüzgâr", "v bileşeni"]
+  dikkat: Yön bileşenidir. U ve V bileşenlerinin aylık ortalamalarından hız hesaplanmamalıdır.
+- ad: ruzgar_hizi
+  baslik: Rüzgâr hızı
+  birim: m/s
+  ana_urun: GLDAS_NOAH025_M
+  sade_tanim: Yere yakın rüzgârın aylık ortalama hızı.
+  anahtar_kelimeler: ["rüzgâr hızı", "rüzgar hızı", "rüzgâr", "rüzgar"]
+  dikkat: Yakın yüzey hızının aylık ortalamasıdır; fırtına gibi kısa olayları göstermez.
+- ad: deniz_seviyesi_basinci
+  baslik: Deniz seviyesine indirgenmiş basınç
+  birim: hPa
+  ana_urun: M2TMNXSLV
+  sade_tanim: Havanın basıncı, yükseklik etkisi çıkarılarak deniz seviyesine göre hesaplanmış hali.
+  anahtar_kelimeler: ["basınç", "hava basıncı", "yüksek basınç", "alçak basınç"]
+  dikkat: Dolaşım değişimlerinin göstergesidir; tek başına hava olayı tahmini için kullanılmaz.
+- ad: bulut_orani
+  baslik: Bulut örtüsü
+  birim: "%"
+  ana_urun: M2TMNXRAD
+  sade_tanim: Gökyüzünün ortalama ne kadarının bulutla kaplı olduğu.
+  anahtar_kelimeler: ["bulut", "bulutluluk", "güneşlenme"]
+  dikkat: Model (MERRA-2) ürünüdür; bulut türünü ve yüksekliğini ayırmaz.
+- ad: yuzey_sicakligi_gunduz
+  baslik: Gündüz kara yüzeyi sıcaklığı
+  birim: "°C"
+  ana_urun: MOD11C3
+  sade_tanim: Uydunun gündüz ölçtüğü toprağın, kayanın ya da çatının yüzey sıcaklığı.
+  anahtar_kelimeler: ["yüzey sıcaklığı", "gündüz yüzey", "lst", "kentsel ısı adası"]
+  dikkat: Kara yüzeyinin sıcaklığıdır, hava sıcaklığı (sicaklik_2m) değildir; bulutlu günler ölçülemez.
+- ad: yuzey_sicakligi_gece
+  baslik: Gece kara yüzeyi sıcaklığı
+  birim: "°C"
+  ana_urun: MOD11C3
+  sade_tanim: Uydunun gece ölçtüğü kara yüzeyinin sıcaklığı; şehirlerin geceleri ne kadar soğuyamadığını gösterir.
+  anahtar_kelimeler: ["gece yüzey", "gece sıcaklığı"]
+  dikkat: Kara yüzeyinin sıcaklığıdır, hava sıcaklığı (sicaklik_2m) değildir; bulutlu geceler ölçülemez.
+- ad: evi
+  baslik: Gelişmiş bitki indeksi (EVI)
+  birim: "1"
+  ana_urun: MOD13C2
+  sade_tanim: NDVI'ye benzer bir yeşillik ölçüsü; çok yoğun bitki örtüsünde ve atmosfer etkisinde daha az doyuma ulaşır.
+  anahtar_kelimeler: ["evi"]
+  dikkat: NDVI ile birlikte yorumlanmalı; tarım takvimi ve sulama güçlü etkiler.
+- ad: taban_akisi
+  baslik: Taban akışı (yeraltı drenajı)
+  birim: mm/ay
+  ana_urun: GLDAS_NOAH025_M
+  sade_tanim: Topraktan aşağı sızıp yeraltı yoluyla derelere ulaşan su.
+  anahtar_kelimeler: ["taban akışı", "yeraltı drenajı", "baz akış"]
+  dikkat: Model ürünüdür; yeraltı suyu çekimi ve barajlar modelde yoktur.
+- ad: kok_bolgesi_nemi
+  baslik: Kök bölgesi nemi
+  birim: kg/m²
+  ana_urun: GLDAS_NOAH025_M
+  sade_tanim: Bitki köklerinin ulaştığı derinlikteki (yaklaşık 1 m) toprakta bulunan su.
+  anahtar_kelimeler: ["kök bölgesi", "derin toprak nemi"]
+  dikkat: Model ürünüdür; sulama etkisini içermez. Yüzey toprak nemiyle (toprak_nemi) karıştırılmamalı.
+- ad: aerosol_optik_derinlik
+  baslik: Aerosol optik derinliği (AOD)
+  birim: "1"
+  ana_urun: M2TMNXAER
+  sade_tanim: Havadaki toz, duman ve kirletici parçacıkların güneş ışığını ne kadar engellediği; birimsizdir.
+  anahtar_kelimeler: ["aerosol", "aod", "toz", "partikül", "pus"]
+  dikkat: Model (MERRA-2) ürünüdür; yer seviyesindeki PM2.5 ile aynı şey değildir.
+- ad: ozon_kolon
+  baslik: Toplam ozon kolonu
+  birim: DU
+  ana_urun: M2TMNXSLV
+  sade_tanim: Yerden atmosferin tepesine kadar havadaki toplam ozon miktarı (çoğu stratosferde).
+  anahtar_kelimeler: ["ozon"]
+  dikkat: Çoğunluğu stratosferik ozondur; yer seviyesindeki ozon kirliliğini göstermez. OMI ikincil ürünü ertelendi.
+- ad: no2
+  baslik: Troposferik azot dioksit (NO₂)
+  birim: "10^15 molekül/cm²"
+  ana_urun: OMNO2d
+  sade_tanim: Trafik, sanayi ve ısınmadan kaynaklanan azot dioksitin havadaki toplam miktarı.
+  anahtar_kelimeler: ["no2", "azot dioksit", "trafik kirliliği"]
+  dikkat: Troposferik kolon; bulut oranı %30'un altındaki günlerden. Seri 2004-10'da başlar.
+- ad: yanan_alan
+  baslik: Yanan alan
+  birim: "%"
+  ana_urun: MCD64A1
+  sade_tanim: Bir bölgede ay içinde yanan alanın oranı (orman ve tarım arazisi yangınları).
+  anahtar_kelimeler: ["yangın", "yanan alan", "orman yangını"]
+  dikkat: Ürün ertelendi; henüz veri yok.
+  henuz_veri_yok: true
+- ad: so2
+  baslik: Kükürt dioksit (SO₂)
+  birim: DU
+  ana_urun: OMSO2e
+  sade_tanim: Kömür yakımı, sanayi ve volkanlardan kaynaklanan kükürt dioksit miktarı.
+  anahtar_kelimeler: ["so2", "kükürt dioksit"]
+  dikkat: Ürün ertelendi; henüz veri yok.
+  henuz_veri_yok: true
+- ad: deniz_yuzey_sicakligi
+  baslik: Deniz yüzeyi sıcaklığı
+  birim: "°C"
+  ana_urun: MODISA_L3m_SST
+  sade_tanim: Deniz suyunun en üst tabakasının sıcaklığı.
+  anahtar_kelimeler: ["deniz sıcaklığı", "deniz suyu sıcaklığı", "deniz yüzeyi"]
+  dikkat: Ürün ertelendi; henüz veri yok.
+  henuz_veri_yok: true
+- ad: klorofil
+  baslik: Klorofil-a
+  birim: mg/m³
+  ana_urun: MODISA_L3m_CHL
+  sade_tanim: Denizdeki mikroskobik bitkilerin (fitoplankton) miktarının göstergesi; müsilaj ve aşırı besin yükü takibinde kullanılır.
+  anahtar_kelimeler: ["klorofil", "fitoplankton", "müsilaj", "deniz salyası"]
+  dikkat: Ürün ertelendi; henüz veri yok. Kıyıya yakın bulanık sularda belirsizlik yüksektir.
+  henuz_veri_yok: true

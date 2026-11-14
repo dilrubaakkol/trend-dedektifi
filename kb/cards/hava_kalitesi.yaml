@@ -1,0 +1,29 @@
+id: hava_kalitesi
+baslik: Hava kalitesi (aerosol ve NO₂) değişimi
+konu: Hava kalitesi
+sade_tanim: Havadaki toz/duman parçacıkları (aerosol) ve trafik/sanayi kaynaklı azot dioksit (NO₂) zamanla artıyor mu?
+soru_kaliplari: ["hava kirlili", "hava kalitesi", "kirlilik", "aerosol", "no2", "azot dioksit", "toz taşınımı", "partikül", "duman"]
+ornek_sorular:
+  - "İstanbul'da hava kirliliği artıyor mu?"
+  - "Güneydoğu'da toz (aerosol) yükü değişiyor mu?"
+belirti:
+  - degisken: aerosol_optik_derinlik
+    urun: MERRA2
+    beklenen_yon: belirsiz
+  - degisken: no2
+    urun: OMI
+    beklenen_yon: belirsiz
+supheliler:
+  - degisken: ruzgar_hizi
+    urunler: [GLDAS]
+    neden: "Rüzgâr kirleticileri seyreltir; zayıf rüzgâr birikime, güçlü rüzgâr toz taşınımına yol açabilir."
+  - degisken: yagis
+    urunler: [GPM, MERRA2]
+    neden: "Yağış havadaki parçacıkları yıkayarak yere indirir (ıslak çökelme)."
+  - degisken: toprak_nemi
+    urunler: [GLDAS]
+    neden: "Kuru toprak rüzgârla daha kolay toz kaynağı olur."
+alternatifler:
+  - "Emisyon değişimleri (trafik, sanayi, ısınma, salgın dönemi kapanmaları) — uydu verisinde değişken olarak yok"
+  - "Uzak kaynaklı toz taşınımı (ör. Sahra/Orta Doğu tozu)"
+kaynaklar: []
