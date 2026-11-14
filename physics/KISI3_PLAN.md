@@ -113,6 +113,13 @@ Her faz sentetik veriyle test edilir ve testler geçmeden sonraki faza geçilmez
 - Vektörleştirilmiş hesap (1.300 hücre birkaç saniyede)
 - **Test:** Sentetik haritada bir bölgeye ilişki, bir bölgeye ters ilişki gömülür; doğru yerler doğru etiketi alır, gerisi `anlamsiz` kalır
 
+**Durum (2026-11-14): ✅ bitti.** `physics/harita.py` (`iliski_harita`, `cift_haritasi`, `etiket_ozeti`), `tests/test_physics_harita.py` (7 test).
+- Vektörleştirilmiş hesap her hücrede `iliski_1d` ile birebir aynı sonucu veriyor (testte hücre hücre karşılaştırıldı). Tam Türkiye ızgarasında 4 çift 0,4 saniyede hesaplanıyor.
+- Gömülü desen testi: batıya beklenen yönde, doğuya ters yönde ilişki gömüldü. Etiketler doğru yerlerde çıktı, deniz hücreleri "hesaplanamadı" (−99) oldu.
+- İlişkisiz 1.120 hücrelik haritada FDR olmadan %5,4 hücre "anlamlı" çıkıyor, FDR sonrasında %0.
+- Çift 1'de FDR yalnızca kar kapsamındaki hücreler üzerinden yapılıyor (`fdr_hucre_sayisi` attr'ı).
+- Yayın attr'ları (`urun_surumu`, `veri_seti_doi`, `lisans`, `doi_1`, `doi_2`, `dogrulanmadi`) Faz 5'te dosya yazılırken eklenecek.
+
 ### Faz 4: İl, bölge ve Türkiye tablosu (`L4_iliski/ciftler.csv`)
 - 81 il, 7 bölge ve Türkiye için alan ağırlıklı (cos enlem) ortalama seriler üzerinden 6 çift hesaplanır
 - İl satırlarında FDR, 81 il üzerinden yapılır
