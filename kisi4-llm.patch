@@ -1,0 +1,1295 @@
+From 936a4667fbda47aa9fd8a6132eb18c65a0ba89ff Mon Sep 17 00:00:00 2001
+From: Esra Kaya <esraa.kyaa4@gmail.com>
+Date: Sat, 14 Nov 2026 14:14:23 +0300
+Subject: [PATCH] =?UTF-8?q?Ki=C5=9Fi=204:=20bilgi=20kartlar=C4=B1=20ve=20L?=
+ =?UTF-8?q?LM=20katman=C4=B1=20(plan,=20a=C3=A7=C4=B1klama,=20do=C4=9Frula?=
+ =?UTF-8?q?y=C4=B1c=C4=B1)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- kb: 7 süreç kartı, 12 değişken kartı, 81 il -> 7 bölge yer kartı
+- llm: LLM'in yalnızca katalogdan seçtiği planlayıcı (anahtar kelime yedeği)
+- llm: [ref:id] bağlantılı açıklama, sayı doğrulayıcı, yeniden üretme ve şablon yedeği
+- tests: sahte LLM ile 25 test; tests/conftest.py repo kökünü import yoluna ekler
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019uZxwAQNpcqvtuJGFnpYzg
+---
+ kb/cards/akis_azalmasi.yaml |  24 ++++++
+ kb/cards/bitki_ortusu.yaml  |  25 ++++++
+ kb/cards/isinma.yaml        |  20 +++++
+ kb/cards/kar_isinma.yaml    |  16 +++-
+ kb/cards/kuraklik.yaml      |  30 ++++++++
+ kb/cards/nem_artisi.yaml    |  25 ++++++
+ kb/cards/su_kaynaklari.yaml |  24 ++++++
+ kb/degiskenler.yaml         |  88 +++++++++++++++++++++
+ kb/yerler.yaml              |  25 ++++++
+ llm/README.md               |  53 +++++++++++++
+ llm/__init__.py             |  12 +++
+ llm/answer.py               |  80 ++++++++++++++++++++
+ llm/client.py               |  73 ++++++++++++++++++
+ llm/explain.py              | 121 +++++++++++++++++++++++++++++
+ llm/kb.py                   | 136 +++++++++++++++++++++++++++++++++
+ llm/plan.py                 |  99 ++++++++++++++++++++++++
+ llm/verify.py               |  92 ++++++++++++++++++++++
+ requirements.txt            |   3 +
+ tests/conftest.py           |   6 ++
+ tests/test_llm.py           | 147 ++++++++++++++++++++++++++++++++++++
+ 20 files changed, 1096 insertions(+), 3 deletions(-)
+ create mode 100644 kb/cards/akis_azalmasi.yaml
+ create mode 100644 kb/cards/bitki_ortusu.yaml
+ create mode 100644 kb/cards/isinma.yaml
+ create mode 100644 kb/cards/kuraklik.yaml
+ create mode 100644 kb/cards/nem_artisi.yaml
+ create mode 100644 kb/cards/su_kaynaklari.yaml
+ create mode 100644 kb/degiskenler.yaml
+ create mode 100644 kb/yerler.yaml
+ create mode 100644 llm/README.md
+ create mode 100644 llm/answer.py
+ create mode 100644 llm/client.py
+ create mode 100644 llm/explain.py
+ create mode 100644 llm/kb.py
+ create mode 100644 llm/plan.py
+ create mode 100644 llm/verify.py
+ create mode 100644 tests/conftest.py
+ create mode 100644 tests/test_llm.py
+
+diff --git a/kb/cards/akis_azalmasi.yaml b/kb/cards/akis_azalmasi.yaml
+new file mode 100644
+index 0000000..9b26c11
+--- /dev/null
++++ b/kb/cards/akis_azalmasi.yaml
+@@ -0,0 +1,24 @@
++id: akis_azalmasi
++baslik: Yüzey akışında (derelere giden suda) değişim
++konu: Kuraklık ve su
++sade_tanim: Yağmur ve eriyen kardan derelere ve barajlara akan su miktarına bakar.
++soru_kaliplari: ["akış", "dere", "nehir", "sel", "baraj doluluk", "taşkın"]
++ornek_sorular:
++  - "Karadeniz'de yüzey akışı artıyor mu?"
++belirti:
++  - degisken: yuzey_akisi
++    urun: GLDAS_NOAH025_M
++    beklenen_yon: belirsiz
++supheliler:
++  - degisken: yagis
++    urunler: [GPM, MERRA2]
++    neden: "Akışın ana kaynağı yağıştır."
++  - degisken: kar_su_esdegeri
++    urunler: [GLDAS]
++    neden: "Bahar akışının önemli kısmı kar erimesinden gelir."
++  - degisken: sicaklik_2m
++    urunler: [MERRA2]
++    neden: "Isınma karın daha erken erimesine yol açar."
++alternatifler:
++  - "Baraj ve sulama kaynaklı düzenleme (model görmez)"
++kaynaklar: []
+diff --git a/kb/cards/bitki_ortusu.yaml b/kb/cards/bitki_ortusu.yaml
+new file mode 100644
+index 0000000..c02543a
+--- /dev/null
++++ b/kb/cards/bitki_ortusu.yaml
+@@ -0,0 +1,25 @@
++id: bitki_ortusu
++baslik: Bitki örtüsündeki değişim
++konu: Bitki örtüsü ve tarım
++sade_tanim: Uydu, bitkilerin ne kadar yeşil ve gür olduğunu ölçer (NDVI); azalma bitki stresine işaret edebilir.
++soru_kaliplari: ["bitki", "yeşil", "orman", "ndvi", "mera", "çölleş"]
++ornek_sorular:
++  - "Güneydoğu'da bitki örtüsü azalıyor mu?"
++belirti:
++  - degisken: ndvi
++    urun: MOD13C2
++    beklenen_yon: belirsiz
++supheliler:
++  - degisken: yagis
++    urunler: [GPM, MERRA2]
++    neden: "Bitkiler büyümek için suya ihtiyaç duyar."
++  - degisken: toprak_nemi
++    urunler: [GLDAS]
++    neden: "Kökler suyu topraktan alır."
++  - degisken: sicaklik_2m
++    urunler: [MERRA2]
++    neden: "Aşırı sıcak bitkiyi strese sokar; soğuk bölgelerde ise ısınma büyüme mevsimini uzatabilir."
++alternatifler:
++  - "Sulamalı tarımın yayılması (yeşillenme)"
++  - "Orman yangınları, kentleşme"
++kaynaklar: []
+diff --git a/kb/cards/isinma.yaml b/kb/cards/isinma.yaml
+new file mode 100644
+index 0000000..dd2c5d5
+--- /dev/null
++++ b/kb/cards/isinma.yaml
+@@ -0,0 +1,20 @@
++id: isinma
++baslik: Hava sıcaklığında ısınma eğilimi
++konu: Isınma
++sade_tanim: Mevsimlerin etkisi çıkarıldıktan sonra havanın yıllar içinde ısınıp ısınmadığına bakar.
++soru_kaliplari: ["ısın", "sıcaklık", "sıcak", "iklim değiş", "küresel ısınma", "derece"]
++ornek_sorular:
++  - "Akdeniz'de hava ısınıyor mu?"
++  - "Ankara'da sıcaklık nasıl değişti?"
++belirti:
++  - degisken: sicaklik_2m
++    urun: M2TMNXSLV
++    beklenen_yon: artis
++supheliler: []
++not: >
++  Sıcaklık burada belirtinin kendisidir; neden analizi yerine aynı değişkenin farklı ürünlerde
++  (MERRA-2, GLDAS, AIRS) aynı sonucu verip vermediğine bakılır.
++alternatifler:
++  - "Ölçüm/model ürünleri arasındaki farklar (ürünler arası uyumla kontrol edilir)"
++kaynaklar:
++  - "IPCC AR6 WG1 (2021), Bölüm 2: İklim sisteminin değişen durumu"
+diff --git a/kb/cards/kar_isinma.yaml b/kb/cards/kar_isinma.yaml
+index d39d18e..6d7560b 100644
+--- a/kb/cards/kar_isinma.yaml
++++ b/kb/cards/kar_isinma.yaml
+@@ -1,11 +1,20 @@
+-# Örnek süreç kartı (Kişi 4 geliştirir). Yeni süreç = bu klasöre yeni bir YAML dosyası.
++# Süreç kartı. Yeni süreç = bu klasöre yeni bir YAML dosyası (aynı alanlarla).
++# Planlayıcı (llm/plan.py) bu kartlardan beslenir; arayüz "sade_tanim"ı kullanıcıya gösterir.
+ id: kar_isinma
+ baslik: Kar örtüsü azalımı ve ısınma
+-sade_tanim: Isınan bir dağda kar çizgisi yukarı çekilir.
++konu: Kar
++sade_tanim: Isınan bir dağda kar çizgisi yukarı çekilir; alçak yerlerde kar azalır.
++soru_kaliplari: ["kar", "kar örtüsü", "kar çizgisi", "kar eriyor", "kayak", "kar su"]
++ornek_sorular:
++  - "Doğu Anadolu'da kar nasıl değişiyor ve bu ısınmayla tutarlı mı?"
++  - "Erzurum'da kar azalıyor mu?"
+ belirti:
+   - degisken: kar_ortusu
+     urun: MOD10CM
+     beklenen_yon: azalis
++  - degisken: kar_su_esdegeri
++    urun: GLDAS_NOAH025_M
++    beklenen_yon: azalis
+ supheliler:
+   - degisken: sicaklik_2m
+     urunler: [MERRA2, GLDAS, AIRS]
+@@ -20,4 +29,5 @@ fiziksel_test:
+ alternatifler:
+   - "Kış yağışı azalımı"
+   - "Toz/kurum kaynaklı albedo düşüşü"
+-kaynaklar: []
++kaynaklar:
++  - "IPCC SROCC (2019), Bölüm 2: Yüksek dağ bölgeleri"
+diff --git a/kb/cards/kuraklik.yaml b/kb/cards/kuraklik.yaml
+new file mode 100644
+index 0000000..43d4e31
+--- /dev/null
++++ b/kb/cards/kuraklik.yaml
+@@ -0,0 +1,30 @@
++id: kuraklik
++baslik: Toprakta kuraklık
++konu: Kuraklık ve su
++sade_tanim: Toprak, bitkilerin kullanabileceği suyu tutan bir depo gibidir; depo boşalıyorsa kuraklık artıyordur.
++soru_kaliplari: ["kurak", "kuraklık", "kuruyor", "toprak nemi", "tarım", "susuz", "ekin"]
++ornek_sorular:
++  - "Konya'da kuraklık artıyor mu?"
++  - "Ege'de toprak kuruyor mu?"
++belirti:
++  - degisken: toprak_nemi
++    urun: GLDAS_NOAH025_M
++    beklenen_yon: azalis
++supheliler:
++  - degisken: yagis
++    urunler: [GPM, MERRA2, GLDAS]
++    neden: "Depoya daha az su giriyorsa toprak kurur."
++  - degisken: sicaklik_2m
++    urunler: [MERRA2, GLDAS]
++    neden: "Sıcak hava topraktan daha çok su çeker."
++  - degisken: buharlasma
++    urunler: [GLDAS]
++    neden: "Topraktan ve bitkilerden havaya giden su artarsa depo boşalır."
++fiziksel_test:
++  tip: su_dengesi
++  aciklama: "Yağış − buharlaşma − akış ≈ depodaki değişim; toprak nemi trendiyle aynı yönde olmalı."
++alternatifler:
++  - "Yoğun sulama ve yeraltı suyu çekimi (uydu doğrudan görmez)"
++  - "Arazi kullanımı değişimi"
++kaynaklar:
++  - "IPCC AR6 WG1 (2021), Bölüm 8: Su döngüsü değişiklikleri"
+diff --git a/kb/cards/nem_artisi.yaml b/kb/cards/nem_artisi.yaml
+new file mode 100644
+index 0000000..7632622
+--- /dev/null
++++ b/kb/cards/nem_artisi.yaml
+@@ -0,0 +1,25 @@
++id: nem_artisi
++baslik: Isınan havada nem artışı
++konu: Isınma
++sade_tanim: Sıcak hava daha çok su buharı taşıyabilir; ısınan bölgelerde havadaki nemin de artması beklenir.
++soru_kaliplari: ["nem", "nemli", "bunaltıcı", "su buharı", "rutubet"]
++ornek_sorular:
++  - "Karadeniz'de hava daha nemli mi oluyor?"
++belirti:
++  - degisken: ozgul_nem_2m
++    urun: M2TMNXSLV
++    beklenen_yon: artis
++  - degisken: su_buhari_kolon
++    urun: AIRS3STM
++    beklenen_yon: artis
++supheliler:
++  - degisken: sicaklik_2m
++    urunler: [MERRA2, AIRS]
++    neden: "Her 1 °C ısınmada hava yaklaşık %7 daha fazla su buharı tutabilir (Clausius–Clapeyron)."
++fiziksel_test:
++  tip: clausius_clapeyron
++  aciklama: "Nemdeki yüzde artış ≈ 7 × sıcaklık artışı (°C) olmalı."
++alternatifler:
++  - "Rüzgâr ve dolaşım değişimi (nemi başka yerden taşıma)"
++kaynaklar:
++  - "IPCC AR6 WG1 (2021), Bölüm 8: Su döngüsü değişiklikleri"
+diff --git a/kb/cards/su_kaynaklari.yaml b/kb/cards/su_kaynaklari.yaml
+new file mode 100644
+index 0000000..59e0265
+--- /dev/null
++++ b/kb/cards/su_kaynaklari.yaml
+@@ -0,0 +1,24 @@
++id: su_kaynaklari
++baslik: Yeraltı ve toplam su depolarının azalması
++konu: Kuraklık ve su
++sade_tanim: GRACE uyduları yerçekimindeki küçük değişimlerden bir bölgenin toplam suyunun azalıp arttığını ölçer.
++soru_kaliplari: ["yeraltı suyu", "yer altı", "su seviyesi", "göl", "baraj", "su kaynak", "obruk", "kuyu"]
++ornek_sorular:
++  - "Konya'da yeraltı suyu azalıyor mu?"
++belirti:
++  - degisken: toplam_su_depolama
++    urun: GRACE/GRACE-FO JPL Mascon
++    beklenen_yon: azalis
++supheliler:
++  - degisken: yagis
++    urunler: [GPM, MERRA2]
++    neden: "Depoya giren su azalır."
++  - degisken: buharlasma
++    urunler: [GLDAS]
++    neden: "Depodan havaya giden su artar."
++  - degisken: toprak_nemi
++    urunler: [GLDAS]
++    neden: "Toplam su deposunun yüzeye yakın kısmı."
++alternatifler:
++  - "Tarımsal sulama için yeraltı suyu çekimi (yağış normalken bile depo azalıyorsa güçlü aday)"
++kaynaklar: []
+diff --git a/kb/degiskenler.yaml b/kb/degiskenler.yaml
+new file mode 100644
+index 0000000..651c784
+--- /dev/null
++++ b/kb/degiskenler.yaml
+@@ -0,0 +1,88 @@
++# Değişken kartları. "ad" alanı docs/sozlesmeler.md tablosundaki değişken adıyla BİREBİR aynı olmalı.
++# sade_tanim: lise öğrencisinin anlayacağı dil. anahtar_kelimeler: planlayıcının yedek eşleştirmesi.
++- ad: kar_ortusu
++  baslik: Kar örtüsü
++  birim: "%"
++  ana_urun: MOD10CM
++  sade_tanim: Bir bölgenin ay boyunca ortalama ne kadarının karla kaplı olduğu.
++  anahtar_kelimeler: ["kar örtüsü", "karla kaplı"]
++  dikkat: Bulutlu günlerde uydu yeri göremez; aylık üründe bu boşluklar azalır ama kaybolmaz.
++- ad: kar_su_esdegeri
++  baslik: Kar su eşdeğeri
++  birim: mm
++  ana_urun: GLDAS_NOAH025_M
++  sade_tanim: Yerdeki kar eriseydi kaç milimetre su olurdu; barajlara gidecek suyun göstergesi.
++  anahtar_kelimeler: ["kar suyu", "kar su", "kar kalınlığı"]
++  dikkat: Model ürünüdür, doğrudan ölçüm değildir.
++- ad: sicaklik_2m
++  baslik: Hava sıcaklığı (2 m)
++  birim: "°C"
++  ana_urun: M2TMNXSLV
++  ikincil_urunler: [GLDAS_NOAH025_M, AIRS3STM]
++  sade_tanim: Yerden 2 metre yükseklikteki hava sıcaklığı, yani termometrenin gösterdiği.
++  anahtar_kelimeler: ["sıcaklık", "ısın", "sıcak", "soğu"]
++  dikkat: Yaklaşık 25-50 km'lik hücrelerin ortalamasıdır; şehir içi farkları göremez.
++- ad: ozgul_nem_2m
++  baslik: Havadaki nem
++  birim: kg/kg
++  ana_urun: M2TMNXSLV
++  sade_tanim: Her kilogram havada kaç kilogram su buharı olduğu.
++  anahtar_kelimeler: ["nem", "rutubet"]
++  dikkat: Bağıl nemden farklıdır; havadaki suyun gerçek miktarını gösterir.
++- ad: yagis
++  baslik: Yağış
++  birim: mm/ay
++  ana_urun: GPM_3IMERGM
++  ikincil_urunler: [M2TMNXFLX, GLDAS_NOAH025_M]
++  sade_tanim: Bir ayda düşen yağmur ve karın toplam su miktarı.
++  anahtar_kelimeler: ["yağış", "yağmur", "yağ"]
++  dikkat: Dağlık bölgelerde kar yağışını eksik ölçebilir; bu yüzden üç ürün karşılaştırılır.
++- ad: buharlasma
++  baslik: Buharlaşma
++  birim: mm/ay
++  ana_urun: GLDAS_NOAH025_M
++  sade_tanim: Topraktan, sudan ve bitkilerden havaya geri dönen su miktarı.
++  anahtar_kelimeler: ["buharlaş", "terleme"]
++  dikkat: Model ürünüdür.
++- ad: yuzey_akisi
++  baslik: Yüzey akışı
++  birim: mm/ay
++  ana_urun: GLDAS_NOAH025_M
++  sade_tanim: Toprağa sızmayıp derelere ve nehirlere akan su.
++  anahtar_kelimeler: ["akış", "dere", "nehir"]
++  dikkat: Barajlar ve sulama modele dahil değildir.
++- ad: toprak_nemi
++  baslik: Toprak nemi
++  birim: kg/m²
++  ana_urun: GLDAS_NOAH025_M
++  sade_tanim: Toprağın içinde tutulan su; bitkilerin kullandığı su deposu.
++  anahtar_kelimeler: ["toprak nemi", "toprak"]
++  dikkat: Model ürünüdür; sulama etkisini içermez.
++- ad: ndvi
++  baslik: Bitki örtüsü (NDVI)
++  birim: "-"
++  ana_urun: MOD13C2
++  sade_tanim: Bitkilerin ne kadar yeşil ve gür olduğunu gösteren, -1 ile 1 arasında bir sayı.
++  anahtar_kelimeler: ["ndvi", "yeşil", "bitki"]
++  dikkat: Tarım takvimi ve sulama NDVI'yi güçlü etkiler.
++- ad: su_buhari_kolon
++  baslik: Toplam su buharı
++  birim: kg/m²
++  ana_urun: AIRS3STM
++  sade_tanim: Yerden atmosferin tepesine kadar havadaki tüm su buharı.
++  anahtar_kelimeler: ["su buharı"]
++  dikkat: AIRS bulutlu koşullarda daha belirsizdir.
++- ad: toplam_su_depolama
++  baslik: Toplam su deposu (GRACE)
++  birim: cm
++  ana_urun: GRACE/GRACE-FO JPL Mascon
++  sade_tanim: Kar, toprak, göl ve yeraltı suyu dahil bir bölgedeki tüm suyun değişimi.
++  anahtar_kelimeler: ["yeraltı", "yer altı", "su deposu", "grace"]
++  dikkat: Çözünürlük kabadır (yaklaşık 300 km); küçük il ölçeğinde dikkatli yorumlanmalı.
++- ad: rakim
++  baslik: Rakım
++  birim: m
++  ana_urun: SRTMGL3
++  sade_tanim: Bir yerin deniz seviyesinden yüksekliği.
++  anahtar_kelimeler: ["rakım", "yükseklik"]
++  dikkat: Analiz ekseni olarak kullanılır, trendi incelenmez.
+diff --git a/kb/yerler.yaml b/kb/yerler.yaml
+new file mode 100644
+index 0000000..118f394
+--- /dev/null
++++ b/kb/yerler.yaml
+@@ -0,0 +1,25 @@
++# Yer kartları: kullanıcının yazdığı yer adını analiz bölgesine çevirir.
++# "bolge" kimlikleri data/regions.py içindeki REGIONS anahtarlarıyla eşleşmeli (Kişi 1 ile koordineli).
++# Daha özel bir bölge varsa (ör. konya) "ozel" alanında verilir; planlayıcı önce onu dener.
++bolgeler:
++  turkiye: {ad: Türkiye, takma_adlar: ["türkiye", "ülke genel", "tüm türkiye"]}
++  marmara: {ad: Marmara Bölgesi, takma_adlar: ["marmara"]}
++  ege: {ad: Ege Bölgesi, takma_adlar: ["ege"]}
++  akdeniz: {ad: Akdeniz Bölgesi, takma_adlar: ["akdeniz"]}
++  ic_anadolu: {ad: İç Anadolu Bölgesi, takma_adlar: ["iç anadolu", "orta anadolu", "tuz gölü"]}
++  karadeniz: {ad: Karadeniz Bölgesi, takma_adlar: ["karadeniz"]}
++  dogu_anadolu: {ad: Doğu Anadolu Bölgesi, takma_adlar: ["doğu anadolu", "van gölü"]}
++  guneydogu_anadolu: {ad: Güneydoğu Anadolu Bölgesi, takma_adlar: ["güneydoğu", "gap"]}
++ozel:
++  konya: {ad: Konya Kapalı Havzası, takma_adlar: ["konya ovası", "konya havzası", "konya kapalı"]}
++iller:
++  marmara: [Edirne, Kırklareli, Tekirdağ, İstanbul, Kocaeli, Yalova, Sakarya, Bilecik, Bursa, Balıkesir, Çanakkale]
++  ege: [İzmir, Manisa, Aydın, Denizli, Muğla, Uşak, Kütahya, Afyonkarahisar, Afyon]
++  akdeniz: [Antalya, Isparta, Burdur, Mersin, Adana, Hatay, Osmaniye, Kahramanmaraş, Maraş]
++  ic_anadolu: [Ankara, Konya, Kayseri, Eskişehir, Sivas, Kırıkkale, Aksaray, Karaman, Kırşehir, Niğde, Nevşehir, Yozgat, Çankırı]
++  karadeniz: [Rize, Trabzon, Artvin, Giresun, Ordu, Samsun, Sinop, Kastamonu, Bartın, Zonguldak, Karabük, Düzce, Bolu, Amasya, Tokat, Çorum, Gümüşhane, Bayburt]
++  dogu_anadolu: [Erzurum, Erzincan, Kars, Ardahan, Iğdır, Ağrı, Van, Muş, Bitlis, Bingöl, Tunceli, Elazığ, Malatya, Hakkari]
++  guneydogu_anadolu: [Gaziantep, Antep, Şanlıurfa, Urfa, Diyarbakır, Mardin, Batman, Siirt, Şırnak, Kilis, Adıyaman]
++# Konya ili sorulduğunda özel bölge (konya) varsa o kullanılır:
++il_ozel:
++  Konya: konya
+diff --git a/llm/README.md b/llm/README.md
+new file mode 100644
+index 0000000..352980d
+--- /dev/null
++++ b/llm/README.md
+@@ -0,0 +1,53 @@
++# LLM katmanı (Kişi 4)
++
++**Kural:** LLM sayı üretmez ve hesap yapmaz. Yalnızca (1) soruyu katalogdan bir seçime çevirir,
++(2) analiz sonuçlarını sade dille anlatır. Her sayı `results.json`'dan gelir ve doğrulayıcıdan geçer.
++
++## Akış
++
++```
++soru ──► plan_question ──► run_analysis(plan) ──► açıklama (LLM) ──► verify_text ──┬─► geçti: göster
++         (LLM seçer, kod     (Kişi 1-3,             her cümlede        sayılar/ref'ler  │
++          doğrular; yedek:    pipeline.py)          [ref:id]           kontrol          └─► kaldı: düzeltme
++          anahtar kelime)                                                                   talimatıyla en fazla
++                                                                                            2 kez yeniden üret,
++                                                                                            sonra şablon açıklama
++```
++
++| Dosya | Görevi |
++| --- | --- |
++| `kb.py` | `kb/` kartlarını okur; yer adı → bölge (81 il, 7 bölge), anahtar kelime eşleştirme |
++| `plan.py` | Soru → plan (kart, belirti, şüpheliler, bölge, **gerekçe**) |
++| `explain.py` | Sonuç → açıklama (LLM ya da şablon) + kanıt tablosu |
++| `verify.py` | Metindeki sayılar sonuçta var mı, `[ref:id]`'ler gerçek mi, sayılı cümleler kaynaklı mı |
++| `answer.py` | Hepsini bağlayan orkestratör |
++| `client.py` | Anthropic ya da OpenAI uyumlu API istemcisi (anahtar yalnızca ortam değişkeninden) |
++
++## Arayüzden kullanım (Kişi 5)
++
++```python
++from llm import answer, KnowledgeBase
++from pipeline import run_analysis   # plan -> results.json sözlüğü (Kişi 1-3)
++
++out = answer("Konya'da kuraklık artıyor mu?", run_analysis)
++out["message"]       # doluysa kullanıcıya sor (bölge eksik/desteklenmiyor), analiz yapılmadı
++out["plan"]["gerekce"]   # "neden bu değişkenlere baktık" — açıklanabilirliğin ilk adımı
++out["explanation"]   # markdown; [ref:id] -> kanıt tablosundaki satır
++out["evidence"]      # kanıt tablosu satırları (id, değişken, ürün, değer, aralık, p, etiket)
++out["explainer"]     # "llm" ya da "sablon"; out["verified"] her zaman kontrol edilmiş durumdur
++```
++
++## LLM ayarı (ortam değişkenleri, repoya yazılmaz)
++
++```bash
++export LLM_PROVIDER=anthropic   # ya da openai (Groq, Gemini OpenAI-uyumlu uç, Ollama için LLM_BASE_URL)
++export LLM_MODEL=<model adı>
++export LLM_API_KEY=<anahtar>
++```
++Hiçbiri ayarlı değilse sistem LLM'siz çalışır: anahtar kelime planlayıcı + şablon açıklama.
++
++## Bilgi tabanı (`kb/`)
++
++- `kb/cards/*.yaml` — süreç kartları (konu, belirti, şüpheliler ve **neden** şüpheli oldukları, alternatifler)
++- `kb/degiskenler.yaml` — değişkenlerin lise dilinde tanımı; adlar `docs/sozlesmeler.md` ile birebir aynı
++- `kb/yerler.yaml` — 81 il → 7 bölge; bölge kimlikleri `data/regions.py` ile eşleşmeli
+diff --git a/llm/__init__.py b/llm/__init__.py
+index e69de29..f28288d 100644
+--- a/llm/__init__.py
++++ b/llm/__init__.py
+@@ -0,0 +1,12 @@
++"""LLM katmanı (Kişi 4): soru -> plan, sonuç -> açıklama, sayı doğrulayıcı.
++
++Arayüzün (Kişi 5) kullanacağı ana fonksiyonlar:
++    from llm import KnowledgeBase, answer, plan_question, evidence_table
++"""
++from .answer import answer
++from .explain import evidence_table, template_explanation
++from .kb import KnowledgeBase
++from .plan import plan_question
++from .verify import verify_text
++
++__all__ = ["KnowledgeBase", "answer", "plan_question", "evidence_table", "template_explanation", "verify_text"]
+diff --git a/llm/answer.py b/llm/answer.py
+new file mode 100644
+index 0000000..1c8d160
+--- /dev/null
++++ b/llm/answer.py
+@@ -0,0 +1,80 @@
++"""Orkestratör: soru -> plan -> analiz -> açıklama -> doğrulama (gerekirse yeniden üret) -> yedek.
++
++Analizi bu modül yapmaz: `run_analysis(plan) -> results.json sözlüğü` dışarıdan verilir
++(pipeline.py; Kişi 1-3'ün modülleri). Böylece LLM katmanı veri hazır olmadan da test edilir.
++"""
++from __future__ import annotations
++
++from typing import Callable
++
++from .client import get_client
++from .explain import evidence_table, llm_explanation, template_explanation
++from .kb import KnowledgeBase
++from .plan import plan_question
++from .verify import verify_text
++
++MAX_RETRIES = 2
++
++
++def _available_regions() -> set[str] | None:
++    """Veri hattında tanımlı bölgeler (data/regions.py). Okunamazsa kontrol yapılmaz."""
++    try:
++        from data.regions import REGIONS
++        return set(REGIONS)
++    except Exception:
++        return None
++
++
++def answer(question: str, run_analysis: Callable[[dict], dict], kb: KnowledgeBase | None = None,
++           client="auto", available_regions: set[str] | None = None) -> dict:
++    """Kullanıcı sorusunu uçtan uca cevaplar.
++
++    Dönen sözlük (arayüz bunu gösterir):
++      plan, results, explanation, verified, explainer ("llm" | "sablon"), attempts,
++      evidence (kanıt tablosu satırları), warnings, message (kullanıcıya sorulacak bir şey varsa)
++    """
++    kb = kb or KnowledgeBase.load()
++    warnings: list[str] = []
++    if client == "auto":
++        try:
++            client = get_client()
++        except Exception as e:
++            client = None
++            warnings.append(f"LLM ayarı okunamadı, şablon kullanılacak: {e}")
++    if available_regions is None:
++        available_regions = _available_regions()
++
++    plan = plan_question(question, kb, client, available_regions)
++    warnings += plan.get("warnings", [])
++    out = {"plan": plan, "results": None, "explanation": None, "verified": False,
++           "explainer": None, "attempts": 0, "evidence": [], "warnings": warnings}
++    if not plan["ok"] or plan.get("needs_region") or plan.get("region_missing"):
++        out["message"] = plan.get("message")
++        return out
++
++    results = run_analysis(plan)
++    out["results"], out["evidence"] = results, evidence_table(results, kb)
++
++    feedback = None
++    if client is not None:
++        for attempt in range(1, MAX_RETRIES + 2):
++            out["attempts"] = attempt
++            try:
++                text = llm_explanation(question, plan, results, kb, client, feedback)
++            except Exception as e:
++                warnings.append(f"LLM açıklayıcı çalışmadı ({type(e).__name__}); şablona geçildi.")
++                break
++            check = verify_text(text, results)
++            if check.ok:
++                out.update(explanation=text, verified=True, explainer="llm")
++                return out
++            feedback = check.feedback()
++        else:
++            warnings.append("LLM açıklaması doğrulamayı geçemedi; şablon açıklama gösteriliyor.")
++
++    text = template_explanation(plan, results, kb)
++    check = verify_text(text, results)
++    out.update(explanation=text, verified=check.ok, explainer="sablon")
++    if not check.ok:
++        warnings.append("Şablon açıklama bile doğrulanamadı: " + check.feedback())
++    return out
+diff --git a/llm/client.py b/llm/client.py
+new file mode 100644
+index 0000000..028e0b3
+--- /dev/null
++++ b/llm/client.py
+@@ -0,0 +1,73 @@
++"""LLM sağlayıcı istemcileri. Anahtar YALNIZCA ortam değişkeninden okunur; koda/repoya yazılmaz.
++
++Ortam değişkenleri:
++  LLM_PROVIDER = anthropic | openai | none   (boş bırakılırsa LLM kullanılmaz, şablon devrede)
++  LLM_MODEL    = model adı (sağlayıcının belgesinden)
++  LLM_API_KEY  = API anahtarı
++  LLM_BASE_URL = (yalnız openai) OpenAI uyumlu uç nokta; Groq, Gemini'nin OpenAI uyumlu ucu,
++                 yerel Ollama (http://localhost:11434/v1) gibi servisler de bu yolla bağlanır.
++Streamlit'te bunlar st.secrets'tan os.environ'a aktarılabilir.
++"""
++from __future__ import annotations
++
++import os
++from typing import Protocol
++
++import requests
++
++TIMEOUT_S = 60
++
++
++class LLMClient(Protocol):
++    def complete(self, system: str, user: str) -> str: ...
++
++
++class AnthropicClient:
++    """Anthropic Messages API."""
++
++    def __init__(self, model: str, api_key: str):
++        self.model, self.api_key = model, api_key
++
++    def complete(self, system: str, user: str) -> str:
++        r = requests.post(
++            "https://api.anthropic.com/v1/messages",
++            headers={"x-api-key": self.api_key, "anthropic-version": "2023-06-01",
++                     "content-type": "application/json"},
++            json={"model": self.model, "max_tokens": 1200, "system": system,
++                  "messages": [{"role": "user", "content": user}]},
++            timeout=TIMEOUT_S)
++        r.raise_for_status()
++        return "".join(b.get("text", "") for b in r.json()["content"])
++
++
++class OpenAICompatClient:
++    """OpenAI Chat Completions biçimindeki herhangi bir servis."""
++
++    def __init__(self, model: str, api_key: str, base_url: str):
++        self.model, self.api_key, self.base_url = model, api_key, base_url.rstrip("/")
++
++    def complete(self, system: str, user: str) -> str:
++        r = requests.post(
++            f"{self.base_url}/chat/completions",
++            headers={"Authorization": f"Bearer {self.api_key}"},
++            json={"model": self.model, "temperature": 0.2,
++                  "messages": [{"role": "system", "content": system},
++                               {"role": "user", "content": user}]},
++            timeout=TIMEOUT_S)
++        r.raise_for_status()
++        return r.json()["choices"][0]["message"]["content"]
++
++
++def get_client() -> LLMClient | None:
++    """Ortam değişkenlerinden istemci kurar; ayar yoksa None (şablon açıklayıcı çalışır)."""
++    provider = os.environ.get("LLM_PROVIDER", "none").strip().lower()
++    if provider in ("", "none"):
++        return None
++    model, key = os.environ.get("LLM_MODEL"), os.environ.get("LLM_API_KEY")
++    if not model or not key:
++        raise RuntimeError("LLM_MODEL ve LLM_API_KEY ortam değişkenleri gerekli.")
++    if provider == "anthropic":
++        return AnthropicClient(model, key)
++    if provider == "openai":
++        return OpenAICompatClient(model, key, os.environ.get("LLM_BASE_URL", "https://api.openai.com/v1"))
++    raise RuntimeError(f"Bilinmeyen LLM_PROVIDER: {provider}")
+diff --git a/llm/explain.py b/llm/explain.py
+new file mode 100644
+index 0000000..c8714ca
+--- /dev/null
++++ b/llm/explain.py
+@@ -0,0 +1,121 @@
++"""Sonuç (results.json) -> sade dilde açıklama + kanıt tablosu.
++
++LLM yalnızca anlatır: sayıları sonuçtan kopyalar, her iddiaya [ref:id] ekler. LLM yoksa ya da
++doğrulamayı geçemezse `template_explanation` aynı kanıtlardan güvenli bir metin üretir.
++"""
++from __future__ import annotations
++
++import json
++
++from .kb import KnowledgeBase
++
++LABELS = {
++    "uyumlu": "beklenen yönle/hipotezle uyumlu",
++    "celiskili": "beklenenle çelişiyor; başka bir etken baskın olabilir",
++    "yetersiz": "veri kesin bir sonuç için yetersiz",
++}
++
++EXPLAIN_SYSTEM = """Sen bir NASA veri dedektifisin. Lise öğrencisinin anlayacağı sade bir Türkçeyle,
++aşağıdaki analiz sonuçlarını açıkla. KURALLAR (çiğnersen cevabın reddedilir):
++1. Sayıları YALNIZCA sonuç JSON'undan kopyala; hesap yapma, yuvarlarken en fazla 2 ondalık kullan.
++   Yeni sayı (yüzde, fark, toplam) türetme.
++2. Sayı içeren her cümlenin sonuna kaynağı olan analizi [ref:<id>] biçiminde ekle (noktadan önce).
++3. Etiketleri (uyumlu / celiskili / yetersiz) değiştirme; ne anlama geldiklerini sade dille söyle.
++4. Neden kısmında bunun bir İLİŞKİ ya da TUTARLILIK kanıtı olduğunu, kesin neden olmadığını belirt.
++5. Şu dört başlıkla, toplam 120-200 kelime yaz: **Ne değişti?**, **Nerede?**, **Neden olabilir?**,
++   **Ne kadar güvenebiliriz?** Sonuçta olmayan bir başlık için "Bu analizde bu bilgi yok." yaz.
++6. Mann-Kendall p-değerini "bu değişimin tesadüf olma olasılığı" gibi sade bir dille anlat.
++"""
++
++
++def _var_title(kb: KnowledgeBase, name: str | None) -> str:
++    return kb.variables.get(name, {}).get("baslik", name or "?")
++
++
++def _fmt(x, d=2) -> str:
++    return f"{x:.{d}f}"
++
++
++def _fmt_p(p) -> str:
++    return "< 0.001" if p < 0.001 else f"= {p:.3g}"
++
++
++def evidence_table(results: dict, kb: KnowledgeBase) -> list[dict]:
++    """Arayüz için kanıt tablosu satırları (her satırın id'si açıklamadaki [ref:id] ile eşleşir)."""
++    rows = []
++    for a in results.get("analyses", []):
++        rows.append({
++            "id": a.get("id"),
++            "analiz": a.get("type"),
++            "degisken": _var_title(kb, a.get("variable")) if a.get("variable") else a.get("axis", "-"),
++            "urun": a.get("product", "-"),
++            "deger": a.get("sen_slope_per_decade", a.get("observed_shift_m_per_decade")),
++            "birim": (a.get("units", "") + "/on yıl") if "sen_slope_per_decade" in a else
++                     ("m/on yıl" if "observed_shift_m_per_decade" in a else a.get("units", "")),
++            "aralik_95": a.get("ci95"),
++            "p": a.get("mk_p"),
++            "etiket": a.get("label"),
++            "etiket_sade": LABELS.get(a.get("label"), ""),
++        })
++    return rows
++
++
++def _sentence(a: dict, kb: KnowledgeBase) -> str | None:
++    """Tek bir analiz için güvenli (sonuçtan kopyalanmış sayılarla) cümle."""
++    rid, label = a.get("id"), a.get("label")
++    lab = LABELS.get(label, label or "")
++    if a.get("type") == "trend" and a.get("sen_slope_per_decade") is not None:
++        s = (f"{_var_title(kb, a.get('variable'))} ({a.get('product', '?')}) on yılda "
++             f"{_fmt(a['sen_slope_per_decade'])} {a.get('units', '')} değişiyor")
++        if a.get("ci95"):
++            s += f" (%95 güven aralığı {_fmt(a['ci95'][0])} ile {_fmt(a['ci95'][1])})"
++        if a.get("mk_p") is not None:
++            s += f"; Mann-Kendall p {_fmt_p(a['mk_p'])}"
++        if a.get("fdr_fraction_significant") is not None:
++            s += f"; bölgedeki hücrelerin %{a['fdr_fraction_significant'] * 100:.0f}'inde anlamlı"
++        return s + f" [ref:{rid}]. Sonuç: {lab}."
++    if a.get("type") == "boundary_shift" and a.get("observed_shift_m_per_decade"):
++        o, p = a["observed_shift_m_per_decade"], a.get("predicted_shift_m_per_decade")
++        s = (f"{a.get('axis', 'eksen')} boyunca gözlenen sınır kayması on yılda "
++             f"{_fmt(o[0], 0)} ile {_fmt(o[1], 0)} m")
++        if p:
++            s += f", ısınmadan beklenen ise {_fmt(p[0], 0)} ile {_fmt(p[1], 0)} m"
++        return s + f" [ref:{rid}]. Sonuç: {lab}."
++    if label:
++        return f"{a.get('type', 'analiz')} sonucu: {lab} [ref:{rid}]."
++    return None
++
++
++def template_explanation(plan: dict, results: dict, kb: KnowledgeBase) -> str:
++    """LLM'siz yedek açıklama. Yalnızca sonuçtaki sayıları kullanır, her cümle kanıta bağlıdır."""
++    lines = [f"**{plan.get('card_title', 'Analiz')}** — {plan.get('region_name') or results.get('region', {}).get('name', '')}"]
++    if plan.get("sade_tanim"):
++        lines.append(plan["sade_tanim"])
++    for a in results.get("analyses", []):
++        s = _sentence(a, kb)
++        if s:
++            lines.append("- " + s)
++    if plan.get("supheliler"):
++        lines.append("Not: Şüpheli değişkenlerle görülen ilişkiler kesin neden değil, tutarlılık kanıtıdır.")
++    return "\n".join(lines)
++
++
++def llm_explanation(question: str, plan: dict, results: dict, kb: KnowledgeBase, client,
++                    feedback: str | None = None) -> str:
++    """LLM ile açıklama üretir (doğrulama answer.py'de yapılır)."""
++    names = {a.get("variable") for a in results.get("analyses", [])} | \
++            {b["degisken"] for b in plan.get("belirti", [])} | {s["degisken"] for s in plan.get("supheliler", [])}
++    var_cards = {n: {k: kb.variables[n].get(k) for k in ("baslik", "birim", "sade_tanim", "dikkat")}
++                 for n in names if n in kb.variables}
++    context = {
++        "soru": question,
++        "bolge": plan.get("region_name"),
++        "surec": {k: plan.get(k) for k in ("card_title", "sade_tanim", "supheliler", "alternatifler")},
++        "degisken_kartlari": var_cards,
++        "etiket_anlamlari": LABELS,
++        "sonuclar": {k: v for k, v in results.items() if not str(k).startswith("_")},
++    }
++    user = "Analiz bağlamı ve sonuçları (JSON):\n" + json.dumps(context, ensure_ascii=False, indent=1)
++    if feedback:
++        user += "\n\nÖNCEKİ CEVABIN REDDEDİLDİ. Düzelt:\n" + feedback
++    return client.complete(EXPLAIN_SYSTEM, user)
+diff --git a/llm/kb.py b/llm/kb.py
+new file mode 100644
+index 0000000..2d312c6
+--- /dev/null
++++ b/llm/kb.py
+@@ -0,0 +1,136 @@
++"""Bilgi tabanı (kb/) okuyucusu: süreç kartları, değişken kartları ve yer kartları.
++
++Kartlar YAML'dır ve küçük (onlarca) olduğu için vektör veritabanı gerekmez: LLM'e kart
++listesinin özeti verilir, yedek eşleştirme ise anahtar kelimeyle yapılır.
++"""
++from __future__ import annotations
++
++import re
++from dataclasses import dataclass, field
++from pathlib import Path
++
++import yaml
++
++KB_DIR = Path(__file__).resolve().parent.parent / "kb"
++
++
++def tr_lower(text: str) -> str:
++    """Türkçe'ye uygun küçük harf: 'İ'->'i', 'I'->'ı' (Python'un lower()'ı bunu yanlış yapar)."""
++    return text.replace("İ", "i").replace("I", "ı").lower()
++
++
++def _starts_word(name: str, text: str) -> bool:
++    """`name`, metinde bir kelimenin BAŞINDA geçiyor mu? ("Konya'da" eşleşir, "olmuş" ≠ "Muş")."""
++    return re.search(r"(?<![0-9a-zçğıöşü])" + re.escape(name), text) is not None
++
++
++@dataclass
++class KnowledgeBase:
++    cards: dict[str, dict] = field(default_factory=dict)
++    variables: dict[str, dict] = field(default_factory=dict)
++    places: dict = field(default_factory=dict)
++
++    # ------------------------------------------------------------------ yükleme
++    @classmethod
++    def load(cls, kb_dir: Path | str = KB_DIR) -> "KnowledgeBase":
++        """kb/ klasöründeki tüm kartları okur."""
++        kb_dir = Path(kb_dir)
++        cards = {}
++        for f in sorted((kb_dir / "cards").glob("*.yaml")):
++            c = yaml.safe_load(f.read_text(encoding="utf-8"))
++            cards[c["id"]] = c
++        variables = {v["ad"]: v for v in
++                     yaml.safe_load((kb_dir / "degiskenler.yaml").read_text(encoding="utf-8"))}
++        places = yaml.safe_load((kb_dir / "yerler.yaml").read_text(encoding="utf-8"))
++        return cls(cards, variables, places)
++
++    # ------------------------------------------------------------------ yerler
++    def resolve_place(self, text: str, available: set[str] | None = None) -> dict:
++        """Metindeki yer adını analiz bölgesine çevirir.
++
++        Sıra: özel bölge (ör. Konya Ovası) -> il -> coğrafi bölge adı.
++        available: veri hattında gerçekten bulunan bölge kimlikleri (data/regions.py). Verilirse
++        önerilen bölge orada yoksa `missing=True` döner, böylece arayüz kullanıcıya söyler.
++        Dönen: {"region": id|None, "matched": "metindeki ad", "via": "ozel|il|bolge", "missing": bool}
++        """
++        q = tr_lower(text)
++        hit = None
++        for rid, r in self.places.get("ozel", {}).items():
++            if any(_starts_word(tr_lower(a), q) for a in r["takma_adlar"]):
++                hit = {"region": rid, "matched": r["ad"], "via": "ozel"}
++                break
++        if hit is None:
++            # Uzun adlar önce: "Kahramanmaraş" "Maraş"tan önce denenir.
++            pairs = [(il, rid) for rid, iller in self.places["iller"].items() for il in iller]
++            for il, rid in sorted(pairs, key=lambda p: -len(p[0])):
++                if _starts_word(tr_lower(il), q):
++                    special = self.places.get("il_ozel", {}).get(il)
++                    if special and (available is None or special in available):
++                        rid = special
++                    hit = {"region": rid, "matched": il, "via": "il"}
++                    break
++        if hit is None:
++            for rid, r in self.places["bolgeler"].items():
++                if any(_starts_word(tr_lower(a), q) for a in r["takma_adlar"]):
++                    hit = {"region": rid, "matched": r["ad"], "via": "bolge"}
++                    break
++        if hit is None:
++            return {"region": None, "matched": None, "via": None, "missing": False}
++        hit["missing"] = available is not None and hit["region"] not in available
++        return hit
++
++    def region_name(self, region_id: str) -> str:
++        """Bölge kimliğinin okunur adı."""
++        for group in ("ozel", "bolgeler"):
++            if region_id in self.places.get(group, {}):
++                return self.places[group][region_id]["ad"]
++        return region_id
++
++    # ------------------------------------------------------------------ eşleştirme (yedek)
++    def _strip_places(self, q: str) -> str:
++        """Yer adlarını sorudan çıkarır: "Karadeniz" içindeki "kar" kar kartını tetiklemesin."""
++        names = [a for g in ("ozel", "bolgeler") for r in self.places.get(g, {}).values()
++                 for a in r["takma_adlar"]]
++        names += [il for iller in self.places["iller"].values() for il in iller]
++        for n in sorted((tr_lower(x) for x in names), key=len, reverse=True):
++            q = re.sub(r"(?<![0-9a-zçğıöşü])" + re.escape(n) + r"[\w']*", " ", q)
++        return q
++
++    def match_card(self, text: str) -> str | None:
++        """Anahtar kelimeyle en uygun süreç kartı (LLM yokken/başarısızken yedek).
++
++        Puan = eşleşen kalıp sayısı; beraberlikte soruda İLK geçen konu kazanır
++        ("Doğu Anadolu'da kar ... ısınmayla tutarlı mı?" -> kar kartı)."""
++        q = self._strip_places(tr_lower(text))
++        best, best_key = None, (0, 0)
++        for cid, c in self.cards.items():
++            pos = [m.start() for k in c.get("soru_kaliplari", [])
++                   for m in [re.search(r"(?<![0-9a-zçğıöşü])" + re.escape(tr_lower(k)), q)] if m]
++            if pos:
++                key = (len(pos), -min(pos))
++                if key > best_key:
++                    best, best_key = cid, key
++        return best
++
++    def match_variable(self, text: str) -> str | None:
++        """Anahtar kelimeyle değişken (kartsız, tek değişkenli sorular için)."""
++        q = self._strip_places(tr_lower(text))
++        best, score = None, 0
++        for ad, v in self.variables.items():
++            s = sum(len(k) for k in v.get("anahtar_kelimeler", []) if tr_lower(k) in q)
++            if s > score:
++                best, score = ad, s
++        return best
++
++    # ------------------------------------------------------------------ LLM için özet
++    def catalog_for_prompt(self) -> str:
++        """Planlayıcı LLM'e verilen kısa katalog: kart ve değişken kimlikleri + açıklamaları."""
++        lines = ["SÜREÇ KARTLARI (card_id: başlık — örnek soru):"]
++        for cid, c in self.cards.items():
++            ex = (c.get("ornek_sorular") or [""])[0]
++            lines.append(f"- {cid}: {c['baslik']} — örn. \"{ex}\"")
++        lines.append("\nDEĞİŞKENLER (degisken: başlık):")
++        for ad, v in self.variables.items():
++            if ad != "rakim":
++                lines.append(f"- {ad}: {v['baslik']}")
++        return "\n".join(lines)
+diff --git a/llm/plan.py b/llm/plan.py
+new file mode 100644
+index 0000000..ce4253f
+--- /dev/null
++++ b/llm/plan.py
+@@ -0,0 +1,99 @@
++"""Soru -> plan. LLM yalnızca KATALOGDAN SEÇİM yapar (kart/değişken kimliği + yer adı);
++kimlikler kodda doğrulanır, yer adı deterministik olarak bölgeye çevrilir. LLM yoksa veya
++hatalı cevap verirse anahtar kelime eşleştirmesi devreye girer.
++"""
++from __future__ import annotations
++
++import json
++import re
++
++from .kb import KnowledgeBase
++
++PLAN_SYSTEM = """Sen bir NASA yer bilimi veri asistanısın. Kullanıcının Türkiye hakkındaki sorusunu,
++aşağıdaki katalogdan BİR süreç kartına ya da (uygun kart yoksa) BİR değişkene eşle ve soruda geçen
++yer adını aynen çıkar. Katalogda olmayan kimlik UYDURMA. Yalnızca şu JSON'u döndür:
++{"card_id": "<katalogdaki kart kimliği ya da null>",
++ "degisken": "<kart null ise katalogdaki değişken kimliği ya da null>",
++ "yer": "<soruda geçen il/bölge adı ya da null>",
++ "gerekce": "<neden bu kartı/değişkeni seçtiğini lise öğrencisine anlatan tek cümle>"}
++"""
++
++
++def _parse_json(text: str) -> dict:
++    """LLM cevabındaki ilk JSON nesnesini ayıklar (```json bloklarına dayanıklı)."""
++    m = re.search(r"\{.*\}", text, re.S)
++    if not m:
++        raise ValueError("LLM cevabında JSON yok")
++    return json.loads(m.group(0))
++
++
++def _ask_llm(question: str, kb: KnowledgeBase, client) -> dict:
++    raw = client.complete(PLAN_SYSTEM, kb.catalog_for_prompt() + f"\n\nSORU: {question}")
++    d = _parse_json(raw)
++    card = d.get("card_id") if d.get("card_id") in kb.cards else None
++    var = d.get("degisken") if d.get("degisken") in kb.variables else None
++    if card is None and var is None:
++        raise ValueError("LLM katalogda olmayan ya da boş bir seçim döndürdü")
++    return {"card_id": card, "degisken": var, "yer": d.get("yer"),
++            "gerekce": str(d.get("gerekce") or "")}
++
++
++def plan_question(question: str, kb: KnowledgeBase, client=None,
++                  available_regions: set[str] | None = None) -> dict:
++    """Kullanıcı sorusunu analiz planına çevirir.
++
++    Dönen plan (arayüz ve analiz modülleri bunu kullanır):
++      ok, kind ("surec" | "degisken"), card_id, card_title, sade_tanim,
++      belirti, supheliler, fiziksel_test, alternatifler,
++      region, region_name, place_matched, needs_region, region_missing,
++      method ("llm" | "anahtar_kelime"), gerekce, warnings, message
++    """
++    warnings: list[str] = []
++    choice, method = None, "anahtar_kelime"
++    if client is not None:
++        try:
++            choice, method = _ask_llm(question, kb, client), "llm"
++        except Exception as e:  # LLM çökse de demo durmasın
++            warnings.append(f"LLM planlayıcı kullanılamadı, anahtar kelimeye geçildi ({type(e).__name__}).")
++    if choice is None:
++        card = kb.match_card(question)
++        choice = {"card_id": card, "degisken": None if card else kb.match_variable(question),
++                  "yer": None, "gerekce": ""}
++
++    plan: dict = {"ok": True, "question": question, "method": method,
++                  "gerekce": choice["gerekce"], "warnings": warnings}
++
++    if choice["card_id"]:
++        c = kb.cards[choice["card_id"]]
++        plan.update(kind="surec", card_id=c["id"], card_title=c["baslik"], sade_tanim=c.get("sade_tanim"),
++                    belirti=c.get("belirti", []), supheliler=c.get("supheliler", []),
++                    fiziksel_test=c.get("fiziksel_test"), alternatifler=c.get("alternatifler", []))
++        if not plan["gerekce"]:
++            plan["gerekce"] = (f"Soru \"{c['baslik']}\" konusuyla eşleşti; bu konuda "
++                               f"{', '.join(kb.variables[b['degisken']]['baslik'] for b in c['belirti'])} "
++                               "belirti olarak incelenir.")
++    elif choice["degisken"]:
++        v = kb.variables[choice["degisken"]]
++        plan.update(kind="degisken", card_id=None, card_title=v["baslik"], sade_tanim=v["sade_tanim"],
++                    belirti=[{"degisken": v["ad"], "urun": v["ana_urun"], "beklenen_yon": "belirsiz"}],
++                    supheliler=[], fiziksel_test=None, alternatifler=[])
++        if not plan["gerekce"]:
++            plan["gerekce"] = f"Soru doğrudan \"{v['baslik']}\" değişkeniyle ilgili."
++    else:
++        topics = sorted({c.get("konu", c["baslik"]) for c in kb.cards.values()})
++        plan.update(ok=False, message="Bu soruyu henüz desteklenen bir konuyla eşleştiremedim. "
++                                      "Şu konularda soru sorabilirsin: " + ", ".join(topics) + ".")
++        return plan
++
++    place = kb.resolve_place(choice["yer"], available_regions) if choice["yer"] else None
++    if not place or place["region"] is None:
++        place = kb.resolve_place(question, available_regions)
++    plan.update(region=place["region"], place_matched=place["matched"],
++                region_name=kb.region_name(place["region"]) if place["region"] else None,
++                needs_region=place["region"] is None, region_missing=place["missing"])
++    if plan["needs_region"]:
++        plan["message"] = "Hangi il ya da bölgeyi incelemek istersin?"
++    elif plan["region_missing"]:
++        plan["message"] = (f"{plan['region_name']} için veri henüz hazırlanmadı. "
++                           "Mevcut bölgelerden birini seç.")
++    return plan
+diff --git a/llm/verify.py b/llm/verify.py
+new file mode 100644
+index 0000000..a4e8b3c
+--- /dev/null
++++ b/llm/verify.py
+@@ -0,0 +1,92 @@
++"""Halüsinasyon koruması. Açıklama metni şu üç kuralı sağlamalı:
++  1. Metindeki her sayı, sonuç dosyasındaki (results.json) bir sayıya eşit olmalı
++     (gösterilen basamağa yuvarlanmış, mutlak değer ya da yüzde hali kabul edilir).
++  2. Her [ref:id] bağlantısı sonuçlarda gerçekten olan bir analize işaret etmeli.
++  3. Sayı içeren her cümle en az bir [ref:id] taşımalı (izlenebilirlik = açıklanabilirlik).
++"""
++from __future__ import annotations
++
++import math
++import re
++from dataclasses import dataclass, field
++
++REF = re.compile(r"\[ref:([^\]\s]+)\]")
++NUM = re.compile(r"(?<![\w.])[-−+]?\d+(?:[.,]\d+)?")
++# Yıl ve sabitler dışındaki serbest sayılar: on yıl, %95 güven, olağan anlamlılık eşikleri.
++DEFAULT_ALLOWED = {10.0, 95.0, 100.0, 0.05, 0.01, 0.001}
++
++
++@dataclass
++class VerifyResult:
++    ok: bool
++    unverified_numbers: list[str] = field(default_factory=list)
++    unknown_refs: list[str] = field(default_factory=list)
++    uncited_sentences: list[str] = field(default_factory=list)
++
++    def feedback(self) -> str:
++        """LLM'e yeniden üretirken verilecek düzeltme talimatı."""
++        parts = []
++        if self.unverified_numbers:
++            parts.append("Şu sayılar analiz sonuçlarında yok, kaldır ya da sonuçtaki değeri kullan: "
++                         + ", ".join(self.unverified_numbers))
++        if self.unknown_refs:
++            parts.append("Şu kanıt kimlikleri yok, yalnızca verilen id'leri kullan: " + ", ".join(self.unknown_refs))
++        if self.uncited_sentences:
++            parts.append("Sayı içeren her cümlenin sonuna ilgili [ref:id] ekle. Eksik olanlar: "
++                         + " | ".join(s[:60] for s in self.uncited_sentences))
++        return "\n".join(parts)
++
++
++def _numbers_in(obj) -> list[float]:
++    """Sonuç nesnesindeki tüm sonlu sayılar (iç içe dict/list)."""
++    if isinstance(obj, bool) or obj is None:
++        return []
++    if isinstance(obj, (int, float)):
++        return [float(obj)] if math.isfinite(obj) else []
++    if isinstance(obj, dict):
++        return [x for k, v in obj.items() if not str(k).startswith("_") for x in _numbers_in(v)]
++    if isinstance(obj, (list, tuple)):
++        return [x for v in obj for x in _numbers_in(v)]
++    return []
++
++
++def _years(results: dict) -> set[float]:
++    try:
++        y0, y1 = (int(str(p)[:4]) for p in results.get("period", []))
++        return {float(y) for y in range(y0, y1 + 1)}
++    except (ValueError, TypeError):
++        return set()
++
++
++def verify_text(text: str, results: dict, extra_allowed: set[float] | None = None) -> VerifyResult:
++    """Açıklama metnini sonuçlara karşı denetler."""
++    ids = {a.get("id") for a in results.get("analyses", [])}
++    unknown = sorted({r for r in REF.findall(text) if r not in ids})
++
++    ref_numbers = _numbers_in(results.get("analyses", []))
++    candidates = set()
++    for r in ref_numbers:
++        candidates.update({abs(r), abs(r) * 100})
++    allowed = DEFAULT_ALLOWED | _years(results) | (extra_allowed or set())
++
++    bad = []
++    plain = REF.sub(" ", text)
++    for tok in NUM.findall(plain):
++        t = tok.replace("−", "-").replace(",", ".")
++        x = abs(float(t))
++        if x in allowed:
++            continue
++        decimals = len(t.split(".")[1]) if "." in t else 0
++        tol = 0.5 * 10 ** (-decimals) + 1e-9
++        if not any(abs(x - c) <= tol for c in candidates):
++            bad.append(tok)
++
++    # Cümle bölme: nokta + boşluk; hemen ardından gelen [ref:..] önceki cümleye aittir.
++    sentences = re.split(r"(?<=[.!?])\s+(?!\[ref:)|\n+", text)
++    uncited = [s.strip() for s in sentences
++               if NUM.search(REF.sub(" ", s)) and not REF.search(s)
++               and any(not abs(float(n.replace("−", "-").replace(",", "."))) in allowed
++                       for n in NUM.findall(REF.sub(" ", s)))]
++
++    return VerifyResult(ok=not (bad or unknown or uncited), unverified_numbers=bad,
++                        unknown_refs=unknown, uncited_sentences=uncited)
+diff --git a/requirements.txt b/requirements.txt
+index ec946c8..f38810d 100644
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -14,6 +14,9 @@ scipy
+ statsmodels
+ pymannkendall
+ 
++# LLM katmanı (Kişi 4)
++requests
++
+ # Arayüz (Kişi 5)
+ streamlit
+ plotly
+diff --git a/tests/conftest.py b/tests/conftest.py
+new file mode 100644
+index 0000000..f64df9c
+--- /dev/null
++++ b/tests/conftest.py
+@@ -0,0 +1,6 @@
++"""Testler hangi klasörden çalıştırılırsa çalıştırılsın repo kökü import yolunda olsun
++(`from llm import ...`, `from stats import ...` vb. çalışsın)."""
++import sys
++from pathlib import Path
++
++sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+diff --git a/tests/test_llm.py b/tests/test_llm.py
+new file mode 100644
+index 0000000..ef620bf
+--- /dev/null
++++ b/tests/test_llm.py
+@@ -0,0 +1,147 @@
++"""LLM katmanı testleri (Kişi 4). Gerçek LLM ve veri gerekmez: sahte istemci ve
++examples/results_example.json (YER TUTUCU sayılar) kullanılır."""
++import json
++from pathlib import Path
++
++import pytest
++
++from llm import KnowledgeBase, answer, plan_question, template_explanation, verify_text
++
++ROOT = Path(__file__).resolve().parent.parent
++EXAMPLE = json.loads((ROOT / "examples" / "results_example.json").read_text(encoding="utf-8"))
++ALL_REGIONS = {"turkiye", "marmara", "ege", "akdeniz", "ic_anadolu", "karadeniz",
++               "dogu_anadolu", "guneydogu_anadolu", "konya"}
++
++
++@pytest.fixture(scope="module")
++def kb():
++    return KnowledgeBase.load()
++
++
++class FakeClient:
++    """Sırayla verilen cevapları döndüren sahte LLM."""
++    def __init__(self, *replies):
++        self.replies, self.calls = list(replies), 0
++
++    def complete(self, system, user):
++        self.calls += 1
++        r = self.replies[min(self.calls, len(self.replies)) - 1]
++        if isinstance(r, Exception):
++            raise r
++        return r
++
++
++# ------------------------------------------------------------------ bilgi tabanı
++def test_kb_cards_use_contract_variables(kb):
++    """Kartlardaki her değişken, sözleşmedeki değişken listesinde olmalı."""
++    for c in kb.cards.values():
++        for item in c.get("belirti", []) + c.get("supheliler", []):
++            assert item["degisken"] in kb.variables, (c["id"], item["degisken"])
++
++
++@pytest.mark.parametrize("q,region", [
++    ("Konya'da kuraklık artıyor mu?", "konya"),
++    ("Erzurum'da kar azalıyor mu?", "dogu_anadolu"),
++    ("İzmir'de yağış nasıl değişti?", "ege"),
++    ("Kahramanmaraş'ta sıcaklık", "akdeniz"),
++    ("ISPARTA'DA SICAKLIK", "akdeniz"),
++    ("Karadeniz'de hava nemli mi?", "karadeniz"),
++    ("Toprak kurumuş mu, Ege'de?", "ege"),       # "kurumuş" içindeki "muş" ≠ Muş
++])
++def test_resolve_place(kb, q, region):
++    assert kb.resolve_place(q, ALL_REGIONS)["region"] == region
++
++
++def test_konya_without_special_region_falls_back_to_bolge(kb):
++    assert kb.resolve_place("Konya'da kuraklık", {"ic_anadolu"})["region"] == "ic_anadolu"
++
++
++# ------------------------------------------------------------------ planlayıcı (yedek)
++@pytest.mark.parametrize("q,card", [
++    ("Konya'da kuraklık artıyor mu?", "kuraklik"),
++    ("Doğu Anadolu'da kar nasıl değişiyor ve bu ısınmayla tutarlı mı?", "kar_isinma"),
++    ("Karadeniz'de hava daha nemli mi oluyor?", "nem_artisi"),
++    ("Ankara'da sıcaklık nasıl değişti?", "isinma"),
++])
++def test_keyword_plan(kb, q, card):
++    p = plan_question(q, kb, None, ALL_REGIONS)
++    assert p["ok"] and p["card_id"] == card and p["method"] == "anahtar_kelime"
++    assert p["gerekce"]
++
++
++def test_variable_only_question(kb):
++    p = plan_question("İzmir'de yağış nasıl değişti?", kb, None, ALL_REGIONS)
++    assert p["kind"] == "degisken" and p["belirti"][0]["degisken"] == "yagis"
++
++
++def test_unsupported_and_missing_region(kb):
++    assert not plan_question("Mars'ta hayat var mı?", kb, None, ALL_REGIONS)["ok"]
++    assert plan_question("Kuraklık artıyor mu?", kb, None, ALL_REGIONS)["needs_region"]
++    assert plan_question("İzmir'de kuraklık", kb, None, {"konya"})["region_missing"]
++
++
++# ------------------------------------------------------------------ planlayıcı (LLM)
++def test_llm_plan_valid(kb):
++    c = FakeClient('```json\n{"card_id": "kuraklik", "degisken": null, "yer": "Konya", '
++                   '"gerekce": "Toprak nemi kuraklığın göstergesi."}\n```')
++    p = plan_question("Konya tarımı tehlikede mi?", kb, c, ALL_REGIONS)
++    assert p["method"] == "llm" and p["card_id"] == "kuraklik" and p["region"] == "konya"
++
++
++def test_llm_plan_invented_id_falls_back(kb):
++    c = FakeClient('{"card_id": "uydurma_kart", "degisken": "uydurma", "yer": null}')
++    p = plan_question("Konya'da kuraklık artıyor mu?", kb, c, ALL_REGIONS)
++    assert p["method"] == "anahtar_kelime" and p["card_id"] == "kuraklik" and p["warnings"]
++
++
++def test_llm_plan_crash_falls_back(kb):
++    p = plan_question("Konya'da kuraklık?", kb, FakeClient(TimeoutError()), ALL_REGIONS)
++    assert p["ok"] and p["method"] == "anahtar_kelime"
++
++
++# ------------------------------------------------------------------ doğrulayıcı
++def test_verify_accepts_numbers_from_results():
++    t = ("Kar örtüsü on yılda -2.1 % azalıyor (%95 aralık -3.0 ile -1.2), hücrelerin %41'inde anlamlı "
++         "[ref:trend_kar_ortusu_MOD10CM]. 2001-2025 döneminde kar çizgisi 40 ile 95 m kaydı [ref:sinir_rakim_kar].")
++    assert verify_text(t, EXAMPLE).ok
++
++
++def test_verify_rejects_invented_number():
++    r = verify_text("Kar örtüsü on yılda 7.5 % azalıyor [ref:trend_kar_ortusu_MOD10CM].", EXAMPLE)
++    assert not r.ok and r.unverified_numbers == ["7.5"]
++
++
++def test_verify_rejects_unknown_ref_and_uncited():
++    r = verify_text("Kar azalıyor [ref:yok_boyle]. Değişim -2.1 %.", EXAMPLE)
++    assert r.unknown_refs == ["yok_boyle"] and r.uncited_sentences and not r.ok
++
++
++def test_template_is_always_verified(kb):
++    p = plan_question("Doğu Anadolu'da kar azalıyor mu?", kb, None, ALL_REGIONS)
++    assert verify_text(template_explanation(p, EXAMPLE, kb), EXAMPLE).ok
++
++
++# ------------------------------------------------------------------ uçtan uca
++def run(plan):
++    return EXAMPLE
++
++
++def test_answer_retries_after_hallucination(kb):
++    bad = "Kar on yılda 9.9 % azalıyor [ref:trend_kar_ortusu_MOD10CM]."
++    good = "Kar on yılda -2.1 % azalıyor [ref:trend_kar_ortusu_MOD10CM]."
++    c = FakeClient('{"card_id": "kar_isinma", "yer": "Erzurum"}', bad, good)
++    out = answer("Erzurum'da kar azalıyor mu?", run, kb, c, ALL_REGIONS)
++    assert out["verified"] and out["explainer"] == "llm" and out["attempts"] == 2
++    assert out["evidence"][0]["id"] == "trend_kar_ortusu_MOD10CM"
++
++
++def test_answer_falls_back_to_template(kb):
++    c = FakeClient('{"card_id": "kar_isinma", "yer": "Erzurum"}', "Kar 123 kat azaldı.")
++    out = answer("Erzurum'da kar azalıyor mu?", run, kb, c, ALL_REGIONS)
++    assert out["verified"] and out["explainer"] == "sablon" and out["warnings"]
++
++
++def test_answer_without_llm_and_asks_region(kb):
++    assert answer("Erzurum'da kar azalıyor mu?", run, kb, None, ALL_REGIONS)["explainer"] == "sablon"
++    out = answer("Kar azalıyor mu?", run, kb, None, ALL_REGIONS)
++    assert out["results"] is None and out["message"]
+-- 
+2.43.0
+
