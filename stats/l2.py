@@ -2,6 +2,7 @@
 
     python -m stats.l2 --surum v0.1
     python -m stats.l2 --surum v0.1 --dosyalar sicaklik_2m__MERRA2,yagis__GPM   # yalnız bunlar
+    python -m stats.l2 --surum v0.1 --yalniz-isaretler   # uyarılar, kaynak uyumu, OZET (trend aynı)
 
 Girdi : outputs/trend-dedektifi-turkiye-<surum>/L1_kup/ (ICINDEKILER.csv'deki dosyalar, rakım hariç)
 Çıktı : outputs/trend-dedektifi-turkiye-<surum>/L2_trend/
@@ -32,7 +33,21 @@ MIN_YIL = 12
 L2_DEGISKENLERI = ("sen_egimi", "ga_alt", "ga_ust", "p_mk", "etkin_n", "gereken_yil")
 KAYNAK_UYUMU = {"yagis": ["GPM", "GLDAS", "MERRA2"], "sicaklik_2m": ["MERRA2", "GLDAS"]}
 OZET_COLS = ["dosya", "mevsim", "kara_hucre", "anlamli_artan_yuzde", "anlamli_azalan_yuzde",
-             "medyan_egim", "egim_birimi"]
+             "medyan_egim", "egim_birimi", "trend_uyarisi", "mk_yedek_hucre"]
+
+# Trend güvenilirliği uyarıları (değerler silinmez; yalnız attr ve OZET'e yazılır).
+# Anahtar: (degisken, dosya kodu); değer: [(mevsim ya da None = tüm mevsimler, metin)].
+# Metindeki {kara_hucre}, o mevsimde trendi hesaplanan kara hücresi sayısıyla doldurulur.
+_GLDAS_UYARI = ("GLDAS-2.1 zorlama verisi homojen olmayabilir; trend için MERRA2/GPM tercih edin "
+                "(MERRA2'den %50 hızlı ısınma, yağışta 2,5 kat negatif eğim)")
+_MODIS_LST_UYARI = ("Terra sensör kayması olasılığı doğrulanmadı; gündüz-gece farkını yorumlamadan önce "
+                    "kontrol edin")
+_KIS_SEYREK = "kar/bulut nedeniyle kış serisi seyrek ({kara_hucre} hücre)"
+TREND_UYARILARI = {
+    **{(v, "GLDAS"): [(None, _GLDAS_UYARI)] for v in ("sicaklik_2m", "yagis", "taban_akisi", "yuzey_akisi")},
+    **{(v, "MOD11C3"): [(None, _MODIS_LST_UYARI)] for v in ("yuzey_sicakligi_gunduz", "yuzey_sicakligi_gece")},
+    **{(v, "MOD13C2"): [("kis", _KIS_SEYREK)] for v in ("ndvi", "evi")},
+}
 SERI_TANIMI = {"yillik": "Ocak–Aralık", "kis": "Aralık(Y−1)–Şubat(Y)", "ilkbahar": "Mart–Mayıs",
                "yaz": "Haziran–Ağustos", "sonbahar": "Eylül–Kasım"}
 YONTEM_ATTRS = {
@@ -168,8 +183,51 @@ def yaz_nc(ds: xr.Dataset, path: Path) -> Path:
     return path
 
 
+def _kara_hucre(ds: xr.Dataset, mevsim: str, maske: np.ndarray) -> int:
+    """Mevsimde trendi hesaplanan (p_mk sonlu) kara hücresi sayısı."""
+    return int((maske & np.isfinite(ds["p_mk"].sel(mevsim=mevsim).values)).sum())
+
+
+def trend_uyarisi(degisken: str, urun: str, ds: xr.Dataset, maske: np.ndarray) -> str:
+    """Dosyanın ``trend_uyarisi`` attr metni ("" = uyarı yok).
+
+    Biçim: uyarılar " | " ile ayrılır. Tüm mevsimler için geçerli uyarı düz metin, yalnız bir
+    mevsime ait uyarı "[mevsim] metin" biçimindedir.
+    """
+    parcalar = []
+    for mevsim, metin in TREND_UYARILARI.get((degisken, urun), []):
+        if mevsim is None:
+            parcalar.append(metin)
+        elif mevsim in ds["mevsim"].values:
+            parcalar.append(f"[{mevsim}] " + metin.format(kara_hucre=_kara_hucre(ds, mevsim, maske)))
+    return " | ".join(parcalar)
+
+
+def mevsim_uyarisi(attr: str, mevsim: str) -> str:
+    """``trend_uyarisi`` attr'ından bir mevsime düşen uyarılar (tüm-mevsim uyarıları dahil)."""
+    out = []
+    for u in filter(None, (x.strip() for x in (attr or "").split(" | "))):
+        if u.startswith("["):
+            m, _, metin = u[1:].partition("] ")
+            if m == mevsim:
+                out.append(metin)
+        else:
+            out.append(u)
+    return " | ".join(out)
+
+
+def yedek_sayilari(attr: str) -> dict:
+    """``mk_yedek_hucre`` attr'ı ("yillik: 1; kis: 0; …") → {mevsim: sayı}."""
+    out = {}
+    for parca in filter(None, (x.strip() for x in (attr or "").split(";"))):
+        m, _, n = parca.partition(":")
+        out[m.strip()] = int(n)
+    return out
+
+
 def ozet_satirlari(ds: xr.Dataset, dosya: str, maske: np.ndarray) -> list[dict]:
-    """OZET.csv satırları: kara hücre sayısı, anlamlı artan/azalan yüzdesi, medyan eğim."""
+    """OZET.csv satırları: kara hücre, anlamlı artan/azalan yüzdesi, medyan eğim, uyarı, MK yedeği."""
+    yedek = yedek_sayilari(ds.attrs.get("mk_yedek_hucre", ""))
     rows = []
     for m in ds["mevsim"].values:
         s = ds.sel(mevsim=m)
@@ -182,6 +240,8 @@ def ozet_satirlari(ds: xr.Dataset, dosya: str, maske: np.ndarray) -> list[dict]:
             "anlamli_azalan_yuzde": round(100 * float(((anl == 1) & (egim < 0)).sum()) / n, 1) if n else "",
             "medyan_egim": round(float(np.nanmedian(egim[hesap])), 4) if n else "",
             "egim_birimi": ds["sen_egimi"].attrs.get("units", ""),
+            "trend_uyarisi": mevsim_uyarisi(ds.attrs.get("trend_uyarisi", ""), str(m)),
+            "mk_yedek_hucre": yedek.get(str(m), ""),
         })
     return rows
 
@@ -219,19 +279,28 @@ def kaynak_uyumu(dalar: dict[str, xr.DataArray], degisken: str, maske: np.ndarra
     egim = np.stack([sonuclar[u]["sen_egimi"].values for u in dalar])
     m = (anl >= 0).sum(axis=0)
     k = np.maximum(((anl == 1) & (egim > 0)).sum(axis=0), ((anl == 1) & (egim < 0)).sum(axis=0))
+    # İşaret uyumu: anlamlılığa bakmadan aynı işaretli en büyük grup / m
+    gecerli = anl >= 0
+    ayni = np.maximum((gecerli & (egim > 0)).sum(axis=0), (gecerli & (egim < 0)).sum(axis=0))
     disarida = ~np.broadcast_to(maske, m.shape)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        isaret = np.where(disarida | (m == 0), np.nan, ayni / np.maximum(m, 1)).astype("float32")
     m = np.where(disarida, -1, m).astype("int16")
     k = np.where(disarida, -1, k).astype("int16")
     ref = next(iter(sonuclar.values()))
-    ds = xr.Dataset({"k": (("mevsim", "lat", "lon"), k), "m": (("mevsim", "lat", "lon"), m)},
+    ds = xr.Dataset({"k": (("mevsim", "lat", "lon"), k), "m": (("mevsim", "lat", "lon"), m),
+                     "isaret_uyumu": (("mevsim", "lat", "lon"), isaret)},
                     coords={"mevsim": ref["mevsim"], "lat": ref["lat"], "lon": ref["lon"]})
     ds["k"].attrs["long_name"] = "anlamlı ve aynı yönde trend veren en büyük ürün grubu"
     ds["m"].attrs["long_name"] = "trendi hesaplanabilen ürün sayısı"
+    ds["isaret_uyumu"].attrs.update(units="1", long_name=(
+        "anlamlılığa bakmadan aynı işaretli en büyük ürün grubu / m; maske dışı ya da m = 0 ise NaN"))
     ilk = next(iter(dalar.values())).attrs
     ds.attrs = {
         "katman": "L2", "degisken": degisken, "urunler": ", ".join(dalar),
         "ortak_donem": f"{bas:%Y-%m} … {son:%Y-%m}", "alfa_fdr": alfa,
-        "tanim": "k/m: m ürünün k tanesi aynı yönde anlamlı trend veriyor; maske dışı −1",
+        "tanim": ("k/m: m ürünün k tanesi aynı yönde anlamlı trend veriyor; maske dışı −1. "
+                  "isaret_uyumu: anlamlılığa bakmadan aynı işaretli en büyük grup / m"),
         "urun_surumu": ilk.get("urun_surumu", ""), "veri_seti_doi": ilk.get("veri_seti_doi", ""),
         "lisans": ilk.get("lisans", ""), "olusturma_tarihi": date.today().isoformat(),
         "kaynak_doi": "; ".join(f"{u}: {da.attrs.get('doi', '')}" for u, da in dalar.items()),
@@ -267,11 +336,29 @@ def uret(surum: str = SURUM, kok: Path | None = None, dosyalar: list[str] | None
         if maske is None:
             maske = kara_maskesi(da)
         res = l2_dosya(da, degisken, maske, alfa=alfa, min_yil=min_yil)
+        _uyari_ekle(res, degisken, urun, maske)
         yaz_nc(res, out_dir / f"{stem}__trend.nc")
         ozet += ozet_satirlari(res, r["dosya"], maske)
         hazir[(degisken, urun)] = res
         dalar_hepsi[(degisken, urun)] = da
         print(f"  {stem}__trend.nc  ({time.time() - t1:.0f} sn)")
+    _kaynak_ve_ozet(out_dir, hazir, dalar_hepsi, maske, ozet, alfa, min_yil)
+    print(f"L2 tamam: {len(tablo)} dosya, {time.time() - t0:.0f} sn → {out_dir}")
+    return out_dir
+
+
+def _uyari_ekle(res: xr.Dataset, degisken: str, urun: str, maske: np.ndarray) -> None:
+    """``trend_uyarisi`` attr'ını ekler ya da (uyarı yoksa) kaldırır (yerinde)."""
+    metin = trend_uyarisi(degisken, urun, res, maske)
+    if metin:
+        res.attrs["trend_uyarisi"] = metin
+    else:
+        res.attrs.pop("trend_uyarisi", None)
+
+
+def _kaynak_ve_ozet(out_dir: Path, hazir: dict, dalar_hepsi: dict, maske: np.ndarray, ozet: list,
+                    alfa: float, min_yil: int) -> None:
+    """Kaynak uyumu dosyalarını ve OZET.csv'yi yazar."""
     for degisken, urunler in KAYNAK_UYUMU.items():
         dalar = {u: dalar_hepsi[(degisken, u)] for u in urunler if (degisken, u) in dalar_hepsi}
         if len(dalar) < 2:
@@ -285,7 +372,40 @@ def uret(surum: str = SURUM, kok: Path | None = None, dosyalar: list[str] | None
         wr = csv.DictWriter(f, fieldnames=OZET_COLS)
         wr.writeheader()
         wr.writerows(ozet)
-    print(f"L2 tamam: {len(tablo)} dosya, {time.time() - t0:.0f} sn → {out_dir}")
+
+
+def isaretle(surum: str = SURUM, kok: Path | None = None, alfa: float = ALFA_FDR,
+             min_yil: int = MIN_YIL) -> Path:
+    """Var olan L2 dosyalarına güvenilirlik işaretlerini ekler; trend değerlerine dokunmaz.
+
+    Trend dosyalarında yalnız ``trend_uyarisi`` attr'ı güncellenir. Kaynak uyumu (L1'den, ortak
+    dönemde) ve OZET.csv yeniden yazılır. Sonuç, tam ``uret`` çalıştırmasıyla aynıdır.
+    """
+    paket = paket_koku(surum, kok)
+    out_dir = paket / "L2_trend"
+    ozet, hazir, dalar_hepsi, maske = [], {}, {}, None
+    for _, r in icindekiler(paket).iterrows():
+        stem = r["dosya"][:-3]
+        degisken, urun = stem.split("__")
+        yol = out_dir / f"{stem}__trend.nc"
+        if not yol.exists():
+            continue
+        with xr.open_dataset(yol) as ds:
+            res = ds.load()
+        if maske is None:
+            maske = kara_maskesi(res)
+        _uyari_ekle(res, degisken, urun, maske)
+        yaz_nc(res, yol)
+        ozet += ozet_satirlari(res, r["dosya"], maske)
+        hazir[(degisken, urun)] = res
+        if urun in KAYNAK_UYUMU.get(degisken, []):
+            with xr.open_dataset(paket / "L1_kup" / r["dosya"]) as l1:
+                l1 = l1.load()
+            da = l1[degisken]
+            da.attrs = {**l1.attrs, **da.attrs, "kaynak_dosya": r["dosya"]}
+            dalar_hepsi[(degisken, urun)] = da
+        print(f"  işaretlendi: {yol.name}" + ("  [uyarı var]" if "trend_uyarisi" in res.attrs else ""))
+    _kaynak_ve_ozet(out_dir, hazir, dalar_hepsi, maske, ozet, alfa, min_yil)
     return out_dir
 
 
@@ -295,7 +415,12 @@ def main(argv=None):
     ap.add_argument("--kok", default=None, help="outputs kök klasörü (varsayılan: repo/outputs)")
     ap.add_argument("--dosyalar", default=None, help="virgülle: sicaklik_2m__MERRA2,yagis__GPM")
     ap.add_argument("--min-yil", type=int, default=MIN_YIL)
+    ap.add_argument("--yalniz-isaretler", action="store_true",
+                    help="trendleri yeniden hesaplamadan uyarıları, kaynak uyumunu ve OZET'i güncelle")
     a = ap.parse_args(argv)
+    if a.yalniz_isaretler:
+        isaretle(a.surum, Path(a.kok) if a.kok else None, min_yil=a.min_yil)
+        return
     uret(a.surum, Path(a.kok) if a.kok else None,
          a.dosyalar.split(",") if a.dosyalar else None, min_yil=a.min_yil)
 

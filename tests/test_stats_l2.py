@@ -138,3 +138,56 @@ def test_l1_oku(tmp_path):
     assert da.attrs["kaynak_dosya"] == "yagis__GPM.nc" and da.dims == ("time", "lat", "lon")
     with pytest.raises(FileNotFoundError):
         l1_oku("yagis", "YOK", kok=kok)
+
+
+def test_isaret_uyumu_ve_uyarilar(tmp_path):
+    out = l2.uret("v0.1", kok=_paket(tmp_path))
+    with xr.open_dataset(out / "yagis__kaynak_uyumu.nc") as ku:
+        iu, k, m = ku["isaret_uyumu"].values, ku["k"].values, ku["m"].values
+        assert ku["isaret_uyumu"].dtype == np.float32 and tuple(ku["isaret_uyumu"].dims) == ("mevsim", "lat", "lon")
+        ok = m > 0
+        assert np.nanmin(iu) >= 1 / 3 - 1e-6 and np.nanmax(iu) <= 1
+        assert (iu[ok] >= k[ok] / m[ok] - 1e-6).all()          # anlamlılık şartı yok → k/m'den küçük olamaz
+    with xr.open_dataset(out / "yagis__GLDAS__trend.nc") as ds:
+        assert "GLDAS-2.1" in ds.attrs["trend_uyarisi"]
+    with xr.open_dataset(out / "yagis__GPM__trend.nc") as ds:
+        assert "trend_uyarisi" not in ds.attrs
+    oz = pd.read_csv(out / "OZET.csv", encoding="utf-8-sig", keep_default_na=False)
+    gldas = oz[oz["dosya"] == "yagis__GLDAS.nc"]
+    assert gldas["trend_uyarisi"].str.contains("GLDAS-2.1").all()
+    assert (oz[oz["dosya"] == "yagis__GPM.nc"]["trend_uyarisi"] == "").all()
+    assert pd.to_numeric(oz["mk_yedek_hucre"]).ge(0).all()
+
+
+def test_isaretle_trendi_degistirmez(tmp_path):
+    kok = _paket(tmp_path)
+    out = l2.uret("v0.1", kok=kok)
+    with xr.open_dataset(out / "yagis__GLDAS__trend.nc") as ds:
+        once = ds.load()
+    bos = once.copy()
+    bos.attrs.pop("trend_uyarisi")
+    l2.yaz_nc(bos, out / "yagis__GLDAS__trend.nc")
+    oz_once = pd.read_csv(out / "OZET.csv", encoding="utf-8-sig")
+    (out / "OZET.csv").unlink()
+    (out / "yagis__kaynak_uyumu.nc").unlink()
+    l2.isaretle("v0.1", kok=kok)
+    with xr.open_dataset(out / "yagis__GLDAS__trend.nc") as ds:
+        assert ds.attrs["trend_uyarisi"] == once.attrs["trend_uyarisi"]
+        for v in l2.L2_DEGISKENLERI + ("p_fdr", "anlamli"):
+            np.testing.assert_array_equal(ds[v].values, once[v].values)
+    pd.testing.assert_frame_equal(pd.read_csv(out / "OZET.csv", encoding="utf-8-sig"), oz_once)
+    assert (out / "yagis__kaynak_uyumu.nc").exists()
+
+
+def test_mevsimlik_uyari():
+    p = np.full((5, 2, 3), 0.5, dtype="float32")
+    p[1, 0, :] = np.nan                                           # kış: 3 hücre hesaplanamadı
+    ds = xr.Dataset({"p_mk": (("mevsim", "lat", "lon"), p)}, coords={"mevsim": list(MEVSIMLER)})
+    metin = l2.trend_uyarisi("ndvi", "MOD13C2", ds, np.ones((2, 3), bool))
+    assert metin == "[kis] kar/bulut nedeniyle kış serisi seyrek (3 hücre)"
+    assert l2.mevsim_uyarisi(metin, "kis") == "kar/bulut nedeniyle kış serisi seyrek (3 hücre)"
+    assert l2.mevsim_uyarisi(metin, "yaz") == ""
+    assert l2.trend_uyarisi("ndvi", "SENTETIK", ds, np.ones((2, 3), bool)) == ""
+    hepsi = l2.trend_uyarisi("yuzey_sicakligi_gece", "MOD11C3", ds, np.ones((2, 3), bool))
+    assert "Terra" in hepsi and l2.mevsim_uyarisi(hepsi, "yaz") == hepsi
+    assert l2.yedek_sayilari("yillik: 1; kis: 0") == {"yillik": 1, "kis": 0}
