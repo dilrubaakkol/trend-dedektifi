@@ -1,0 +1,36 @@
+# Türkiye'nin 7 coğrafi bölgesi: il → bölge eşlemesi (1941 Birinci Coğrafya Kongresi bölümlemesi,
+# il bazında yaygın kullanılan atama). Bazı illerin toprakları iki bölgeye taşar; burada her il
+# tek bir bölgeye atanır. Bölge sınırı = o bölgedeki illerin birleşimi.
+# İl adları data/boundaries/iller.geojson içindeki "ad" alanıyla eşleşir (Türkçe yazım).
+
+marmara:
+  ad: Marmara Bölgesi
+  iller: [Edirne, Kırklareli, Tekirdağ, İstanbul, Kocaeli, Yalova, Sakarya, Bilecik, Bursa,
+          Balıkesir, Çanakkale]
+
+ege:
+  ad: Ege Bölgesi
+  iller: [İzmir, Manisa, Aydın, Denizli, Muğla, Afyonkarahisar, Kütahya, Uşak]
+
+akdeniz:
+  ad: Akdeniz Bölgesi
+  iller: [Antalya, Isparta, Burdur, Mersin, Adana, Hatay, Osmaniye, Kahramanmaraş]
+
+ic_anadolu:
+  ad: İç Anadolu Bölgesi
+  iller: [Ankara, Konya, Kayseri, Eskişehir, Sivas, Kırıkkale, Aksaray, Karaman, Kırşehir,
+          Niğde, Nevşehir, Yozgat, Çankırı]
+
+karadeniz:
+  ad: Karadeniz Bölgesi
+  iller: [Bolu, Düzce, Zonguldak, Karabük, Bartın, Kastamonu, Çorum, Sinop, Samsun, Amasya,
+          Tokat, Ordu, Giresun, Gümüşhane, Trabzon, Bayburt, Rize, Artvin]
+
+dogu_anadolu:
+  ad: Doğu Anadolu Bölgesi
+  iller: [Erzurum, Erzincan, Kars, Ağrı, Iğdır, Ardahan, Malatya, Elazığ, Tunceli, Bingöl, Muş,
+          Bitlis, Van, Hakkâri]
+
+guneydogu_anadolu:
+  ad: Güneydoğu Anadolu Bölgesi
+  iller: [Gaziantep, Kilis, Adıyaman, Şanlıurfa, Diyarbakır, Mardin, Batman, Siirt, Şırnak]
