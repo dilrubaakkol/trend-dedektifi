@@ -191,3 +191,38 @@ def test_mevsimlik_uyari():
     hepsi = l2.trend_uyarisi("yuzey_sicakligi_gece", "MOD11C3", ds, np.ones((2, 3), bool))
     assert "Terra" in hepsi and l2.mevsim_uyarisi(hepsi, "yaz") == hepsi
     assert l2.yedek_sayilari("yillik: 1; kis: 0") == {"yillik": 1, "kis": 0}
+
+
+def test_anlamli_kurali_l2_ve_yeniden_turetme():
+    from stats.trend_tests import anlamli_kural
+    da = _kup(egim_10yil=0.15, nlat=10, nlon=10, sigma=0.6, seed=5)    # zayıf trend: kural fark yaratsın
+    ds = l2.l2_dosya(da, "sicaklik_2m", maske=np.ones((10, 10), bool))
+    a, q, alt, ust = (ds[v].values for v in ("anlamli", "p_fdr", "ga_alt", "ga_ust"))
+    np.testing.assert_array_equal(a, anlamli_kural(q, alt, ust))
+    assert not ((a == 1) & (alt <= 0) & (ust >= 0)).any()               # anlamlı ise GA 0'ı dışlar
+    assert "GA sıfırı dışlıyor" in ds.attrs["anlamlilik_kurali"]
+    eski = ds.copy(deep=True)
+    eski["anlamli"] = (eski["anlamli"].dims, np.where(np.isfinite(q), (q <= 0.10).astype("int8"), -1).astype("int8"))
+    yeni = l2.anlamli_yeniden(eski)
+    np.testing.assert_array_equal(yeni["anlamli"].values, a)
+    np.testing.assert_array_equal(yeni["sen_egimi"].values, ds["sen_egimi"].values)
+
+
+def test_grace_eksik_esigi():
+    from stats.preprocessing import eksik_esigi
+    assert eksik_esigi("GRACE", "yillik") == 0.5 and eksik_esigi("GRACE", "kis") == pytest.approx(1 / 3)
+    assert eksik_esigi("GPM", "yillik") == 0.20 and eksik_esigi(None, "yaz") == 0.20
+    da = _kup(nlat=1, nlon=1)
+    da[12:12 + 6] = np.nan                                     # 2002: 6 ay eksik (6 geçerli)
+    da[24:24 + 7] = np.nan                                     # 2003: 7 ay eksik (5 geçerli)
+    da[36 + 6] = np.nan                                        # 2004 yazında 1 ay eksik
+    g = donem_serisi(da, MEVSIMLER["yillik"], eksik_esik=eksik_esigi("GRACE", "yillik"))
+    v = donem_serisi(da, MEVSIMLER["yillik"])
+    assert np.isfinite(g.sel(yil=2002)).all() and np.isnan(g.sel(yil=2003)).all()
+    assert np.isnan(v.sel(yil=2002)).all()
+    yaz_g = donem_serisi(da, MEVSIMLER["yaz"], eksik_esik=eksik_esigi("GRACE", "yaz"))
+    assert np.isfinite(yaz_g.sel(yil=2004)).all() and np.isnan(donem_serisi(da, MEVSIMLER["yaz"]).sel(yil=2004)).all()
+    # l2_dosya ürünü kaynak_dosya attr'ından okur
+    da.attrs["kaynak_dosya"] = "toplam_su_depolama__GRACE.nc"
+    ds = l2.l2_dosya(da, "toplam_su_depolama", maske=np.ones((1, 1), bool), mevsimler={"yillik": MEVSIMLER["yillik"]})
+    assert "0.50" in ds.attrs["eksik_veri_kurali"] and "2001–2025" in ds.attrs["donem"]

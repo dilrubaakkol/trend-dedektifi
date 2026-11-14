@@ -83,7 +83,10 @@ kısmı). Diğer Kademe 1 dosyaları (`sicaklik_2m__GLDAS`, `yagis__MERRA2`, `to
 `kar_ortusu__MOD10CM`, `kar_su_esdegeri__GLDAS`, `ndvi__MOD13C2`, `toplam_su_depolama__GRACE`) için
 Giovanni karşılaştırması henüz yapılmadı.
 
-## L2 akıl kontrolü (2026-11-14)
+## L2 akıl kontrolü (2026-11-14, ilk sürüm)
+
+> Bu bölümdeki anlamlılık sayıları **eski kurala** (yalnız `p_fdr ≤ 0,10`) ve GRACE için eski eksik veri
+> eşiğine göredir. Güncel sayılar: aşağıdaki "Anlamlılık kuralı ve GRACE eşiği" bölümü.
 
 `python -m stats.l2 --surum v0.1` çıktısı (`outputs/trend-dedektifi-turkiye-v0.1/L2_trend/`), Türkiye
 kara hücreleri (1287–1303 hücre), 2001–2025. Eğimler Sen eğimi, anlamlılık BH-FDR α = 0,10.
@@ -153,3 +156,79 @@ Değerler silinmedi. Uyarılar trend dosyalarının attrs'ında ve `OZET.csv` i�
 - **Makul görünenler:** NDVI %83 hücrede artış. Su buharı ve özgül nem hemen her hücrede artış. Ozon,
   bulut ve deniz seviyesi basıncında anlamlı hücre yok.
 - **Tamamen NaN dosya ya da mevsim yok.** Birim sorunu görülmedi.
+
+## Anlamlılık kuralı ve GRACE eşiği (2026-11-14, güncelleme)
+
+Kişi 2 ile alınan karar üç değişiklik getirdi:
+- **(a) Anlamlılık:** `anlamli = 1` için artık `p_fdr ≤ 0,10` **ve** %95 genişletilmiş GA'nın sıfırı
+  dışlaması gerekiyor. Kural tek yerde: `stats/trend_tests.anlamli_kural`.
+- **(c) GRACE eksik veri eşiği:** Yıllıkta en az 6, mevsimde en az 2 geçerli ay.
+- **Türkiye satırı:** L3 bölge CSV'lerine eklendi (`duzey = "ulke"`).
+
+L2'de yalnız GRACE yeniden hesaplandı. Diğer dosyalarda `anlamli`, kayıtlı `p_fdr` ve GA'dan yeniden
+türetildi. L3 baştan üretildi.
+
+### Önce / sonra: anlamlı sayıları
+
+- Hücre = Türkiye kara hücreleri (L2). İl = 81 il (L3).
+- "5 mevsim" sütunları, her mevsimdeki anlamlı sayılarının toplamıdır.
+- GRACE'te "sonra" değerine eksik veri eşiği değişikliği de dahil.
+
+| Dosya | Hücre, yıllık | Hücre, 5 mevsim | İl, yıllık | İl, 5 mevsim |
+| --- | --- | --- | --- | --- |
+| `sicaklik_2m__MERRA2` | 1303 → 1303 | 4795 → 4259 | 81 → 81 | 308 → 271 |
+| `toplam_su_depolama__GRACE` | 1172 → 542 | 5939 → 3333 | 75 → 38 | 377 → 225 |
+| `yagis__GPM` | 1 → 1 | 413 → 219 | 0 → 0 | 14 → 7 |
+| `yagis__GLDAS` | 144 → 135 | 785 → 456 | 10 → 7 | 38 → 22 |
+| `yagis__MERRA2` | 196 → 155 | 707 → 512 | 14 → 11 | 46 → 34 |
+| `ruzgar_hizi__GLDAS` | 1012 → 427 | 4843 → 2785 | 66 → 25 | 311 → 173 |
+| `no2__OMI` | 813 → 322 | 2254 → 1353 | 66 → 14 | 210 → 118 |
+
+- **Sıcaklık:** Yıllık sonuç değişmedi; düşüş mevsimlik serilerde. İlkbaharda GA sıfırı kapsıyor.
+- **En çok düşenler:** GRACE, `ruzgar_hizi` ve NO2. Bunlarda MK p küçüktü, ama otokorelasyon yüzünden
+  GA geniş.
+
+### GRACE
+
+- **Seri:** Yıllık seride artık **22 yıl** var (2002–2025). Yalnız GRACE → GRACE-FO boşluğu olan 2017 ve
+  2018 eksik; önce 16 yıldı.
+- **GA genişliği:**
+  - Hücre medyanı 16,2 cm/10 yıl.
+  - n_etkin = 3'te takılan hücre oranı %9; önceki hesapta %21'di.
+  - İl medyanı 13,9 cm/10 yıl. Önce Osmaniye'de GA 150 cm/10 yıl genişliğindeydi.
+- **Anlamlı azalma:** Hücrelerin %41,3'ünde (önce %89,1), 38 ilde (önce 75).
+- **Türkiye geneli:** −7,5 cm/10 yıl, GA [−12,3, −2,7], anlamlı.
+
+En çok su kaybeden 5 il (yıllık, cm/10 yıl):
+
+| İl | Eğim | GA | n_etkin | Anlamlı | Not |
+| --- | --- | --- | --- | --- | --- |
+| Karaman | −17,6 | −115,4 … 79,2 | 3,0 | 0 | GA hâlâ çok geniş |
+| Osmaniye | −16,7 | −28,2 … −3,1 | 5,4 | 1 | |
+| Hatay | −16,5 | −34,2 … 3,1 | 4,3 | 0 | GA sıfırı az farkla kapsıyor |
+| Mersin | −16,4 | −48,8 … 14,3 | 3,6 | 0 | |
+| Kilis | −15,6 | −28,4 … −2,1 | 5,2 | 1 | az hücre |
+
+GRACE düşüşü doğrusal değil, hızlanıyor. Bu yüzden artık otokorelasyonu yüksek ve bazı illerde GA hâlâ
+geniş. Bu bir hata değil: doğrusal trend tanımının sınırını gösteriyor.
+
+### Türkiye geneli (L3 bölge CSV'si, `duzey = "ulke"`, yıllık)
+
+| Değişken | Eğim | %95 GA | Anlamlı | Anlamlı hücre oranı |
+| --- | --- | --- | --- | --- |
+| Sıcaklık MERRA2 | +0,70 °C/10 yıl | 0,47 … 0,99 | 1 | 1,00 |
+| Sıcaklık GLDAS (uyarılı) | +0,98 °C/10 yıl | 0,69 … 1,29 | 1 | 0,82 |
+| GRACE | −7,5 cm/10 yıl | −12,3 … −2,7 | 1 | 0,42 |
+| Yağış GPM (2001–2024) | −15,1 mm/yıl/10 yıl | −63,9 … 31,1 | 0 | 0,00 |
+| Yağış GLDAS (uyarılı) | −42,7 mm/yıl/10 yıl | −88,1 … 4,5 | 0 | 0,10 |
+| Yağış MERRA2 | −16,8 mm/yıl/10 yıl | −54,5 … 28,2 | 0 | 0,12 |
+| NDVI | +0,018 /10 yıl | 0,009 … 0,027 | 1 | 0,68 |
+
+- **Sıcaklık, mevsimler** (MERRA2, °C/10 yıl): kış 1,16, sonbahar 0,79, yaz 0,59 (anlamlı); ilkbahar
+  0,58 (anlamlı değil).
+- **Yağış:** Türkiye ortalamasında üç ürünün de yıllık eğimi negatif, ama hiçbiri anlamlı değil.
+  - Kaynak uyumu: k/m = 0/3, işaret uyumu 1,0.
+  - Mevsimlerde işaret uyumu kış, yaz ve sonbaharda 1,0, ilkbaharda 0,67.
+  - Kış ve sonbaharda üç ürün de azalma, yazda artma gösteriyor; hiçbiri anlamlı değil.
+- **Yağış, il düzeyi (yıllık):** 0/3 73 il, 1/3 8 il. Üç ürünün aynı işarette olduğu il sayısı 29.
+- **NDVI:** Türkiye genelinde anlamlı yeşillenme. Kışta anlamlı değil.

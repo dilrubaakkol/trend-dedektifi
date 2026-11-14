@@ -173,6 +173,25 @@ def weatherhead_gereken_yil(seri, ornek_per_yil: int = 1) -> float:
                         ornek_per_yil)
 
 
+def anlamli_kural(p_fdr, ga_alt, ga_ust, alfa: float = 0.10):
+    """Projenin tek anlamlılık kuralı (L2 hücreleri, L3 il/bölge ve kaynak uyumu ``k`` bunu kullanır).
+
+    anlamli = 1  ⇔  p_fdr ≤ alfa  VE  %95 genişletilmiş GA sıfırı dışlıyor (ga_alt > 0 ya da ga_ust < 0)
+    anlamli = 0  ⇔  p_fdr hesaplanmış ama koşullardan biri sağlanmıyor
+    anlamli = −1 ⇔  p_fdr NaN (maske dışı ya da trend hesaplanamadı)
+
+    Gerekçe: MK testi ile genişletilmiş Sen GA'sı farklı yöntemlerdir. Yalnız p_fdr'ye bakmak, GA'sı
+    sıfırı kapsayan trendleri "anlamlı" gösteriyordu. İkisinin birlikte sağlanması temkinli taraftır.
+    Girdi diziler (aynı şekil) ya da sayılar; çıktı int8 dizi.
+    """
+    q = np.asarray(p_fdr, dtype=float)
+    alt = np.asarray(ga_alt, dtype=float)
+    ust = np.asarray(ga_ust, dtype=float)
+    with np.errstate(invalid="ignore"):
+        evet = (q <= alfa) & ((alt > 0) | (ust < 0))
+    return np.where(np.isfinite(q), evet.astype("int8"), np.int8(-1)).astype("int8")
+
+
 def bh_fdr(p, alfa: float = 0.10):
     """Benjamini-Hochberg FDR (vektörel; NaN'lar atlanır ve NaN kalır).
 

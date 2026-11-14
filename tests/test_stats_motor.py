@@ -94,3 +94,13 @@ def test_bh_fdr_statsmodels_ile_ayni():
     np.testing.assert_allclose(q[ok], q_ref)
     assert (anl[ok] == rej).all() and np.isnan(q[~ok]).all() and not anl[~ok].any()
     assert q.shape == p.shape
+
+
+def test_anlamli_kural():
+    from stats.trend_tests import anlamli_kural
+    q = np.array([0.01, 0.01, 0.01, 0.20, np.nan])
+    alt = np.array([0.1, -0.1, -0.5, 0.1, 0.1])
+    ust = np.array([0.5, 0.3, -0.1, 0.5, 0.5])
+    np.testing.assert_array_equal(anlamli_kural(q, alt, ust), [1, 0, 1, 0, -1])   # GA 0'ı kapsarsa 0
+    assert anlamli_kural(q, alt, ust).dtype == np.int8
+    assert anlamli_kural(0.10, 0.2, 0.4) == 1 and anlamli_kural(0.1000001, 0.2, 0.4) == 0
