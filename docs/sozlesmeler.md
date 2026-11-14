@@ -64,11 +64,11 @@ Domain: `land` = Türkiye kara maskeli, `ocean` = deniz maskeli, `all` = kutunun
 | `sicaklik_2m` | °C | all (MERRA2), land (GLDAS) | M2TMNXSLV 5.12.4 (MERRA2) | GLDAS_NOAH025_M 2.1 (GLDAS) |
 | `ozgul_nem_2m` | kg/kg | all | M2TMNXSLV (MERRA2) | — |
 | `ruzgar_u_10m`, `ruzgar_v_10m` | m/s | all | M2TMNXSLV (MERRA2) | — |
-| `ruzgar_hizi` | m/s | land | GLDAS_NOAH025_M (GLDAS) | — |
+| `ruzgar_hizi` | m/s | land | GLDAS_NOAH025_M (GLDAS) — yakın yüzey hızı, aylık ortalama; U/V bileşenlerinden hız hesaplamayın | — |
 | `deniz_seviyesi_basinci` | hPa | all | M2TMNXSLV (MERRA2) | — |
 | `su_buhari_kolon` | kg/m² | all | M2TMNXSLV `TQV` (MERRA2) | AIRS3STM 7.0 (AIRS) ⏸ |
 | `bulut_orani` | % | all | M2TMNXRAD (MERRA2) | MOD08_M3 ⏸ |
-| `yagis` | mm/ay | land | GPM_3IMERGM V07 (GPM) | GLDAS_NOAH025_M (GLDAS), M2TMNXFLX (MERRA2) |
+| `yagis` | mm/ay | land | GPM_3IMERGM V07 (GPM) — Final ürün ~3 ay gecikmeli; son aylar NaN (şu an 2025-09'a kadar) | GLDAS_NOAH025_M (GLDAS), M2TMNXFLX (MERRA2) |
 | `buharlasma` | mm/ay | land | GLDAS_NOAH025_M (GLDAS) | — |
 | `yuzey_akisi` | mm/ay | land | GLDAS_NOAH025_M (GLDAS) | — |
 | `taban_akisi` | mm/ay | land | GLDAS_NOAH025_M (GLDAS) | — |
