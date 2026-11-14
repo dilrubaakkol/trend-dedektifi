@@ -14,7 +14,7 @@ aşağıdaki katalogdan BİR süreç kartına ya da (uygun kart yoksa) BİR değ
 yer adını aynen çıkar. Katalogda olmayan kimlik UYDURMA. Yalnızca şu JSON'u döndür:
 {"card_id": "<katalogdaki kart kimliği ya da null>",
  "degisken": "<kart null ise katalogdaki değişken kimliği ya da null>",
- "yer": "<soruda geçen il/bölge adı ya da null>",
+ "yer": "<soruda geçen il ya da coğrafi bölge adı; ilçe/kasaba/havza geçiyorsa bağlı olduğu İL adı; yoksa null>",
  "gerekce": "<neden bu kartı/değişkeni seçtiğini lise öğrencisine anlatan tek cümle>"}
 """
 
@@ -45,7 +45,8 @@ def plan_question(question: str, kb: KnowledgeBase, client=None,
     Dönen plan (arayüz ve analiz modülleri bunu kullanır):
       ok, kind ("surec" | "degisken"), card_id, card_title, sade_tanim,
       belirti, supheliler, fiziksel_test, alternatifler,
-      region, region_name, place_matched, needs_region, region_missing,
+      region (data/regions anahtarı), region_level ("il"|"bolge"|"turkiye"), region_bolge (ilin bölgesi),
+      region_name, place_matched, needs_region, region_missing,
       method ("llm" | "anahtar_kelime"), gerekce, warnings, message
     """
     warnings: list[str] = []
@@ -88,7 +89,8 @@ def plan_question(question: str, kb: KnowledgeBase, client=None,
     place = kb.resolve_place(choice["yer"], available_regions) if choice["yer"] else None
     if not place or place["region"] is None:
         place = kb.resolve_place(question, available_regions)
-    plan.update(region=place["region"], place_matched=place["matched"],
+    plan.update(region=place["region"], region_level=place["level"], region_bolge=place["bolge"],
+                place_matched=place["matched"],
                 region_name=kb.region_name(place["region"]) if place["region"] else None,
                 needs_region=place["region"] is None, region_missing=place["missing"])
     if plan["needs_region"]:
