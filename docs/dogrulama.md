@@ -258,3 +258,54 @@ geniş. Bu bir hata değil: doğrusal trend tanımının sınırını gösteriyo
   - Kış ve sonbaharda üç ürün de azalma, yazda artma gösteriyor; hiçbiri anlamlı değil.
 - **Yağış, il düzeyi (yıllık):** 0/3 73 il, 1/3 8 il. Üç ürünün aynı işarette olduğu il sayısı 29.
 - **NDVI:** Türkiye genelinde anlamlı yeşillenme. Kışta anlamlı değil.
+
+## Bulgu karnesi (2026-11-15)
+
+`python -m stats.karne --surum v0.1` → `karne/` (kural: `docs/sozlesmeler.md` 2.4, `karne-v1`; sonuçlar görülmeden
+sabitlendi, sonradan ayarlanmadı). Süre: trend 2,7 dk (12 015 satır), ilişki 1,1 dk (542 satır), toplam 3,8 dk.
+L2/L3/L4'ün 96 dosyası karne üretiminden önce ve sonra bayt bayt aynı. Yeniden kurulan serilerin Sen eğimi L3
+dosyalarıyla en çok 4,9·10⁻⁶ (göreli; CSV yuvarlaması) farklı.
+
+**Türkiye × yıllık** (✓ geçti · ✗ kaldı · – uygulanamaz):
+
+| Değişken | Ürün | Sen eğimi / 10 yıl | a kaynak | b karıştırma (p_perm) | c dönem | d α=0,05 | e veri | Uyarı | Güven |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| sicaklik_2m | MERRA2 | +0,70 °C | ✓ 2/2 | ✓ 0,002 | ✓ | ✓ | ✓ (16 ≤ 25) | — | **YÜKSEK** |
+| sicaklik_2m | GLDAS | +0,98 °C | ✓ 2/2 | ✓ 0,002 | ✓ | ✓ | ✓ | trend uyarısı | ORTA |
+| toplam_su_depolama | GRACE | −7,55 cm | – tek kaynak | ✓ 0,008 | ✗ | ✓ | ✓ (18 ≤ 22) | — | **DÜŞÜK** |
+| yagis | GPM | −15,1 mm | – | ✗ 0,47 | ✗ | ✗ | ✗ (59 > 24) | — | YOK (veri henüz yetmiyor) |
+| yagis | GLDAS | −42,7 mm | – | ✓ 0,05 | ✗ | ✗ | ✗ (31 > 25) | trend uyarısı, bilinen sorun | YOK (veri henüz yetmiyor) |
+| yagis | MERRA2 | −16,8 mm | – | ✗ 0,43 | ✗ | ✗ | ✗ (54 > 25) | — | YOK (veri henüz yetmiyor) |
+| ndvi | MOD13C2 | +0,018 | – tek kaynak | ✓ 0,006 | ✓ | ✓ | ✓ | — | ORTA |
+
+- **GRACE neden DÜŞÜK (kural değişmeden):** son 3 yıl çıkarılınca eğim −6,1 cm/10 yıl, anlamsız (ilk 3 yıl
+  çıkarılınca −8,3, anlamlı). Seri 22 geçerli yıl; azalış son yıllarda hızlanmış ve kısaltılmış seride
+  genişletilmiş güven aralığı sıfırı içeriyor. Yön sağlam, büyüklük ve anlamlılık son yıllara duyarlı.
+- **Yağış:** üç üründe de işaret uyumu 1,00 (hepsi negatif) ama hiçbiri anlamlı değil; Weatherhead'e göre
+  31–59 yıl veri gerekiyor.
+
+**İller, MERRA2 sıcaklık yıllık:** 68 YÜKSEK · 5 ORTA (kaynak uyumu kaldı: GLDAS bu illerde anlamlı değil) ·
+8 DÜŞÜK · 0 YOK. DÜŞÜK illerin hepsi aynı kuşakta (Bilecik, Bolu, Düzce, Eskişehir, Kocaeli, Kütahya, Sakarya,
+Zonguldak) ve hepsinde son 3 yıl (2023–2025) çıkarılınca eğim ≈ +0,6'dan ≈ +0,4 °C/10 yıla iniyor ve anlamlılık
+kayboluyor; karıştırma testi hepsinde geçiyor. Bu kuşakta ısınma sinyali büyük ölçüde son birkaç çok sıcak yıla
+dayanıyor.
+
+**Genel tablo:** il düzeyinde anlamlı 2 892 trendin 1 379'u DÜŞÜK. Bunların 1 352'si yalnız c'den (dönem
+duyarlılığı) kalıyor; c'den kalan satırların **hiçbirinde işaret dönmüyor** (1 378/1 378 işaret korunuyor),
+yalnız 22 yıla kısalan seride anlamlılık kayboluyor (449 son 3, 379 ilk 3, 550 ikisinde). Yani DÜŞÜK çoğunlukla
+"yön belirsiz" değil, "kısa seride istatistiksel güç sınırda" demektir. YÜKSEK yalnız çok ürünlü değişkenlerde
+mümkün (kural: tek kaynak en çok ORTA); il düzeyinde 145 YÜKSEK'in 143'ü MERRA2 sıcaklık (68 yıllık, 47 sonbahar, 16 yaz, 12 kış), 2'si MERRA2 sonbahar yağışı.
+
+**İlişkiler (L4):** 81 YÜKSEK · 323 ORTA · 0 DÜŞÜK · 138 YOK.
+
+| Satır | r (ham r) | a | b (p_perm) | c | d | e | Uyarı | Güven |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Çift 1 Türkiye (kış sıcaklığı ~ kar) | −0,90 (−0,93) | ✓ 2/2 | ✓ 0,002 | ✓ | ✓ (gecikme 1: −0,87) | ✓ | — | **YÜKSEK** |
+| Çift 5 Türkiye (yaz sıcaklığı ~ buharlaşma) | −0,36 (−0,22) | – (anlamsız) | ✓ 0,058 | ✓ | ✓ | ✓ | Kademe 2, rejime bağlı | YOK (anlamsız) |
+| Sıcaklık ~ GRACE, Türkiye yıllık (tek çift komutu) | −0,24 (−0,70) | – (anlamsız) | ✗ 0,31 | **✗** | ✓ | ✓ | — | YOK |
+
+- Çift 1: 79 YÜKSEK satır (il ve bölge). Çift 2 tümü ORTA (mevsimlik seride gecikme testi uygulanamaz), çift 6
+  tümü ORTA (MOD11C3 Kademe 2), çift 5'in ters yönlü il satırları ORTA (rejime bağlı çift + Kademe 2 kritik uyarı).
+- Sıcaklık ~ GRACE: beklendiği gibi c kalıyor; ham −0,70 korelasyonunun büyük kısmı iki serinin aynı dönemde
+  trendli olmasından geliyor (sahte korelasyon örneği).
+

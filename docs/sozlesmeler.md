@@ -514,3 +514,56 @@ attrs: `yontem`, `uyari` ("Doğrulanmadı; neden göstermez. …"), `not` (MODIS
 `sulama_izi_kumeleri.csv` sütunları: `kume`, `hucre_sayisi`, `tepe_sulama_izi`, `ortalama_sulama_izi`, `tepe_lat`,
 `tepe_lon`, `merkez_lat`, `merkez_lon` (skor ağırlıklı), `il` (tepe hücrenin ili), `iller`, `esik`.
 
+### 2.4 Bulgu karnesi (2026-11-15; `python -m stats.karne --surum v0.1`)
+
+Her trend (L3) ve ilişki (L4) sonucunun yanına şeffaf bir güven karnesi. L2/L3/L4 dosyalarını **değiştirmez**;
+`<paket>/karne/` altına ayrı yazılır. Karne bir **sağlamlık ve tutarlılık** özetidir; bir sonucun doğruluğunu
+ya da nedenselliğini göstermez. Kural sonuçlar görülmeden sabitlendi (`kural_surumu = karne-v1`) ve
+`karne/KURALLAR.txt` dosyasına da yazılır.
+
+| Yol | İçerik |
+| --- | --- |
+| `karne/trend_karne_il.csv` | L3 il satırları (bütün L1 değişkenleri × 5 mevsim) |
+| `karne/trend_karne_bolge.csv` | L3 bölge ve Türkiye (`duzey = ulke`) satırları |
+| `karne/iliski_karne.csv` | L4 `ciftler.csv` satırları |
+| `karne/KURALLAR.txt` | Güven kuralı, tekrar sayısı, tohum, üretim tarihi |
+
+Her kontrol iki sütundur: durum (`geçti` / `kaldı` / `uygulanamaz`) ve sayı/açıklama. **`uygulanamaz` geçti sayılmaz.**
+
+**Trend kontrolleri** (seriler L3 ile aynı fonksiyonlarla yeniden kurulur):
+
+| Sütunlar | Kontrol | Geçti |
+| --- | --- | --- |
+| `a_kaynak_uyumu`, `a_sayi` | L3 kaynak uyumu (yalnız `sicaklik_2m`: MERRA2, GLDAS; `yagis`: GPM, GLDAS, MERRA2). Tek ürün → `uygulanamaz` ("tek kaynak"); anlamsız sonuçta da `uygulanamaz` | Satır anlamlı ve bu ürün dahil en az 2 ürün anlamlı ve aynı yönde |
+| `b_karistirma`, `b_p_perm`, `b_blok` | Dairesel blok permütasyonu: blok = ceil(n / etkin_n) (en az 1, en çok n/2), 499 tekrar, satıra özgü sabit tohum. p_perm = (1 + #{\|Sen_perm\| ≥ \|Sen\|}) / 500 | p_perm < 0,10 |
+| `c_donem`, `c_sayi` | İlk 3 ve son 3 geçerli yıl ayrı ayrı çıkarılır. Alt dönemde FDR uygulanamadığı için anlamlılık p_mk ≤ 0,10 ve %95 GA sıfırı dışlar | İki kırpmada da işaret aynı ve anlamlı |
+| `d_esik`, `d_sayi` | α = 0,05: p_fdr ≤ 0,05 ve GA sıfırı dışlar | Anlamlı |
+| `e_yeterlilik`, `e_sayi` | Weatherhead `gereken_yil` ile geçerli yıl sayısı | gereken ≤ mevcut |
+| `f_uyarilar`, `f_kritik` | `trend_uyarisi`, L1 `bilinen_sorunlar`, Kademe 2 (doğrulanmadı) → **kritik**; `mk_yedek` yalnız listelenir | — |
+
+Diğer sütunlar: `degisken`, `urun`, `bolge_kodu`, `bolge_adi`, `duzey`, `mevsim`, `sen_egimi`, `egim_birimi`,
+`ga_alt`, `ga_ust`, `p_fdr`, `anlamli` (L3'ten aynen), `guven`, `gerekce`, `kural_surumu`.
+
+**İlişki kontrolleri** (`iliski_karne.csv`; ayrıca `python -m physics.iliski … --karne`):
+
+| Sütunlar | Kontrol | Geçti |
+| --- | --- | --- |
+| `a_kaynak_uyumu`, `a_sayi` | x/y'nin pakette bulunan alternatif ürünleriyle (ör. yağış GPM/GLDAS/MERRA2, sıcaklık MERRA2/GLDAS) aynı çift ve kapsam yeniden hesaplanır. Alternatif yok ya da sonuç anlamsız → `uygulanamaz` | Satır anlamlı ve ana kombinasyon dahil en az 2 kombinasyon aynı etiket |
+| `b_karistirma`, `b_p_perm`, `b_blok` | Trendi giderilmiş y serisi dairesel blok permütasyonuyla karıştırılır (blok = ceil(n / etkin_n), 499, sabit tohum); \|r_perm\| ≥ \|r\| oranı | p_perm < 0,10 |
+| `c_trend`, `c_sayi`, `r_ham` | Trendden arındırma: trendsiz r ile ham r | Aynı işaret ve \|r\| ≥ \|ham r\| / 2 |
+| `d_gecikme`, `d_sayi` | Gecikme ±1 ay (negatif gecikme ve `mevsim_anomali` serisi → `uygulanamaz`) | r'nin işareti korunur |
+| `e_esik`, `e_sayi` | α = 0,05: il satırında p_fdr ≤ 0,05; bölge/Türkiye satırı zaten p < 0,05 | Etiket aynı |
+| `f_uyarilar`, `f_kritik` | Ürün uyarıları (`bilinen_sorunlar`, `trend_uyarisi`, Kademe 2), `rejime_bagli` çift, az hücre (< 3) → **kritik** | — |
+
+**Güven seviyesi** (trend ve ilişki için aynı kural):
+
+| `guven` | Kural |
+| --- | --- |
+| `YOK` | Sonuç anlamlı değil (trend/ilişki iddiası yok). Trendde `e` kaldıysa gerekçeye "veri henüz yetmiyor" yazılır |
+| `DÜŞÜK` | Anlamlı ama `b` ya da `c` geçmedi |
+| `YÜKSEK` | Anlamlı; `a`, `b`, `c`, `d`, `e` geçti; kritik uyarı yok |
+| `ORTA` | Anlamlı; `b` ve `c` geçti ama `YÜKSEK`'in başka bir şartı sağlanmadı (ör. tek kaynak, `d`/`e` kaldı, kritik uyarı) |
+
+Sonuç: tek ürünlü değişkenler ve mevsimlik seri çifti en çok `ORTA` olabilir (bağımsız ikinci kaynak / gecikme
+testi yok). Ürünler ortak girdi paylaşabildiği için `a` bağımsız doğrulama değil, tutarlılık göstergesidir.
+
