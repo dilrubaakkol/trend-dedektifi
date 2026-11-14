@@ -90,7 +90,7 @@ def test_kayma_yoksa_yetersiz(z):
 
 def test_run_uctan_uca(monkeypatch):
     """physics.run: veri okuma taklit edilir (diske/internete dokunmaz), tüm zincir çalışır."""
-    import physics.run as run
+    import physics.run_yol_haritasi as run
     from physics.synthetic import synthetic_dem, synthetic_temperature
 
     z05, z25 = synthetic_dem(seed=0), synthetic_dem(grid="025", seed=0)

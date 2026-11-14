@@ -139,6 +139,13 @@ Her faz sentetik veriyle test edilir ve testler geçmeden sonraki faza geçilmez
 - Kademe 2 girdili çiftlerde (5, 6) `dogrulanmadi = evet` yazılır
 - Gerçek veri yoksa yalnızca `cache/physics/` klasörüne, "YER TUTUCU" işaretli olarak yazar. Yayın paketine asla sentetik sonuç girmez
 
+**Durum (2026-11-14): ✅ bitti.** `physics/run.py` (yeni), `tests/test_physics_run.py` (5 test). Eski `run.py` rafa kalktı ve `physics/run_yol_haritasi.py` adını aldı.
+- `python -m physics.run --surum v0.1`: `outputs/trend-dedektifi-turkiye-v0.1/L1_kup/` dosyalarını okuyor, aynı pakete `L4_iliski/` yazıyor. L1 dosyası eksik olan çiftler uyarıyla atlanıyor.
+- `python -m physics.run --sentetik`: uçtan uca deneme. Çıktı yalnızca `cache/physics/L4_iliski__YER_TUTUCU/` klasörüne gidiyor ve her satırda YER TUTUCU notu var.
+- Güvenlik: L1 içinde sentetik dosya varsa yayın paketine hiçbir şey yazılmıyor (testle kanıtlandı).
+- NetCDF: float32 değişkenlerde boş değer NaN, `etiket` ve `anlamli` int8 (boş değer kodu yok, −99 / −1 anlamlı). Attr'lar: ortak alanlar, `doi_1`, `doi_2`, `kademe`, `dogrulanmadi`.
+- **Kişi 4 uyumsuzluğu (2026-11-14):** `llm/evidence.py` L4 tablosunda eski taslaktaki `bolge` sütununu okuyor. Kesinleşen sözleşmede bu sütun yok; yerine `bolge_kodu` (il: plaka) ve `bolge_adi` var. Kişi 4, L3 için kullandığı eşleştirmeyi (`bolge_kodu` ya da `bolge_adi`) L4'te de kullanmalı. Ayrıca çift 3'ün iki satırı var (`gecikme_ay` 1 ve 2); kanıt kimliğine gecikme eklenmeli. `llm/` klasörü bizim değil; kullanıcı aracılığıyla Kişi 4'e iletildi.
+
 ### Faz 6: Gerçek veriyle çalıştırma ve fizik kontrolü
 - Kişi 1'in gerçek L1 dosyalarıyla çalıştırılır
 - Akıl kontrolleri:

@@ -23,7 +23,8 @@ LON = 25.625 + 0.25 * np.arange(78)
 ZAMAN = pd.date_range("2001-01", "2025-12", freq="MS")
 
 
-def ornek_tablo(seed: int = 0) -> pd.DataFrame:
+def ornek_veri(seed: int = 0) -> dict[str, xr.DataArray]:
+    """6 çiftin 8 girdisi: ``{"<degisken>__<urun>": aylık küp}`` — SENTETİK (yer tutucu)."""
     m = bolge_maskeleri(LAT, LON)
     kara = m["turkiye"]
     rng = np.random.default_rng(seed)
@@ -35,7 +36,8 @@ def ornek_tablo(seed: int = 0) -> pd.DataFrame:
 
     def kup(v, ad):
         k = {"urun_surumu": "YER TUTUCU", "veri_seti_doi": "(yayında doldurulacak)",
-             "lisans": "CC BY 4.0", "doi": f"YER TUTUCU ({ad})"}
+             "lisans": "CC BY 4.0", "doi": f"YER TUTUCU ({ad})", "source_product": "SENTETIK",
+             "yer_tutucu": "evet"}
         return xr.DataArray(np.where(kara[None], v, np.nan),
                             coords={"time": ZAMAN, "lat": LAT, "lon": LON},
                             dims=("time", "lat", "lon"), attrs=k)
@@ -57,7 +59,11 @@ def ornek_tablo(seed: int = 0) -> pd.DataFrame:
         "buharlasma__GLDAS": kup(np.clip(50 + 30 * dongu + bagli(olcek=8), 0, None), "GLDAS"),
         "yuzey_sicakligi_gunduz__MOD11C3": kup(14 + 15 * dongu + 2.5 * bagli(), "MOD11C3"),
     }
-    df = ciftler_tablosu(veri)
+    return veri
+
+
+def ornek_tablo(seed: int = 0) -> pd.DataFrame:
+    df = ciftler_tablosu(ornek_veri(seed))
     assert set(df["cift_no"]) == {c.no for c in CIFTLER}
     return df
 
