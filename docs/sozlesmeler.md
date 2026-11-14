@@ -28,6 +28,9 @@ Modüller birbirleriyle yalnızca bu iki biçim üzerinden konuşur. Değişikli
   (`python -m data.export`) 25,5°D–45,0°D, 35,5°K–42,5°K kutusuna kırpılır (0,25°'de 28 × 78 hücre).
 - **İl sınırları:** Natural Earth 10m Admin-1 (kamu malı). geoBoundaries TUR ADM1, lisansı
   CC BY-SA 2.0 olduğu için seçilmedi. Ayrıntı: [`data/boundaries/README.md`](../data/boundaries/README.md).
+- **Bilinen sorunlar:** `yagis__GLDAS` 2025-12 değeri belirsiz. GES DISC granülü revizyon 3 ve Giovanni
+  aynı ay için yaklaşık 2 kat düşük değer veriyor. Değer silinmedi; dosyada `bilinen_sorunlar` attr'ı
+  var. Ayrıntı: [`docs/dogrulama.md`](dogrulama.md).
 
 ### Kullanım
 
