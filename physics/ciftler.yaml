@@ -20,11 +20,22 @@
 #   etiket_notlari   : (isteğe bağlı) {beklenen_yonde|ters_yonde|anlamsiz: not} — etikete göre ek not;
 #                      verilmezse ters_yonde satırına genel "incelenmeli" notu eklenir
 #   kalite_kontrolu  : (isteğe bağlı) true ise güçlü ilişki çıkmadığında "veri sorunu olabilir" notu eklenir
+#   rejime_bagli     : true ise beklenen yön iklim rejimine bağlıdır; su sınırlı (kurak) yerdeki ters sonuç
+#                      sapma haritasında (physics.sapma) "rejimle açıklanabilir" sayılır. true iken
+#                      rejim_gerekcesi zorunludur.
 
 # Ürün belirtilmezse (physics.iliski) seçilecek ürün sırası: önce Kademe 1'in ana ürünü.
 urun_onceligi:
   sicaklik_2m: [MERRA2, GLDAS]
   yagis: [GPM, GLDAS, MERRA2]
+
+# Sapma haritası (physics.sapma) için iklim rejimi göstergesi. Yer adı ya da yere özel eşik yazılmaz.
+rejim:
+  # GLDAS-2.1 yıllık buharlaşma / yağış (E/P), uzun dönem ortalaması. GLDAS Noah sulamayı simüle etmez;
+  # bu yüzden oran iklimseldir. E/P yüksek → yağışın çoğu buharlaşıyor → buharlaşma suyla sınırlı.
+  buharlasma: {degisken: buharlasma, urun: GLDAS}
+  yagis: {degisken: yagis, urun: GLDAS}
+  su_sinirli_esik: 0.7   # E/P ≥ 0,7: su sınırlı (Budyko eğrisinde kuru tarafa denk gelen kaba sınır)
 
 ciftler:
   - no: 1
@@ -35,6 +46,7 @@ ciftler:
     gecikme_ay: 0
     beklenen: "-"
     kademe: 1
+    rejime_bagli: false
     harita: true
     kar_maskesi_esik: 10
     fiziksel_gerekce: Sıcak kışlarda kar örtüsünün az olması beklenir.
@@ -48,6 +60,7 @@ ciftler:
     gecikme_ay: 0
     beklenen: "+"
     kademe: 1
+    rejime_bagli: false
     harita: true
     fiziksel_gerekce: Yağışlı mevsimlerde toprak neminin de yüksek olması beklenir.
     not: ""
@@ -61,6 +74,7 @@ ciftler:
     gecikme_ay: [1, 2]
     beklenen: "+"
     kademe: 1
+    rejime_bagli: false
     harita: true
     fiziksel_gerekce: Büyüme mevsiminde nemli topraktan bir iki ay sonra bitki örtüsünün daha yeşil olması beklenir.
     not: NDVI, toprak neminden 1 ya da 2 ay sonra.
@@ -73,6 +87,7 @@ ciftler:
     gecikme_ay: 0
     beklenen: "+"
     kademe: 1
+    rejime_bagli: false
     harita: false
     fiziksel_gerekce: Yağışlı yıllarda yer altı ve yüzey suyu depolamasının artması beklenir.
     not: >-
@@ -88,6 +103,11 @@ ciftler:
     gecikme_ay: 0
     beklenen: "+"
     kademe: 2
+    rejime_bagli: true
+    rejim_gerekcesi: >-
+      Su sınırlı (kurak) yerde sıcak yazlar kurak yazlardır; buharlaşma topraktaki suyla sınırlandığı
+      için sıcaklıkla ters yönlü ilişki iklim rejiminin beklenen işaretidir (Budyko çerçevesi). Ters sonuç
+      yalnız enerji sınırlı (nemli) yerde fiziksel beklentiden sapma sayılır.
     harita: true
     fiziksel_gerekce: Toprakta su yeterliyse sıcak yazlarda buharlaşmanın artması beklenir.
     not: Yaz sıcaklığı ile buharlaşma; yönü yerin kuraklığına bağlıdır.
@@ -106,6 +126,7 @@ ciftler:
     gecikme_ay: 0
     beklenen: "+"
     kademe: 2
+    rejime_bagli: false
     harita: true
     kalite_kontrolu: true
     fiziksel_gerekce: Aynı olgunun iki ölçümü olduğu için güçlü pozitif ilişki beklenir.

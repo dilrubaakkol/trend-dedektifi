@@ -58,6 +58,8 @@ class Cift:
     kar_maskesi_esik: float | None = None
     etiket_notlari: dict = field(default_factory=dict, hash=False, compare=False)
     kalite_kontrolu: bool = False
+    rejime_bagli: bool = False          # sapma haritası: kurak yerdeki ters sonuç rejimle açıklanır
+    rejim_gerekcesi: str = ""
 
     @property
     def kod(self) -> str:
@@ -135,6 +137,9 @@ def _cift_kur(d: dict) -> Cift:
     x, y = d["x"], d["y"]
     if esik is not None and KAR not in (x["degisken"], y["degisken"]):
         raise ValueError(f"{yer}: kar_maskesi_esik için x ya da y '{KAR}' olmalı")
+    rejime_bagli = bool(d.get("rejime_bagli", False))
+    if rejime_bagli and not str(d.get("rejim_gerekcesi") or "").strip():
+        raise ValueError(f"{yer}: rejime_bagli: true iken rejim_gerekcesi yazılmalı")
     notlar = dict(d.get("etiket_notlari") or {})
     if set(notlar) - set(ETIKET_ADLARI):
         raise ValueError(f"{yer}: etiket_notlari anahtarları {ETIKET_ADLARI} olmalı")
@@ -144,11 +149,12 @@ def _cift_kur(d: dict) -> Cift:
                 not_=str(d.get("not") or ""), ad=str(d.get("ad") or ""), mevsim=mevsim, aylar=aylar,
                 fiziksel_gerekce=str(d.get("fiziksel_gerekce") or ""),
                 kar_maskesi_esik=None if esik is None else float(esik), etiket_notlari=notlar,
-                kalite_kontrolu=bool(d.get("kalite_kontrolu", False)))
+                kalite_kontrolu=bool(d.get("kalite_kontrolu", False)), rejime_bagli=rejime_bagli,
+                rejim_gerekcesi=str(d.get("rejim_gerekcesi") or "").strip())
 
 
 def ayar_oku(yol: str | Path = AYAR_DOSYASI) -> dict:
-    """ciftler.yaml'ı okur: ``{"ciftler": tuple[Cift], "urun_onceligi": {degisken: [urun, …]}}``."""
+    """ciftler.yaml'ı okur: ``{"ciftler": tuple[Cift], "urun_onceligi": {...}, "rejim": {...}}``."""
     ham = yaml.safe_load(Path(yol).read_text(encoding="utf-8")) or {}
     ciftler = tuple(_cift_kur(d) for d in ham.get("ciftler") or [])
     if not ciftler:
@@ -157,7 +163,10 @@ def ayar_oku(yol: str | Path = AYAR_DOSYASI) -> dict:
     if len(set(nolar)) != len(nolar):
         raise ValueError(f"{yol}: çift numaraları benzersiz olmalı ({nolar})")
     oncelik = {str(k): [str(u) for u in v] for k, v in (ham.get("urun_onceligi") or {}).items()}
-    return {"ciftler": ciftler, "urun_onceligi": oncelik}
+    rejim = dict(ham.get("rejim") or {})
+    if rejim and not 0 < float(rejim.get("su_sinirli_esik", 0)) < 10:
+        raise ValueError(f"{yol}: rejim.su_sinirli_esik pozitif bir sayı olmalı")
+    return {"ciftler": ciftler, "urun_onceligi": oncelik, "rejim": rejim}
 
 
 def ciftleri_yukle(yol: str | Path = AYAR_DOSYASI) -> tuple[Cift, ...]:
