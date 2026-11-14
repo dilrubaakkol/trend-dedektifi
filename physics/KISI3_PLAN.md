@@ -126,6 +126,14 @@ Her faz sentetik veriyle test edilir ve testler geçmeden sonraki faza geçilmez
 - Sütunlar: sözleşme 2.3'teki sütunlar ile belgedeki ek sütunlar (`zaman_olcegi`, `gecikme_ay`, `beklenen_yon`, `anlamli_fdr`) ve ortak alanlar (`urun_surumu`, `veri_seti_doi`, `kademe`, `lisans`, `dogrulanmadi`, `donem`, `seri`)
 - Bölge listesi `data.regions` ile alınır (Kişi 1'in Natural Earth il sınırları)
 
+**Durum (2026-11-14): ✅ bitti.** `physics/tablo.py` (`bolge_listesi`, `bolge_maskeleri`, `cift_tablosu`, `ciftler_tablosu`, `csv_yaz`), `tests/test_physics_tablo.py` (9 test).
+- Bölge maskeleri Kişi 1'in `data.regions.subset` fonksiyonundan alınıyor (hücre merkezi kuralı). Türkiye, 7 bölgenin toplamı ve 81 ilin toplamı aynı sayıyı veriyor: 1.303 hücre. En küçük iller Kilis ve Yalova (2'şer hücre); `hucre_sayisi` sütununda görünüyor.
+- Satır sayısı: 81 il + 7 bölge + Türkiye = 89 satır. Çift 3'te iki gecikme olduğu için 178 satır, çift 4'te yalnızca 8 satır (bölge ve Türkiye).
+- Gömülü desen testi: Konya'ya ters ilişki gömüldü, Konya `ters_yonde` çıktı; geri kalan 80 il ve Türkiye `beklenen_yonde`.
+- CSV: UTF-8 BOM'lu (Excel Türkçe karakterleri doğru açsın diye), ondalık nokta, boş değer boş hücre.
+- **Kişi 5 için örnek:** `physics/ornekler/ciftler__YER_TUTUCU.csv` (542 satır, sentetik). Yeniden üretmek için: `python -m physics.ornek_l4`.
+- **Kişi 1'e not:** İl plakası için `data.regions._iller()` (iç fonksiyon) kullanılıyor. `list_regions()` plakayı da verirse oraya geçilir.
+
 ### Faz 5: Yayın paketine bağlantı (`python -m physics.run`)
 - L1 küplerini okur (yayın paketi ya da `cache/processed/`) ve `outputs/trend-dedektifi-turkiye-<surum>/L4_iliski/` klasörüne yazar
 - Kademe 2 girdili çiftlerde (5, 6) `dogrulanmadi = evet` yazılır
