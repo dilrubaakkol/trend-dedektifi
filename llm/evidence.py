@@ -147,34 +147,83 @@ def _agreement(trends: list[dict], degisken: str) -> dict | None:
 
 
 # --------------------------------------------------------------------------- L4
+L4_FIELDS = ["r", "p", "p_fdr", "anlamli", "etkin_n", "n", "r1_1", "r1_2", "hucre_sayisi"]
+L4_META = ["cift_no", "seri", "beklenen_yon", "donem", "kademe", "not", "doi_1", "doi_2", "bolge_adi",
+           "urun_surumu", "veri_seti_doi", "lisans"]
+
+
 def _pair_vars(cift: str) -> list[tuple[str, str]]:
+    """"sicaklik_2m__MERRA2~kar_ortusu__MOD10CM" -> [("sicaklik_2m", "MERRA2"), ("kar_ortusu", "MOD10CM")]"""
     return [tuple(p.split("__", 1)) for p in str(cift).split("~")]
 
 
-def _relation_evidence(pkg: Path, variables: set[str], targets: set[str], region: dict) -> tuple[list, str | None]:
-    """L4 satırları: en az bir hedef (belirti) değişkeni ve plandaki başka bir değişkeni içeren çiftler.
-    İl için L4 satırı yoksa ilin bölgesine, o da yoksa Türkiye'ye düşülür."""
+def _region_mask(df: pd.DataFrame, level: str, key: str) -> pd.Series:
+    """L4 satırlarını bölgeye göre seçer: bolge_turu + (bolge_kodu ya da bolge_adi) — L3 ile aynı kural."""
+    turu = df["bolge_turu"].astype(str).str.strip().str.lower()
+    if level == "turkiye":
+        return turu == "turkiye"
+    same = (df["bolge_kodu"].map(norm_key) == key) | (df["bolge_adi"].map(norm_key) == key)
+    return (turu == level) & same
+
+
+def _relation_id(v1, u1, v2, u2, gecikme) -> str:
+    """Kanıt kimliği; gecikmeli çiftlerde (çift 3: 1 ve 2 ay) gecikme kimliğe girer, yoksa çakışır."""
+    base = f"iliski__{v1}__{u1}__{v2}__{u2}"
+    return f"{base}__g{gecikme}" if gecikme else base
+
+
+def _relation_evidence(pkg: Path, variables: set[str], targets: set[str], region: dict) -> list[dict]:
+    """L4 (docs/sozlesmeler.md 2.3): plandaki değişkenlerle ilgili çiftler.
+
+    Bir çift alınır: değişkenlerinden biri belirti (hedef) ise ya da ikisi de plandaysa.
+    Her çift × gecikme için EN AYRINTILI mevcut düzey seçilir (il -> ilin bölgesi -> Türkiye);
+    ör. yağış~GRACE yalnız bölge/Türkiye düzeyinde vardır, il sorusunda bölge satırı kullanılır.
+    """
     f = pkg / "L4_iliski" / "ciftler.csv"
     if not f.exists():
-        return [], None
-    df = pd.read_csv(f, dtype={"bolge": str}, encoding="utf-8-sig")
-    df["_k"] = df["bolge"].map(norm_key)
-    for key in [region["key"], region.get("bolge"), "turkiye"]:
-        if not key:
+        return []
+    try:
+        df = pd.read_csv(f, dtype={"bolge_kodu": str}, encoding="utf-8-sig")
+    except pd.errors.EmptyDataError:
+        return []
+    if df.empty or not {"cift", "bolge_turu", "bolge_kodu", "bolge_adi"} <= set(df.columns):
+        return []
+    if "gecikme_ay" not in df.columns:
+        df["gecikme_ay"] = 0
+    df["gecikme_ay"] = pd.to_numeric(df["gecikme_ay"], errors="coerce").fillna(0).astype(int)
+
+    levels = []
+    if region["level"] == "il":
+        levels = [("il", region["key"]), ("bolge", region.get("bolge")), ("turkiye", "turkiye")]
+    elif region["level"] == "bolge":
+        levels = [("bolge", region["key"]), ("turkiye", "turkiye")]
+    else:
+        levels = [("turkiye", "turkiye")]
+    levels = [(lv, k) for lv, k in levels if k]
+
+    out = []
+    for (cift, gecikme), grp in df.groupby(["cift", "gecikme_ay"], sort=True):
+        (v1, u1), (v2, u2) = _pair_vars(cift)
+        vs = {v1, v2}
+        if not (vs & targets or vs <= variables):
             continue
-        rows = []
-        for r in df[df["_k"] == key].to_dict("records"):
-            vs = {v for v, _ in _pair_vars(r["cift"])}
-            if vs & targets and vs <= variables:
-                (v1, u1), (v2, u2) = _pair_vars(r["cift"])
-                rows.append({"id": f"iliski__{v1}__{u1}__{v2}__{u2}", "type": "iliski",
-                             "pair": r["cift"], "variables": [v1, v2], "products": [u1, u2],
-                             "region_key": key, "r": _num(r.get("r")), "p": _num(r.get("p")),
-                             "etkin_n": _num(r.get("etkin_n")), "label": r.get("etiket"),
-                             "file": f.relative_to(pkg).as_posix()})
-        if rows:
-            return rows, key
-    return [], None
+        for level, key in levels:
+            hit = grp[_region_mask(grp, level, key)]
+            if len(hit):
+                r = hit.iloc[0].to_dict()
+                etiket = r.get("etiket")
+                e = {"id": _relation_id(v1, u1, v2, u2, gecikme), "type": "iliski", "pair": cift,
+                     "variables": [v1, v2], "products": [u1, u2], "gecikme_ay": int(gecikme),
+                     "region_level": level, "region_key": key,
+                     "label": etiket if isinstance(etiket, str) and etiket.strip() else "hesaplanamadi",
+                     "file": f.relative_to(pkg).as_posix()}
+                e.update({k: _num(r.get(k)) for k in L4_FIELDS})
+                e.update({k: (None if pd.isna(r.get(k)) else r.get(k)) for k in L4_META if k in r})
+                e["dogrulanmadi"] = str(r.get("dogrulanmadi", "")).strip().lower() == "evet"
+                e["provenance"] = [provenance(v1, u1), provenance(v2, u2)]
+                out.append(e)
+                break
+    return out
 
 
 # --------------------------------------------------------------------------- ana giriş
@@ -208,10 +257,13 @@ def collect_evidence(plan: dict, pkg: Path | str | None = None) -> dict:
         a = _agreement(trends, v)
         if a:
             out["analyses"].append(a)
-    rel, rel_key = _relation_evidence(pkg, variables, targets, region)
+    rel = _relation_evidence(pkg, variables, targets, region)
     out["analyses"] += rel
-    if rel and rel_key != region["key"]:
-        out["warnings"].append(f"Bu bölge için ilişki (L4) satırı yok; '{rel_key}' sonuçları gösteriliyor.")
+    fell = sorted({f"{a['pair']} → {a.get('bolge_adi') or a['region_key']}" for a in rel
+                   if a["region_level"] != region["level"]})
+    if fell:
+        out["warnings"].append("Bu çiftler için seçilen düzeyde ilişki (L4) satırı yok, daha geniş bölgenin "
+                               "sonucu kullanıldı: " + "; ".join(fell) + ".")
     if trends and any(t["region_level"] != region["level"] for t in trends):
         out["warnings"].append("Bazı değişkenlerde il özeti yok; bağlı olduğu bölgenin sonucu kullanıldı.")
     donemler = {t.get("donem") for t in trends if t.get("donem")}
