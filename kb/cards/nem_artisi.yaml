@@ -1,0 +1,25 @@
+id: nem_artisi
+baslik: Isınan havada nem artışı
+konu: Isınma
+sade_tanim: Sıcak hava daha çok su buharı taşıyabilir; ısınan bölgelerde havadaki nemin de artması beklenir.
+soru_kaliplari: ["nem", "nemli", "bunaltıcı", "su buharı", "rutubet"]
+ornek_sorular:
+  - "Karadeniz'de hava daha nemli mi oluyor?"
+belirti:
+  - degisken: ozgul_nem_2m
+    urun: M2TMNXSLV
+    beklenen_yon: artis
+  - degisken: su_buhari_kolon
+    urun: AIRS3STM
+    beklenen_yon: artis
+supheliler:
+  - degisken: sicaklik_2m
+    urunler: [MERRA2, AIRS]
+    neden: "Her 1 °C ısınmada hava yaklaşık %7 daha fazla su buharı tutabilir (Clausius–Clapeyron)."
+fiziksel_test:
+  tip: clausius_clapeyron
+  aciklama: "Nemdeki yüzde artış ≈ 7 × sıcaklık artışı (°C) olmalı."
+alternatifler:
+  - "Rüzgâr ve dolaşım değişimi (nemi başka yerden taşıma)"
+kaynaklar:
+  - "IPCC AR6 WG1 (2021), Bölüm 8: Su döngüsü değişiklikleri"

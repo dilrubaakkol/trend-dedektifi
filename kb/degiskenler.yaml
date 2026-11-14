@@ -1,0 +1,88 @@
+# Değişken kartları. "ad" alanı docs/sozlesmeler.md tablosundaki değişken adıyla BİREBİR aynı olmalı.
+# sade_tanim: lise öğrencisinin anlayacağı dil. anahtar_kelimeler: planlayıcının yedek eşleştirmesi.
+- ad: kar_ortusu
+  baslik: Kar örtüsü
+  birim: "%"
+  ana_urun: MOD10CM
+  sade_tanim: Bir bölgenin ay boyunca ortalama ne kadarının karla kaplı olduğu.
+  anahtar_kelimeler: ["kar örtüsü", "karla kaplı"]
+  dikkat: Bulutlu günlerde uydu yeri göremez; aylık üründe bu boşluklar azalır ama kaybolmaz.
+- ad: kar_su_esdegeri
+  baslik: Kar su eşdeğeri
+  birim: mm
+  ana_urun: GLDAS_NOAH025_M
+  sade_tanim: Yerdeki kar eriseydi kaç milimetre su olurdu; barajlara gidecek suyun göstergesi.
+  anahtar_kelimeler: ["kar suyu", "kar su", "kar kalınlığı"]
+  dikkat: Model ürünüdür, doğrudan ölçüm değildir.
+- ad: sicaklik_2m
+  baslik: Hava sıcaklığı (2 m)
+  birim: "°C"
+  ana_urun: M2TMNXSLV
+  ikincil_urunler: [GLDAS_NOAH025_M, AIRS3STM]
+  sade_tanim: Yerden 2 metre yükseklikteki hava sıcaklığı, yani termometrenin gösterdiği.
+  anahtar_kelimeler: ["sıcaklık", "ısın", "sıcak", "soğu"]
+  dikkat: Yaklaşık 25-50 km'lik hücrelerin ortalamasıdır; şehir içi farkları göremez.
+- ad: ozgul_nem_2m
+  baslik: Havadaki nem
+  birim: kg/kg
+  ana_urun: M2TMNXSLV
+  sade_tanim: Her kilogram havada kaç kilogram su buharı olduğu.
+  anahtar_kelimeler: ["nem", "rutubet"]
+  dikkat: Bağıl nemden farklıdır; havadaki suyun gerçek miktarını gösterir.
+- ad: yagis
+  baslik: Yağış
+  birim: mm/ay
+  ana_urun: GPM_3IMERGM
+  ikincil_urunler: [M2TMNXFLX, GLDAS_NOAH025_M]
+  sade_tanim: Bir ayda düşen yağmur ve karın toplam su miktarı.
+  anahtar_kelimeler: ["yağış", "yağmur", "yağ"]
+  dikkat: Dağlık bölgelerde kar yağışını eksik ölçebilir; bu yüzden üç ürün karşılaştırılır.
+- ad: buharlasma
+  baslik: Buharlaşma
+  birim: mm/ay
+  ana_urun: GLDAS_NOAH025_M
+  sade_tanim: Topraktan, sudan ve bitkilerden havaya geri dönen su miktarı.
+  anahtar_kelimeler: ["buharlaş", "terleme"]
+  dikkat: Model ürünüdür.
+- ad: yuzey_akisi
+  baslik: Yüzey akışı
+  birim: mm/ay
+  ana_urun: GLDAS_NOAH025_M
+  sade_tanim: Toprağa sızmayıp derelere ve nehirlere akan su.
+  anahtar_kelimeler: ["akış", "dere", "nehir"]
+  dikkat: Barajlar ve sulama modele dahil değildir.
+- ad: toprak_nemi
+  baslik: Toprak nemi
+  birim: kg/m²
+  ana_urun: GLDAS_NOAH025_M
+  sade_tanim: Toprağın içinde tutulan su; bitkilerin kullandığı su deposu.
+  anahtar_kelimeler: ["toprak nemi", "toprak"]
+  dikkat: Model ürünüdür; sulama etkisini içermez.
+- ad: ndvi
+  baslik: Bitki örtüsü (NDVI)
+  birim: "-"
+  ana_urun: MOD13C2
+  sade_tanim: Bitkilerin ne kadar yeşil ve gür olduğunu gösteren, -1 ile 1 arasında bir sayı.
+  anahtar_kelimeler: ["ndvi", "yeşil", "bitki"]
+  dikkat: Tarım takvimi ve sulama NDVI'yi güçlü etkiler.
+- ad: su_buhari_kolon
+  baslik: Toplam su buharı
+  birim: kg/m²
+  ana_urun: AIRS3STM
+  sade_tanim: Yerden atmosferin tepesine kadar havadaki tüm su buharı.
+  anahtar_kelimeler: ["su buharı"]
+  dikkat: AIRS bulutlu koşullarda daha belirsizdir.
+- ad: toplam_su_depolama
+  baslik: Toplam su deposu (GRACE)
+  birim: cm
+  ana_urun: GRACE/GRACE-FO JPL Mascon
+  sade_tanim: Kar, toprak, göl ve yeraltı suyu dahil bir bölgedeki tüm suyun değişimi.
+  anahtar_kelimeler: ["yeraltı", "yer altı", "su deposu", "grace"]
+  dikkat: Çözünürlük kabadır (yaklaşık 300 km); küçük il ölçeğinde dikkatli yorumlanmalı.
+- ad: rakim
+  baslik: Rakım
+  birim: m
+  ana_urun: SRTMGL3
+  sade_tanim: Bir yerin deniz seviyesinden yüksekliği.
+  anahtar_kelimeler: ["rakım", "yükseklik"]
+  dikkat: Analiz ekseni olarak kullanılır, trendi incelenmez.

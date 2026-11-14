@@ -1,0 +1,24 @@
+id: akis_azalmasi
+baslik: Yüzey akışında (derelere giden suda) değişim
+konu: Kuraklık ve su
+sade_tanim: Yağmur ve eriyen kardan derelere ve barajlara akan su miktarına bakar.
+soru_kaliplari: ["akış", "dere", "nehir", "sel", "baraj doluluk", "taşkın"]
+ornek_sorular:
+  - "Karadeniz'de yüzey akışı artıyor mu?"
+belirti:
+  - degisken: yuzey_akisi
+    urun: GLDAS_NOAH025_M
+    beklenen_yon: belirsiz
+supheliler:
+  - degisken: yagis
+    urunler: [GPM, MERRA2]
+    neden: "Akışın ana kaynağı yağıştır."
+  - degisken: kar_su_esdegeri
+    urunler: [GLDAS]
+    neden: "Bahar akışının önemli kısmı kar erimesinden gelir."
+  - degisken: sicaklik_2m
+    urunler: [MERRA2]
+    neden: "Isınma karın daha erken erimesine yol açar."
+alternatifler:
+  - "Baraj ve sulama kaynaklı düzenleme (model görmez)"
+kaynaklar: []

@@ -1,0 +1,25 @@
+# Yer kartları: kullanıcının yazdığı yer adını analiz bölgesine çevirir.
+# "bolge" kimlikleri data/regions.py içindeki REGIONS anahtarlarıyla eşleşmeli (Kişi 1 ile koordineli).
+# Daha özel bir bölge varsa (ör. konya) "ozel" alanında verilir; planlayıcı önce onu dener.
+bolgeler:
+  turkiye: {ad: Türkiye, takma_adlar: ["türkiye", "ülke genel", "tüm türkiye"]}
+  marmara: {ad: Marmara Bölgesi, takma_adlar: ["marmara"]}
+  ege: {ad: Ege Bölgesi, takma_adlar: ["ege"]}
+  akdeniz: {ad: Akdeniz Bölgesi, takma_adlar: ["akdeniz"]}
+  ic_anadolu: {ad: İç Anadolu Bölgesi, takma_adlar: ["iç anadolu", "orta anadolu", "tuz gölü"]}
+  karadeniz: {ad: Karadeniz Bölgesi, takma_adlar: ["karadeniz"]}
+  dogu_anadolu: {ad: Doğu Anadolu Bölgesi, takma_adlar: ["doğu anadolu", "van gölü"]}
+  guneydogu_anadolu: {ad: Güneydoğu Anadolu Bölgesi, takma_adlar: ["güneydoğu", "gap"]}
+ozel:
+  konya: {ad: Konya Kapalı Havzası, takma_adlar: ["konya ovası", "konya havzası", "konya kapalı"]}
+iller:
+  marmara: [Edirne, Kırklareli, Tekirdağ, İstanbul, Kocaeli, Yalova, Sakarya, Bilecik, Bursa, Balıkesir, Çanakkale]
+  ege: [İzmir, Manisa, Aydın, Denizli, Muğla, Uşak, Kütahya, Afyonkarahisar, Afyon]
+  akdeniz: [Antalya, Isparta, Burdur, Mersin, Adana, Hatay, Osmaniye, Kahramanmaraş, Maraş]
+  ic_anadolu: [Ankara, Konya, Kayseri, Eskişehir, Sivas, Kırıkkale, Aksaray, Karaman, Kırşehir, Niğde, Nevşehir, Yozgat, Çankırı]
+  karadeniz: [Rize, Trabzon, Artvin, Giresun, Ordu, Samsun, Sinop, Kastamonu, Bartın, Zonguldak, Karabük, Düzce, Bolu, Amasya, Tokat, Çorum, Gümüşhane, Bayburt]
+  dogu_anadolu: [Erzurum, Erzincan, Kars, Ardahan, Iğdır, Ağrı, Van, Muş, Bitlis, Bingöl, Tunceli, Elazığ, Malatya, Hakkari]
+  guneydogu_anadolu: [Gaziantep, Antep, Şanlıurfa, Urfa, Diyarbakır, Mardin, Batman, Siirt, Şırnak, Kilis, Adıyaman]
+# Konya ili sorulduğunda özel bölge (konya) varsa o kullanılır:
+il_ozel:
+  Konya: konya

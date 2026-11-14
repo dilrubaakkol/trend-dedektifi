@@ -1,0 +1,20 @@
+id: isinma
+baslik: Hava sıcaklığında ısınma eğilimi
+konu: Isınma
+sade_tanim: Mevsimlerin etkisi çıkarıldıktan sonra havanın yıllar içinde ısınıp ısınmadığına bakar.
+soru_kaliplari: ["ısın", "sıcaklık", "sıcak", "iklim değiş", "küresel ısınma", "derece"]
+ornek_sorular:
+  - "Akdeniz'de hava ısınıyor mu?"
+  - "Ankara'da sıcaklık nasıl değişti?"
+belirti:
+  - degisken: sicaklik_2m
+    urun: M2TMNXSLV
+    beklenen_yon: artis
+supheliler: []
+not: >
+  Sıcaklık burada belirtinin kendisidir; neden analizi yerine aynı değişkenin farklı ürünlerde
+  (MERRA-2, GLDAS, AIRS) aynı sonucu verip vermediğine bakılır.
+alternatifler:
+  - "Ölçüm/model ürünleri arasındaki farklar (ürünler arası uyumla kontrol edilir)"
+kaynaklar:
+  - "IPCC AR6 WG1 (2021), Bölüm 2: İklim sisteminin değişen durumu"

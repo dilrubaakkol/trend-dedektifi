@@ -1,10 +1,19 @@
-# Örnek süreç kartı (Kişi 4 geliştirir). Yeni süreç = bu klasöre yeni bir YAML dosyası.
+# Süreç kartı. Yeni süreç = bu klasöre yeni bir YAML dosyası (aynı alanlarla).
+# Planlayıcı (llm/plan.py) bu kartlardan beslenir; arayüz "sade_tanim"ı kullanıcıya gösterir.
 id: kar_isinma
 baslik: Kar örtüsü azalımı ve ısınma
-sade_tanim: Isınan bir dağda kar çizgisi yukarı çekilir.
+konu: Kar
+sade_tanim: Isınan bir dağda kar çizgisi yukarı çekilir; alçak yerlerde kar azalır.
+soru_kaliplari: ["kar", "kar örtüsü", "kar çizgisi", "kar eriyor", "kayak", "kar su"]
+ornek_sorular:
+  - "Doğu Anadolu'da kar nasıl değişiyor ve bu ısınmayla tutarlı mı?"
+  - "Erzurum'da kar azalıyor mu?"
 belirti:
   - degisken: kar_ortusu
     urun: MOD10CM
+    beklenen_yon: azalis
+  - degisken: kar_su_esdegeri
+    urun: GLDAS_NOAH025_M
     beklenen_yon: azalis
 supheliler:
   - degisken: sicaklik_2m
@@ -20,4 +29,5 @@ fiziksel_test:
 alternatifler:
   - "Kış yağışı azalımı"
   - "Toz/kurum kaynaklı albedo düşüşü"
-kaynaklar: []
+kaynaklar:
+  - "IPCC SROCC (2019), Bölüm 2: Yüksek dağ bölgeleri"

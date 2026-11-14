@@ -1,0 +1,24 @@
+id: su_kaynaklari
+baslik: Yeraltı ve toplam su depolarının azalması
+konu: Kuraklık ve su
+sade_tanim: GRACE uyduları yerçekimindeki küçük değişimlerden bir bölgenin toplam suyunun azalıp arttığını ölçer.
+soru_kaliplari: ["yeraltı suyu", "yer altı", "su seviyesi", "göl", "baraj", "su kaynak", "obruk", "kuyu"]
+ornek_sorular:
+  - "Konya'da yeraltı suyu azalıyor mu?"
+belirti:
+  - degisken: toplam_su_depolama
+    urun: GRACE/GRACE-FO JPL Mascon
+    beklenen_yon: azalis
+supheliler:
+  - degisken: yagis
+    urunler: [GPM, MERRA2]
+    neden: "Depoya giren su azalır."
+  - degisken: buharlasma
+    urunler: [GLDAS]
+    neden: "Depodan havaya giden su artar."
+  - degisken: toprak_nemi
+    urunler: [GLDAS]
+    neden: "Toplam su deposunun yüzeye yakın kısmı."
+alternatifler:
+  - "Tarımsal sulama için yeraltı suyu çekimi (yağış normalken bile depo azalıyorsa güçlü aday)"
+kaynaklar: []
