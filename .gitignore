@@ -35,3 +35,7 @@ Thumbs.db
 *.bak
 *.mdf
 *.ldf
+
+# Yerel site başlatma/durdurma betikleri (bu bilgisayara özel)
+siteyi_baslat.ps1
+siteyi_durdur.ps1
