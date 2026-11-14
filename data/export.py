@@ -10,8 +10,8 @@ Kurallar:
 - Yalnız 0,25° (``__005`` dosyaları girmez) ve yalnız gerçek veri (SENTETIK girmez).
 - İçeride ``TURKIYE_BBOX`` kullanılır; yayında kutu ``YAYIN_BBOX`` (25,5–45,0 D, 35,5–42,5 K),
   0,25°'de 28 enlem × 78 boylam hücre. Hücre kenarlarının kutu sınırına tam oturduğu denetlenir.
-- Kademe 1 = Giovanni ile karşılaştırılan dosyalar (``KADEME_1``); diğerleri Kademe 2 ve
-  ``dogrulanmadi="evet"`` attr'ı taşır.
+- Kademe 1 = ekip belgesindeki çekirdek dosyalar (``KADEME_1``); diğerleri Kademe 2 ve
+  ``dogrulanmadi="evet"`` attr'ı taşır. Sabit alanlar (rakım) kademe dışıdır: ``kademe="-"``.
 - Mevcut ``doi`` attr'ı NASA kaynak ürününün DOI'si olarak kalır; yayın DOI'si ``veri_seti_doi``.
 """
 
@@ -32,8 +32,15 @@ from data.grid import GRID_RES, REPO_ROOT, TURKIYE_DIR, check_contract, write_ne
 YAYIN_BBOX: tuple[float, float, float, float] = (25.5, 35.5, 45.0, 42.5)
 YAYIN_SHAPE = (28, 78)  # (lat, lon) 0,25°'de
 
-# Giovanni ile karşılaştırılan (doğrulanan) değişken × dosya kodu çiftleri
-KADEME_1 = {("yagis", "GPM"), ("sicaklik_2m", "MERRA2"), ("toprak_nemi", "GLDAS")}
+# Kademe 1 değişken × dosya kodu çiftleri (ekip belgesi); geri kalan gerçek dosyalar Kademe 2
+KADEME_1 = {
+    ("sicaklik_2m", "MERRA2"), ("sicaklik_2m", "GLDAS"),
+    ("yagis", "GPM"), ("yagis", "GLDAS"), ("yagis", "MERRA2"),
+    ("toprak_nemi", "GLDAS"), ("kar_ortusu", "MOD10CM"), ("kar_su_esdegeri", "GLDAS"),
+    ("ndvi", "MOD13C2"), ("toplam_su_depolama", "GRACE"),
+}
+# Kademe dışı (sabit alanlar): kademe attr'ı "-", dogrulanmadi yok
+KADEME_DISI = {"rakim"}
 
 LISANS = "CC BY 4.0"
 VERI_SETI_DOI = "(yayında doldurulacak)"
@@ -41,8 +48,10 @@ OUTPUTS_DIR = REPO_ROOT / "outputs"
 ICINDEKILER_COLS = ["dosya", "degisken", "birim", "kaynak", "kaynak_doi", "donem", "kademe"]
 
 
-def kademe(degisken: str, urun: str) -> int:
-    """Değişken × dosya kodu için yayın kademesi (1 = Giovanni ile doğrulandı, 2 = doğrulanmadı)."""
+def kademe(degisken: str, urun: str) -> int | str:
+    """Değişken × dosya kodu için yayın kademesi: 1, 2 (doğrulanmadı) ya da "-" (kademe dışı, sabit)."""
+    if degisken in KADEME_DISI:
+        return "-"
     return 1 if (degisken, urun) in KADEME_1 else 2
 
 
@@ -97,7 +106,8 @@ def release_attrs(ds: xr.Dataset, degisken: str, urun: str, surum: str, bbox=YAY
     w, s, e, n = bbox
     a["processing"] = (f"{a.get('processing', '')}; yayın kutusuna kırpıldı "
                        f"(batı {w}, güney {s}, doğu {e}, kuzey {n})").lstrip("; ")
-    a.update(urun_surumu=surum, veri_seti_doi=VERI_SETI_DOI, kademe=np.int32(k), lisans=LISANS,
+    a.update(urun_surumu=surum, veri_seti_doi=VERI_SETI_DOI,
+             kademe=k if k == "-" else np.int32(k), lisans=LISANS,
              yayin_kutusu=f"{w}, {s}, {e}, {n}")
     if k == 2:
         a["dogrulanmadi"] = "evet"
@@ -141,7 +151,7 @@ def export(surum: str, src_dir: Path = TURKIYE_DIR, out_root: Path = OUTPUTS_DIR
                      "kaynak_doi": cut.attrs.get("doi", ""), "donem": data_period(cut),
                      "kademe": kademe(degisken, urun)})
         print(f"  yazıldı: {path.name} (kademe {rows[-1]['kademe']}, {rows[-1]['donem']})")
-    rows.sort(key=lambda r: (r["kademe"], r["dosya"]))
+    rows.sort(key=lambda r: (str(r["kademe"]).replace("-", "9"), r["dosya"]))
     with open(out_dir / "ICINDEKILER.csv", "w", newline="", encoding="utf-8-sig") as f:
         wr = csv.DictWriter(f, fieldnames=ICINDEKILER_COLS)
         wr.writeheader()

@@ -26,6 +26,8 @@ def src(tmp_path):
     write_netcdf(_fake_real("yagis"), d / "yagis__GPM.nc")
     write_netcdf(_fake_real("yagis"), d / "yagis__GLDAS.nc")
     write_netcdf(_fake_real("sicaklik_2m"), d / "sicaklik_2m__MERRA2.nc")
+    write_netcdf(_fake_real("yagis"), d / "bulut_orani__MERRA2.nc")       # Kademe 2 örneği
+    write_netcdf(_fake_real("yagis").isel(time=0, drop=True), d / "rakim__SRTM.nc")  # kademe dışı
     write_netcdf(_fake_real("yagis"), d / "yagis__GPM__005.nc")       # 0,05° girmemeli
     write_netcdf(make_synthetic("toprak_nemi", start="2001-01", end="2001-12"),
                  d / "toprak_nemi__GLDAS.nc")                         # sentetik girmemeli
@@ -50,20 +52,31 @@ def test_crop_rejects_misaligned_box():
 def test_export_package(src, tmp_path):
     out = export.export("v0.1", src_dir=src, out_root=tmp_path / "outputs")
     names = sorted(p.name for p in out.glob("*.nc"))
-    assert names == ["sicaklik_2m__MERRA2.nc", "yagis__GLDAS.nc", "yagis__GPM.nc"]
+    assert names == ["bulut_orani__MERRA2.nc", "rakim__SRTM.nc", "sicaklik_2m__MERRA2.nc",
+                     "yagis__GLDAS.nc", "yagis__GPM.nc"]
     with xr.open_dataset(out / "yagis__GPM.nc") as ds:
         a = ds.attrs
         assert ds["yagis"].shape[1:] == (28, 78)
     assert a["urun_surumu"] == "v0.1" and a["lisans"] == "CC BY 4.0"
     assert a["veri_seti_doi"] == "(yayında doldurulacak)" and a["doi"] == "10.0000/kaynak"
     assert int(a["kademe"]) == 1 and "dogrulanmadi" not in a
+    assert "yayın kutusuna kırpıldı" in a["processing"] and a["yayin_kutusu"] == "25.5, 35.5, 45.0, 42.5"
     with xr.open_dataset(out / "yagis__GLDAS.nc") as ds:
+        assert int(ds.attrs["kademe"]) == 1 and "dogrulanmadi" not in ds.attrs
+    with xr.open_dataset(out / "bulut_orani__MERRA2.nc") as ds:
         assert int(ds.attrs["kademe"]) == 2 and ds.attrs["dogrulanmadi"] == "evet"
+    with xr.open_dataset(out / "rakim__SRTM.nc") as ds:
+        assert ds.attrs["kademe"] == "-" and "dogrulanmadi" not in ds.attrs
     with open(out / "ICINDEKILER.csv", encoding="utf-8-sig") as f:
         rows = list(csv.DictReader(f))
     assert list(rows[0]) == export.ICINDEKILER_COLS
-    assert [r["kademe"] for r in rows] == ["1", "1", "2"]
-    assert rows[0]["donem"] == "2001-01 … 2001-12"
+    assert [r["kademe"] for r in rows] == ["1", "1", "1", "2", "-"]
+    assert rows[0]["donem"] == "2001-01 … 2001-12" and rows[-1]["donem"] == "sabit"
+
+
+def test_kademe_mapping():
+    assert export.kademe("ndvi", "MOD13C2") == 1 and export.kademe("evi", "MOD13C2") == 2
+    assert export.kademe("toplam_su_depolama", "GRACE") == 1 and export.kademe("rakim", "SRTM") == "-"
 
 
 def test_data_period_static_and_empty():
