@@ -163,3 +163,73 @@ def synthetic_temperature(rakim: xr.DataArray, isinma_C_per_decade: float = 0.4,
     return xr.DataArray(out, coords={"time": zaman, "lat": rakim.lat, "lon": rakim.lon},
                         dims=("time", "lat", "lon"), name="sicaklik_2m",
                         attrs={"units": "°C", "yer_tutucu": "evet", "synthetic_truth": gercek})
+
+
+def synthetic_budget(kayip_mm_per_year: float = 15.0, p_et_r_mm_per_year: float = 0.0,
+                     baslangic: str = "2002-04", bitis: str = "2025-12",
+                     bosluk=("2017-07", "2018-05"), gurultu_mm: float = 8.0,
+                     yagis_yayilim_mm_per_month: float = 1.0, seed: int = 0) -> dict:
+    """Sentetik su bütçesi serileri (bölge ortalaması, (time,)) — YER TUTUCU.
+
+    Akıların ortalaması P − ET − R = ``p_et_r_mm_per_year``; GRACE depolaması bunun üstüne
+    ``kayip_mm_per_year`` kadar ek (görünmeyen, ör. kuyu çekimi) düşüş taşır.
+    Kayıp 0 ise bütçe kapanır. GRACE ``bosluk`` aylarında NaN (GRACE → GRACE-FO arası).
+    Dönüş: {"grace_cm", "yagis": {GPM, GLDAS, MERRA2}, "buharlasma", "yuzey_akisi", "taban_akisi"}.
+    """
+    import pandas as pd
+    rng = np.random.default_rng(seed)
+    zaman = pd.date_range(baslangic, bitis, freq="MS")
+    n = len(zaman)
+    ay = zaman.month.values
+    mevsim = np.cos(2 * np.pi * (ay - 2) / 12.0)                 # kış yağışlı
+    P = 30.0 + 25.0 * mevsim + 5.0 * rng.standard_normal(n)
+    yuzey = 2.0 + 1.5 * mevsim + 0.3 * rng.standard_normal(n)
+    taban = 1.0 + 0.2 * rng.standard_normal(n)
+    # ET'yi bütçe ortalaması tam tutacak şekilde kur
+    ET = P - yuzey - taban - p_et_r_mm_per_year / 12.0 + 3.0 * rng.standard_normal(n)
+    ET = ET - (ET.mean() - (P - yuzey - taban).mean() + p_et_r_mm_per_year / 12.0)
+    akim = P - ET - yuzey - taban                                  # mm/ay
+    S = np.cumsum(akim) - kayip_mm_per_year / 12.0 * np.arange(n)
+    S = S - S.mean() + gurultu_mm * rng.standard_normal(n)
+    grace = S / 10.0                                               # mm → cm
+    b0, b1 = pd.Timestamp(bosluk[0]), pd.Timestamp(bosluk[1])
+    grace[(zaman >= b0) & (zaman <= b1)] = np.nan
+
+    def da(v, ad):
+        return xr.DataArray(v, coords={"time": zaman}, dims="time", name=ad)
+    yay = yagis_yayilim_mm_per_month
+    return {"grace_cm": da(grace, "toplam_su_depolama"),
+            "yagis": {"GPM": da(P, "yagis"), "GLDAS": da(P + yay, "yagis"),
+                      "MERRA2": da(P - yay, "yagis")},
+            "buharlasma": da(ET, "buharlasma"), "yuzey_akisi": da(yuzey, "yuzey_akisi"),
+            "taban_akisi": da(taban, "taban_akisi"),
+            "synthetic_truth": {"kayip_mm_per_year": kayip_mm_per_year,
+                                "p_et_r_mm_per_year": p_et_r_mm_per_year}}
+
+
+def synthetic_cc(oran_pct_per_C: float = 7.0, q0: float = 0.008, n_ay: int = 300,
+                 t_anomali_C: float = 1.0, gurultu: float = 0.02, phi: float = 0.4,
+                 seed: int = 0) -> tuple[xr.DataArray, xr.DataArray]:
+    """Sentetik aylık (özgül nem kg/kg, sıcaklık °C) serisi — YER TUTUCU.
+
+    ln q = ln q0 + oran/100 · T + mevsim + gürültü. Mevsim döngüsü ikisinde de var
+    (anomali hesabının onu silmesi gerekir); gürültü AR(1).
+    """
+    import pandas as pd
+    rng = np.random.default_rng(seed)
+    zaman = pd.date_range("2001-01", periods=n_ay, freq="MS")
+    ay = zaman.month.values
+    t_mev = 10.0 * np.cos(2 * np.pi * (ay - 7) / 12.0)
+    ta = np.empty(n_ay)
+    ta[0] = rng.standard_normal()
+    for i in range(1, n_ay):
+        ta[i] = 0.5 * ta[i - 1] + np.sqrt(1 - 0.25) * rng.standard_normal()
+    T = 15.0 + t_mev + t_anomali_C * ta
+    e = np.empty(n_ay)
+    e[0] = rng.standard_normal()
+    for i in range(1, n_ay):
+        e[i] = phi * e[i - 1] + np.sqrt(1 - phi ** 2) * rng.standard_normal()
+    lnq = np.log(q0) + oran_pct_per_C / 100.0 * T + 0.05 * np.sin(2 * np.pi * ay / 12) + gurultu * e
+    kw = dict(coords={"time": zaman}, dims="time")
+    return (xr.DataArray(np.exp(lnq), name="ozgul_nem_2m", **kw),
+            xr.DataArray(T, name="sicaklik_2m", **kw))

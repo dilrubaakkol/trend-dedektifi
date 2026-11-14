@@ -7,7 +7,8 @@ kar çizgisi 10 yılda ~67 m yükselmeliydi.
 İçerik
 - ``label()``          : tüm testlerin ortak etiket kuralı (uyumlu / celiskili / yetersiz)
 - ``climate_velocity()``: iklim hızı → beklenen kar çizgisi kayması (Adım 5)
-- ``water_budget()``, ``clausius_clapeyron()``: Adım 7'de eklenecek.
+- ``water_budget()``    : GRACE depolama eğimi ↔ P − ET − R ortalaması (Adım 7a)
+- ``clausius_clapeyron()``: nemin sıcaklıkla artış oranı (%/°C) ↔ %6–8 (Adım 7b)
 
 VARSAYIMLAR (sonuç notuna da yazılır)
 - Model sıcaklıkları modelin yumuşatılmış rakımına göredir; dT/dz için SRTM 0,25° ortalaması
@@ -173,4 +174,149 @@ def climate_velocity(sicaklik_kis: xr.DataArray, rakim: xr.DataArray,
         sonuc["observed_shift_m_per_decade"] = gozlenen.get("ci95")
         sonuc.update(label(gozlenen.get("ci95"), sonuc["predicted_shift_m_per_decade"],
                            anlamli=gozlenen.get("anlamli", True), n=gozlenen.get("n")))
+    return sonuc
+
+
+# --------------------------------------------------------------------------- ortak yardımcılar
+def _seri(da: xr.DataArray, mask: xr.DataArray | None = None) -> xr.DataArray:
+    """Uzaysal alanı (time, lat, lon) bölge alan ortalamasına indirir; zaten (time,) ise aynen."""
+    if "lat" in da.dims and "lon" in da.dims:
+        if mask is not None:
+            da = da.where(mask.broadcast_like(da.isel(time=0)))
+        return _alan_ortalamasi(da)
+    return da
+
+
+def _anomali(seri: xr.DataArray) -> xr.DataArray:
+    """Aylık klimatolojiyi (her ayın ortalaması) çıkarır — mevsim döngüsünü siler."""
+    return seri.groupby("time.month") - seri.groupby("time.month").mean("time")
+
+
+def _yil(t) -> np.ndarray:
+    """Zaman → kesirli yıl."""
+    t = xr.DataArray(t)
+    return (t.dt.year + (t.dt.month - 1) / 12.0).values.astype(float)
+
+
+# --------------------------------------------------------------------------- 7a su bütçesi
+def water_budget(grace_cm: xr.DataArray, yagis: dict, buharlasma: xr.DataArray,
+                 yuzey_akisi: xr.DataArray, taban_akisi: xr.DataArray | None = None,
+                 mask: xr.DataArray | None = None, region: str = "konya") -> dict:
+    """Su bütçesi kapanışı: dS/dt = P − ET − R (KISI3_PLAN.md, Adım 7a).
+
+    Terimlerin trendleri DEĞİL; GRACE depolamasının eğimi (mm/yıl) ile aynı dönemde
+    P − ET − R'nin ortalaması (mm/yıl) karşılaştırılır.
+
+    Parametreler
+    ----------
+    grace_cm : DataArray (time[, lat, lon]), cm — ``toplam_su_depolama`` (GRACE), boşluklar NaN.
+    yagis : {ürün: DataArray}, mm/ay — ilki ana ürün (GPM), diğerleri yayılım için
+        (GLDAS, MERRA2). Belirsizlik = ürünler arası yayılım.
+    buharlasma, yuzey_akisi, taban_akisi : DataArray, mm/ay (GLDAS). ``taban_akisi`` yoksa
+        R eksik kalır ve nota yazılır.
+    mask : boolean DataArray, isteğe bağlı — havza.
+
+    Döndürür: dict, ``type: "water_budget"``.
+    """
+    g = _seri(grace_cm, mask) * 10.0  # cm → mm
+    gecerli = g.dropna("time")
+    notlar = ["GRACE'in etkin çözünürlüğü yüzlerce km; bölge bu ölçeğe yakın, sonuç kaba"]
+    sonuc = {"id": f"butce_{region}", "type": "water_budget", "region": region}
+    if gecerli.sizes.get("time", 0) < 24:
+        sonuc.update(label(None, None))
+        sonuc["label_reason"] = "GRACE serisi çok kısa (< 24 ay)"
+        sonuc["note"] = "; ".join(notlar)
+        return sonuc
+
+    bas, son = gecerli.time.values[0], gecerli.time.values[-1]
+    donem = slice(bas, son)
+    # Sol: mevsimselliği çıkarılmış GRACE serisinin Sen eğimi (mm/yıl); boşluk NaN kalır
+    ga = _anomali(g.sel(time=donem))
+    tr = trend_1d(ga.values, _yil(ga.time.values), per=1.0)
+
+    # Sağ: aynı dönemin TÜM aylarında (boşluk dahil) P − ET − R ortalaması × 12
+    et = _seri(buharlasma, mask).sel(time=donem)
+    r = _seri(yuzey_akisi, mask).sel(time=donem)
+    if taban_akisi is not None:
+        r = r + _seri(taban_akisi, mask).sel(time=donem)
+    else:
+        notlar.append("R eksik: yalnız yüzey akışı (taban akışı yok) — sağ taraf fazla tahmin edilir")
+    sag = {}
+    for urun, p in yagis.items():
+        fark = (_seri(p, mask).sel(time=donem) - et - r)
+        if int(fark.notnull().sum()) >= 12:
+            sag[urun] = round(float(fark.mean("time")) * 12.0, 1)
+    if not sag:
+        sonuc.update(label(None, None))
+        sonuc["note"] = "; ".join(notlar)
+        return sonuc
+
+    ana = next(iter(sag))
+    sag_aralik = [min(sag.values()), max(sag.values())]
+    artik = tr["slope"] - sag[ana]
+    sonuc.update({
+        "period": [str(np.datetime64(bas, "M")), str(np.datetime64(son, "M"))],
+        "grace_slope_mm_per_year": [round(v, 1) for v in tr["ci95"]],
+        "grace_slope_point_mm_per_year": round(tr["slope"], 1),
+        "grace_n_months": tr["n"],
+        "p_et_r_mean_mm_per_year": sag_aralik,
+        "p_et_r_by_product": sag,
+        "residual_mm_per_year": round(float(artik), 1),
+    })
+    # Kapanış: GRACE aralığı, yağış ürünlerinin verdiği P − ET − R aralığıyla örtüşüyor mu?
+    sonuc.update(label(sonuc["grace_slope_mm_per_year"], sag_aralik, anlamli=True, n=tr["n"],
+                       n_min=24))
+    if sonuc["label"] == "celiskili" and artik < 0:
+        notlar.insert(0, "olası insan kaynaklı kayıp (yeraltı suyu çekimi / sulama): GLDAS "
+                         "sulamayı ve kuyu çekimini modellemez")
+    elif sonuc["label"] == "celiskili":
+        notlar.insert(0, "depolama, akıların açıkladığından hızlı artıyor; yağış ürünleri ya da "
+                         "GRACE sızıntısı kontrol edilmeli")
+    sonuc["note"] = "; ".join(notlar)
+    return sonuc
+
+
+# --------------------------------------------------------------------------- 7b Clausius-Clapeyron
+BEKLENEN_CC = [6.0, 8.0]  # %/°C
+
+
+def clausius_clapeyron(nem: xr.DataArray, sicaklik: xr.DataArray,
+                       mask: xr.DataArray | None = None, region: str = "deniz_karadeniz",
+                       nem_degisken: str = "ozgul_nem_2m", urun: str = "MERRA2",
+                       etiketli: bool = True) -> dict:
+    """Nemin sıcaklıkla artış oranı (%/°C) — Clausius-Clapeyron ≈ %7/°C (Adım 7b).
+
+    Aylık anomalilerde (mevsim döngüsü çıkarılmış) ln(nem)'in sıcaklığa Sen eğimi × 100,
+    otokorelasyona göre genişletilmiş aralıkla.
+
+    etiketli : True → deniz kutusu; aralık %6–8 ile örtüşüyorsa ``uyumlu``.
+               False → kara; ``label`` alanı YAZILMAZ (arayüz "Bilgi" gösterir), yalnız ``note``.
+    """
+    q = _seri(nem, mask)
+    t = _seri(sicaklik, mask)
+    q, t = xr.align(q, t, join="inner")
+    ok = (q > 0) & q.notnull() & t.notnull()
+    lnq = np.log(q.where(ok))
+    y = _anomali(lnq)
+    x = _anomali(t.where(ok))
+    tr = trend_1d(y.values, x.values, per=100.0)  # %/°C (r1 zaman sırasındaki artıklardan)
+
+    sonuc = {
+        "id": f"cc_{nem_degisken}_{urun}_{region}",
+        "type": "clausius_clapeyron",
+        "region": region,
+        "variable": nem_degisken,
+        "product": urun,
+        "slope_pct_per_C": [round(v, 2) for v in tr["ci95"]],
+        "slope_point_pct_per_C": round(tr["slope"], 2) if np.isfinite(tr["slope"]) else None,
+        "expected_pct_per_C": BEKLENEN_CC,
+        "n_months": tr["n"],
+    }
+    if etiketli:
+        anlamli = _aralik_gecerli(tr["ci95"]) and tr["ci95"][0] > 0
+        sonuc.update(label(tr["ci95"], BEKLENEN_CC, anlamli=anlamli, n=tr["n"], n_min=24))
+        sonuc["note"] = "deniz üzerinde bağıl nem yaklaşık sabit kalır; beklenen %6–8/°C"
+    else:
+        sonuc["note"] = ("kara: etiket yok (bilgi). Karada bağıl nem düştüğü için eğim %7'nin "
+                         "altında kalabilir")
     return sonuc

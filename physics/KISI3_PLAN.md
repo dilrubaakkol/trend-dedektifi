@@ -353,5 +353,23 @@ gerçek sonucu `cache/results/`'e yazar. Sentetik sonuç `cache/physics/`'e gide
 `cache/results/`'te yer tutucu istemiyor). Duyarlılık kontrolü (hücre içi rakım std > 400 m)
 yapılmadı: Kişi 1 rakım std dosyası üretmiyor.
 
+**Adım 7 durumu (2026-11-14):** `water_budget()` ve `clausius_clapeyron()` `physics/tests_physical.py`'de;
+çalıştırma `python -m physics.run --test butce` (demo:konya) ve `--test cc` (deniz_karadeniz
+etiketli + turkiye etiketsiz; `ozgul_nem_2m` ve `su_buhari_kolon`). Sentetikte: gizli kuyu çekimi
+→ `celiskili` + "olası insan kaynaklı kayıp" notu; kayıp yok → `uyumlu`; CC %7 → `uyumlu`,
+%3 ya da %11 → `celiskili`, aralık 100 denemede ≥ %90 kapsıyor.
+- GRACE eğimi mevsim döngüsü çıkarılarak hesaplanır (plan bunu söylemiyordu; mevsimsellik Sen
+  eğimini ve r1'i bozar).
+- **Bilinen sınırlama:** depolama aylık akıların birikimidir (rastgele yürüyüşe yakın); r1 0,95'te
+  kırpıldığından GRACE eğim aralığı gerçekte olduğundan dar olabilir. Konya'da fark büyük
+  beklendiği için etiketi değiştirmesi beklenmez; jüriye söylenir.
+- **Bekleyen veri (Kişi 1):** `toplam_su_depolama__GRACE`, `yagis__GPM/GLDAS/MERRA2`,
+  `buharlasma__GLDAS`, `yuzey_akisi__GLDAS`, `taban_akisi__GLDAS`, `ozgul_nem_2m__MERRA2`,
+  `su_buhari_kolon__MERRA2`, `sicaklik_2m__MERRA2`. Sentetik yedekleri yok; dosyalar gelmeden
+  komut "Veri eksik" der.
+- **Kişi 4'e iletilecek Konya metni:** `celiskili` + note "olası insan kaynaklı kayıp (yeraltı
+  suyu çekimi / sulama): GLDAS sulamayı ve kuyu çekimini modellemez; GRACE'in etkin çözünürlüğü
+  yüzlerce km". Kart: `su_kaynaklari`. CC için kart: `nem_artisi`.
+
 **Ortam notu (Windows):** Kullanıcı klasörü adında Türkçe karakter olduğu için netCDF4 geçici
 klasöre yazamıyor. Testler `pytest --basetemp=D:/pytest_tmp` ile çalıştırılır.
