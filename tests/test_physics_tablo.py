@@ -149,3 +149,14 @@ def test_cift4_notu_8_satiri_aciklar(maske):
     a, b = _cift(maske, ters_bolge=None)
     df = cift_tablosu(4, a.clip(min=0), b)
     assert df["not"].str.contains("8 satır").all() and df["not"].str.contains("300 km").all()
+
+
+def test_cift4_notu_baska_ulkede_ulke_metni():
+    from physics import tablo as T
+    try:
+        T.ulke_ayarla("yunanistan")
+        n = T._not(CIFT[4], "beklenen_yonde")
+    finally:
+        T.ulke_ayarla(None)
+    assert "ülke satırı" in n and "7 bölge" not in n
+    assert "7 bölge" in T._not(CIFT[4], "beklenen_yonde")

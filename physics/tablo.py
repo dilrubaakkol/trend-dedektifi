@@ -130,7 +130,8 @@ def ham_iliski(x, y, t) -> dict:
 
 def _not(c: Cift, et: str | None) -> str:
     """Satır notu: çiftin notu + etikete özel not (ciftler.yaml) ya da genel "incelenmeli" notu."""
-    parca = [c.not_] if c.not_ else []
+    metin = c.not_ulke if (ULKE != "turkiye" and c.not_ulke) else c.not_
+    parca = [metin] if metin else []
     if et in c.etiket_notlari:                    # ör. çift 5: yön kuraklığa bağlı (fiziksel)
         parca.append(c.etiket_notlari[et])
     elif et == "ters_yonde":

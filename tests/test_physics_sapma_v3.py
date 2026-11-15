@@ -109,7 +109,9 @@ def _paket(tmp_path):
     return tmp_path / "paket", sul, kuzey & kara
 
 
-def test_uret_yaz_sulanan_alan_tepede(tmp_path):
+def test_uret_yaz_sulanan_alan_tepede(tmp_path, monkeypatch):
+    import physics.sapma as SP
+    monkeypatch.setattr(SP, "_cache_oku", lambda *a, **k: None)          # cache'teki gerçek 0,05° dosyalarına bakma
     paket, sul, orman = _paket(tmp_path)
     r = V3.uret_yaz(paket, ("025", "005"))
     assert r["atlanan"] and "005" in r["atlanan"][0]                      # 0,05° yoksa atlanır, hata yok

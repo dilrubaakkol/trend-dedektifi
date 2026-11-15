@@ -52,6 +52,7 @@ class Cift:
     harita: bool = True  # hücre haritası üretilir mi (çift 4: hayır)
     not_: str = ""
     ad: str = ""
+    not_ulke: str = ""                  # Türkiye dışı paketlerde not_ yerine (il/bölge yok)
     mevsim: str = ""
     aylar: tuple | None = None          # yalnız aylik: y'nin kullanılan ayları
     fiziksel_gerekce: str = ""
@@ -146,7 +147,7 @@ def _cift_kur(d: dict) -> Cift:
     return Cift(no=int(no), d1=str(x["degisken"]), u1=str(x["urun"]), d2=str(y["degisken"]),
                 u2=str(y["urun"]), seri=seri_adi(mevsim, aylar), beklenen=beklenen,
                 kademe=int(d["kademe"]), gecikmeler=gecikmeler, harita=harita,
-                not_=str(d.get("not") or ""), ad=str(d.get("ad") or ""), mevsim=mevsim, aylar=aylar,
+                not_=str(d.get("not") or ""), not_ulke=str(d.get("not_ulke") or ""), ad=str(d.get("ad") or ""), mevsim=mevsim, aylar=aylar,
                 fiziksel_gerekce=str(d.get("fiziksel_gerekce") or ""),
                 kar_maskesi_esik=None if esik is None else float(esik), etiket_notlari=notlar,
                 kalite_kontrolu=bool(d.get("kalite_kontrolu", False)), rejime_bagli=rejime_bagli,
