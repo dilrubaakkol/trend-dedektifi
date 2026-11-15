@@ -1031,9 +1031,6 @@ def page_soru() -> None:
         st.error(f"Soru cevaplanamadı ({type(e).__name__}). Lütfen soruyu farklı yazmayı dene.")
         return
 
-    # llm.evidence.products_of kaynak uyumu dosyasını ürün sanıyor (Kişi 4'e bildirildi): boş satırı gösterme
-    out = {**out, "evidence": [e for e in out.get("evidence") or []
-                               if not str(e.get("id", "")).startswith("trend__") or "__kaynak_uyumu" not in str(e["id"])]}
     plan = out.get("plan") or {}
     chips = [badge("sayılar doğrulandı" if out.get("verified") else "doğrulanamadı", "ok" if out.get("verified") else "bad"),
              badge(f"açıklama: {'dil modeli' if out.get('explainer') == 'llm' else 'şablon'}", "info")]
