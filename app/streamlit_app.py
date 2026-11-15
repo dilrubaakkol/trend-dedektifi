@@ -1001,12 +1001,19 @@ def _pick_example() -> None:
         st.session_state["q_text"] = st.session_state["q_example"]
 
 
+ROADMAP_PAGES = {"soru"}   # v0.1 kapsamı dışında, "yol haritası" olarak işaretlenen sayfalar
+
+
 def page_soru() -> None:
     """Serbest soru → plan → paketten kanıt → doğrulanmış açıklama (Kişi 4'ün llm.answer katmanı)."""
     kitle = "akademisyen" if academic else "genel"
     header("Soru sor", "Sorunu yaz; cevap analiz paketindeki kanıtlardan kurulsun.",
            "Soru bir konuya ve bölgeye çevrilir, ilgili trend ve ilişki sonuçları paketten okunur. Metindeki her sayı "
-           "bir kanıt satırına bağlıdır ve doğrulayıcıdan geçer; dil modeli sayı üretmez.", tag="Yol haritası · deneysel")
+           "bir kanıt satırına bağlıdır ve doğrulayıcıdan geçer; dil modeli sayı üretmez.", tag="Yol haritası")
+    # Ekip kararı (Esra, 81356d8): v0.1 kapsamı dışında, "yol haritası" olarak işaretlenir.
+    st.markdown('<div class="td-callout warn">Bu özellik v0.1 kapsamı dışındadır: çalışır ve metindeki her sayı '
+                "doğrulanır, ancak yapay zekâ ile soru yorumlama ve metin yazma henüz sınanmadı. Veri paketi, harita "
+                "ve il sayfaları bundan etkilenmez.</div>", unsafe_allow_html=True)
     st.pills("Örnek sorular", EXAMPLE_QUESTIONS, key="q_example", on_change=_pick_example)
     q = st.text_area("Soru", key="q_text", height=90, label_visibility="collapsed",
                      placeholder="Örn. Erzurum'da kar azalıyor mu, ısınmayla ilişkili mi?")
@@ -1345,7 +1352,8 @@ def masthead() -> str:
             st.rerun()
     pages = auth.pages_for(user)
     with st.container(key="navbar"):
-        page = st.segmented_control("Sayfa", pages, default=pages[0], key="page", format_func=auth.PAGES.get,
+        page = st.segmented_control("Sayfa", pages, default=pages[0], key="page",
+                                    format_func=lambda k: auth.PAGES[k] + (" · yol haritası" if k in ROADMAP_PAGES else ""),
                                     label_visibility="collapsed") or pages[0]
     return page
 

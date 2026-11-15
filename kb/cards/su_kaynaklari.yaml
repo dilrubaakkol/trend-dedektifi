@@ -1,8 +1,9 @@
 id: su_kaynaklari
 baslik: Yeraltı ve toplam su depolarının azalması
 konu: Kuraklık ve su
+buyukluk_testleri: [butce]   # L4_iliski/buyukluk/ (sözleşme 2.5)
 sade_tanim: GRACE uyduları yerçekimindeki küçük değişimlerden bir bölgenin toplam suyunun azalıp arttığını ölçer.
-soru_kaliplari: ["yeraltı suyu", "yer altı", "su seviyesi", "göl", "baraj", "su kaynak", "obruk", "kuyu"]
+soru_kaliplari: ["yeraltı suyu", "yer altı", "su seviyesi", "göl", "baraj", "su kaynak", "obruk", "kuyu", "su bütçesi", "grace"]
 ornek_sorular:
   - "Konya'da yeraltı suyu azalıyor mu?"
 belirti:

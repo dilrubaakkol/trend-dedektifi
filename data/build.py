@@ -66,27 +66,35 @@ def resolve_path(degisken: str, grid: str = "025", product: str | None = None,
 
 
 def load(degisken: str, region="turkiye", grid: str = "025", product: str | None = None,
-         sentetik: str | bool = "otomatik", all_touched: bool = False) -> xr.DataArray:
-    """İşlenmiş tüm-Türkiye küpünü açar ve bölgeye keser.
+         sentetik: str | bool = "otomatik", all_touched: bool = False, ulke: str | None = None) -> xr.DataArray:
+    """İşlenmiş ülke küpünü (varsayılan Türkiye) açar ve bölgeye keser.
 
     Döndürür: xr.DataArray (time, lat, lon) — rakım için (lat, lon). attrs: dosyanın tüm attrs'ı
     + region, region_label, region_kind, region_cells, region_method.
-    region: il / bölge / "turkiye" / deniz adı, bbox (batı, güney, doğu, kuzey), GeoJSON ya da None
-    (None → kesmeden tüm kutu).
+    region: il / bölge / "turkiye" / ülke anahtarı ("yunanistan") / deniz adı, bbox, GeoJSON ya da None
+    (None → kesmeden tüm kutu). ``ulke``: cache/processed/<ulke>/ (ör. load("ndvi", "yunanistan",
+    ulke="yunanistan")).
     """
     from data.regions import subset
-    path = resolve_path(degisken, grid, product, sentetik)
-    with xr.open_dataset(path) as ds:
-        ds = ds.load()
-    if region is not None:
-        ds = subset(ds, region, all_touched=all_touched)
+    from data.ulkeler import ulke_baglami
+    with ulke_baglami(ulke):
+        path = resolve_path(degisken, grid, product, sentetik)
+        with xr.open_dataset(path) as ds:
+            ds = ds.load()
+        if region is not None:
+            ds = subset(ds, region, all_touched=all_touched)
     da = ds[degisken]
     da.attrs = {**ds.attrs, **da.attrs, "file": path.name}
     return da
 
 
-def summarize(folder: Path = TURKIYE_DIR) -> pd.DataFrame:
-    """İşlenmiş dosyaların özeti: değişken, ürün, ızgara, boyut, dönem, NaN oranı, MB."""
+def summarize(folder: Path | None = None) -> pd.DataFrame:
+    """İşlenmiş dosyaların özeti: değişken, ürün, ızgara, boyut, dönem, NaN oranı, MB.
+
+    ``folder`` verilmezse aktif ülkenin klasörü (varsayılan cache/processed/turkiye/).
+    """
+    from data.grid import ulke_dir
+    folder = Path(folder) if folder is not None else ulke_dir()
     rows = []
     for f in sorted(folder.glob("*.nc")):
         with xr.open_dataset(f) as ds:
@@ -106,8 +114,19 @@ def summarize(folder: Path = TURKIYE_DIR) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def build(names=None, categories=None, skip_fetch=False, onay=False, include_secondary=True) -> dict:
-    """Seçili değişkenler için fetch → harmonize çalıştırır; sonuç sözlüğü döndürür."""
+def build(names=None, categories=None, skip_fetch=False, onay=False, include_secondary=True,
+          ulke: str | None = None) -> dict:
+    """Seçili değişkenler için fetch → harmonize çalıştırır; sonuç sözlüğü döndürür.
+
+    ``ulke``: data/ulkeler.yaml anahtarı (varsayılan turkiye). Ham kesitler cache/raw/<ulke>/<urun>/
+    (Türkiye: cache/raw/<urun>/), işlenmiş dosyalar cache/processed/<ulke>/.
+    """
+    from data.ulkeler import ulke_baglami
+    with ulke_baglami(ulke):
+        return _build(names, categories, skip_fetch, onay, include_secondary)
+
+
+def _build(names, categories, skip_fetch, onay, include_secondary) -> dict:
     from data.fetch import fetch_product
     from data.harmonize import harmonize
     sel = variables(names, categories, include_secondary=include_secondary)
@@ -141,21 +160,25 @@ def main(argv=None):
     ap.add_argument("--onay", action="store_true", help="büyük/ertelenmiş ürünleri de indir")
     ap.add_argument("--sadece-ana", action="store_true", help="yalnız ana ürünler")
     ap.add_argument("--ozet", action="store_true", help="yalnız mevcut dosyaların özetini yaz")
+    ap.add_argument("--ulke", default=None, help="data/ulkeler.yaml anahtarı (varsayılan turkiye)")
     a = ap.parse_args(argv)
+    from data.ulkeler import aktif, ulke_baglami
     if not a.ozet:
         names = None if a.vars in (None, "all") else a.vars.split(",")
         cats = a.categories.split(",") if a.categories else None
         if a.vars is None and cats is None:
             ap.error("--vars ya da --categories gerekli")
-        out = build(names, cats, a.skip_fetch, a.onay, not a.sadece_ana)
+        out = build(names, cats, a.skip_fetch, a.onay, not a.sadece_ana, ulke=a.ulke)
         errs = {k: v for k, v in out["harmonize"].items() if isinstance(v, str)}
         if errs:
             print("\nİşlenemeyenler:")
             for (ad, urun), msg in errs.items():
                 print(f"  {ad} ({urun}): {msg[:200]}")
-    df = summarize()
+    with ulke_baglami(a.ulke):
+        df = summarize()
+        klasor = aktif()
     with pd.option_context("display.width", 200, "display.max_rows", 200, "display.max_colwidth", 40):
-        print("\nÜRETİLEN DOSYALAR (cache/processed/turkiye/)")
+        print(f"\nÜRETİLEN DOSYALAR (cache/processed/{klasor}/)")
         print(df.to_string(index=False) if len(df) else "  (yok)")
 
 

@@ -54,7 +54,8 @@ def _numbers_in(obj) -> list[float]:
 def _years(results: dict) -> set[float]:
     """Analiz dönemindeki yıllar ("2001-01 … 2025-12", ["2001-01", "2025-12"] ya da analizlerin
     "donem" alanları). Metinde bu yıllar serbestçe geçebilir."""
-    texts = [str(results.get("period", ""))] + [str(a.get("donem", "")) for a in results.get("analyses", [])]
+    texts = [str(results.get("period", ""))] + [str(a.get(k, "")) for a in results.get("analyses", [])
+                                                for k in ("donem", "ortak_donem")]
     years = [int(y) for t in texts for y in re.findall(r"(?<!\d)(1[89]\d\d|20\d\d)(?!\d)", t)]
     return {float(y) for y in range(min(years), max(years) + 1)} if years else set()
 
@@ -87,10 +88,17 @@ def verify_text(text: str, results: dict, extra_allowed: set[float] | None = Non
 
     ignore_phrases: içinde rakam olan ama sonuç olmayan ifadeler (değişken başlıkları, birimler)."""
     text = _strip_phrases(text, ignore_phrases)
+    # "2025-09" gibi yıl-ay tarihlerinde ay kısmı ayrı bir sayı değildir: yalnız yıl kalsın.
+    text = re.sub(r"((?:19|20)\d\d)-(?:0[1-9]|1[0-2])(?!\d)", r"\1", text)
     ids = {a.get("id") for a in results.get("analyses", [])}
     unknown = sorted({r for r in REF.findall(text) if r not in ids})
 
     ref_numbers = _numbers_in(results.get("analyses", []))
+    # Karne/büyüklük kanıtlarının metin sütunlarındaki paket sayıları ("2/3 ürün", "Held ve Soden 2006").
+    for a in results.get("analyses", []):
+        for t in a.get("sayi_metinleri", []) or []:
+            for tok in NUM.findall(re.sub(r"((?:19|20)\d\d)-(?:0[1-9]|1[0-2])(?!\d)", r"\1", str(t))):
+                ref_numbers += [v for v, _ in parse_tr(tok)]
     candidates = set()
     for r in ref_numbers:
         candidates.update({abs(r), abs(r) * 100})

@@ -1,0 +1,38 @@
+# Ülke ayarları (Kişi 1). Veri katmanı bu dosyadaki ülke için çalışır; varsayılan: turkiye.
+#
+# anahtar     : dosya/klasör adlarında kullanılan ASCII ad (cache/processed/<anahtar>/,
+#               outputs/trend-dedektifi-<anahtar>-<surum>/)
+# ad          : kullanıcıya dönük ad (işlem notlarında "… kesiti")
+# iso3        : ISO 3166-1 alpha-3 (Natural Earth ADM0_A3 ile eşleştirilir)
+# ic_kutu     : işleme kutusu (batı, güney, doğu, kuzey), derece. İndirme kesiti = ic_kutu + 1° pay.
+# yayin_kutusu: L1 paketinin kutusu; 0,25° hücre kenarlarına hizalı ve ic_kutu içinde olmalı.
+# ne_adi      : Natural Earth admin-0 ülke adı (NAME)
+# kara        : kara maskesinin kaynağı. "iller" = data/boundaries/iller.geojson birleşimi (yalnız Türkiye);
+#               aksi halde data/boundaries/ altında GeoJSON yolu (python -m data.make_boundaries --ulke <anahtar>)
+# kutu_kara   : kutudaki bütün kara (komşu ülkeler dahil); "ocean" maskesi bunun tersi
+# ek_uyarilar : <degisken>__<urun> → yayın paketinde bilinen_sorunlar attr'ına eklenecek ülkeye özgü not
+
+turkiye:
+  ad: Türkiye
+  iso3: TUR
+  ic_kutu: [25.0, 34.5, 45.5, 43.0]        # data.grid.TURKIYE_BBOX ile birebir aynı
+  yayin_kutusu: [25.5, 35.5, 45.0, 42.5]   # data.export.YAYIN_BBOX ile birebir aynı
+  ne_adi: Turkey
+  kara: iller
+  kutu_kara: kara.geojson
+
+yunanistan:
+  ad: Yunanistan
+  iso3: GRC
+  ic_kutu: [19.0, 34.5, 30.0, 42.0]
+  # Natural Earth GRC sınırının dış kutusu (19,6265, 34,815, 28,2398, 41,7505) 0,25°'ye dışa doğru yuvarlandı
+  # (data.ulkeler.yayin_kutusu_hesapla; tests/test_data_ulkeler.py sınır dosyasından yeniden hesaplayıp
+  # karşılaştırır). 0,25°'de 29 enlem × 35 boylam hücre. Not: NE 10m GRC çokgeninde Meis (Kastellorizo) yok.
+  yayin_kutusu: [19.5, 34.75, 28.25, 42.0]
+  ne_adi: Greece
+  kara: yunanistan/kara.geojson
+  kutu_kara: yunanistan/kutu_kara.geojson
+  ek_uyarilar:
+    toplam_su_depolama__GRACE: >-
+      GRACE/GRACE-FO JPL mascon çözünürlüğü ~3° (~300 km); Yunanistan gibi küçük ve kıyısı uzun bir ülkede
+      hücre değerleri komşu ülkelerin ve denizin sinyalini de taşır (sızıntı). Bölge ortalaması kaba okunmalı.

@@ -1,0 +1,51 @@
+# Motorun bağımsız fizik sınavı — ÖN KAYIT (2026-11-15)
+#
+# Bu çiftler motorun geliştirilmesinde (ciftler.yaml'daki 6 çift) KULLANILMADI. Beklenen yönler
+# motor bu çiftlerde çalıştırılmadan ÖNCE, fizik bilgisine göre yazıldı ve dosya sonradan değiştirilmez.
+# Dosyanın SHA-256 özeti sınav çıktısına yazılır; özet farklıysa sınav geçersizdir.
+#
+# sinif:
+#   kontrol : aynı büyüklüğün iki ayrı ölçümü ya da tanımca bağlı iki değişken. Motorun boru hattı doğru
+#             çalışıyorsa bunlar NEREDEYSE KESİN beklenen yönde çıkar. Ters çıkarsa motorda hata vardır.
+#   fizik   : bilinen fiziksel süreç; ilişki gerçek ama zayıf olabilir ("anlamsiz" başarısızlık değildir,
+#             "ters_yonde" ise incelenir).
+# bolge: tum_bolgeler (7 bölge + Türkiye, p < 0,05). Seri: motorun mevsim seçeneği.
+#
+# BAŞARI ÖLÇÜTÜ (önceden):
+#   1) kontrol sınıfında Türkiye satırlarının hepsi beklenen_yonde; hiçbir satır ters_yonde değil.
+#   2) fizik sınıfında Türkiye satırlarında ters_yonde sayısı ≤ 1 ve beklenen_yonde oranı ≥ %60.
+#   Ölçüt tutmazsa sonuç "başarısız" diye raporlanır; çiftler ya da ölçüt değiştirilmez.
+
+ciftler:
+  # ---- kontrol
+  - {no: K1, sinif: kontrol, x: [sicaklik_2m, MERRA2], y: [sicaklik_2m, GLDAS], mevsim: aylik, beklenen: "+",
+     gerekce: "aynı hava sıcaklığının iki ayrı ürünü"}
+  - {no: K2, sinif: kontrol, x: [ndvi, MOD13C2], y: [evi, MOD13C2], mevsim: yaz, beklenen: "+",
+     gerekce: "iki bitki örtüsü indeksi aynı yeşilliği ölçer"}
+  - {no: K3, sinif: kontrol, x: [ozgul_nem_2m, MERRA2], y: [su_buhari_kolon, MERRA2], mevsim: aylik, beklenen: "+",
+     gerekce: "yüzey nemi ile toplam su buharı aynı hava kütlesinde birlikte değişir"}
+  - {no: K4, sinif: kontrol, x: [yagis, GPM], y: [yagis, MERRA2], mevsim: aylik, beklenen: "+",
+     gerekce: "aynı yağışın uydu ve yeniden analiz ürünü"}
+  - {no: K5, sinif: kontrol, x: [sicaklik_2m, MERRA2], y: [yuzey_sicakligi_gece, MOD11C3], mevsim: aylik, beklenen: "+",
+     gerekce: "hava ile gece yüzey sıcaklığı birlikte ısınır"}
+  # ---- fizik
+  - {no: F1, sinif: fizik, x: [kar_ortusu, MOD10CM], y: [kar_su_esdegeri, GLDAS], mevsim: kis, beklenen: "+",
+     gerekce: "uydu kar örtüsü ile model kar kütlesi (farklı kaynak)"}
+  - {no: F2, sinif: fizik, x: [yagis, GPM], y: [yuzey_akisi, GLDAS], mevsim: aylik, beklenen: "+",
+     gerekce: "yağış arttıkça yüzey akışı artar"}
+  - {no: F3, sinif: fizik, x: [yagis, GPM], y: [kok_bolgesi_nemi, GLDAS], mevsim: ilkbahar, beklenen: "+",
+     gerekce: "yağışlı ilkbahar kök bölgesini nemlendirir"}
+  - {no: F4, sinif: fizik, x: [bulut_orani, MERRA2], y: [yuzey_sicakligi_gunduz, MOD11C3], mevsim: yaz, beklenen: "-",
+     gerekce: "bulut güneşi keser, gündüz yüzeyi serin kalır"}
+  - {no: F5, sinif: fizik, x: [bulut_orani, MERRA2], y: [yagis, GPM], mevsim: aylik, beklenen: "+",
+     gerekce: "bulutlu aylar yağışlı aylardır"}
+  - {no: F6, sinif: fizik, x: [sicaklik_2m, MERRA2], y: [ozgul_nem_2m, MERRA2], mevsim: aylik, beklenen: "+",
+     gerekce: "Clausius-Clapeyron: sıcak hava daha çok nem taşır"}
+  - {no: F7, sinif: fizik, x: [toprak_nemi, GLDAS], y: [yuzey_sicakligi_gunduz, MOD11C3], mevsim: yaz, beklenen: "-",
+     gerekce: "kuru toprak buharlaşmayla soğuyamaz, yüzey ısınır"}
+  - {no: F8, sinif: fizik, x: [deniz_seviyesi_basinci, MERRA2], y: [yagis, GPM], mevsim: kis, beklenen: "-",
+     gerekce: "alçak basınç (siklon) yağış getirir"}
+  - {no: F9, sinif: fizik, x: [ruzgar_hizi, GLDAS], y: [no2, OMI], mevsim: kis, beklenen: "-",
+     gerekce: "rüzgâr kirliliği dağıtır"}
+  - {no: F10, sinif: fizik, x: [yagis, GPM], y: [aerosol_optik_derinlik, MERRA2], mevsim: aylik, beklenen: "-",
+     gerekce: "yağış tozu ve aerosolü yıkar"}

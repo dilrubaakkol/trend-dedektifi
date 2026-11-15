@@ -38,7 +38,8 @@ import yaml
 from shapely.geometry import box, shape
 from shapely.geometry.base import BaseGeometry
 
-from data.grid import TURKIYE_BBOX
+from data.grid import TURKIYE_BBOX, ulke_kutusu
+from data.ulkeler import aktif, ulke, ulke_listesi
 
 BOUNDARY_DIR = Path(__file__).resolve().parent / "boundaries"
 
@@ -161,6 +162,33 @@ def land_geometry() -> BaseGeometry:
     return shapely.make_valid(shape(g))
 
 
+@lru_cache(maxsize=8)
+def _ulke_geom(anahtar: str, alan: str) -> BaseGeometry:
+    u = ulke(anahtar)
+    if u[alan] == "iller":
+        return turkiye_geometry()
+    if u[alan] == "kara.geojson":
+        return land_geometry()
+    return shapely.make_valid(_geojson_to_geom(_read_geojson(u[alan])))
+
+
+def ulke_geometry(anahtar: str | None = None) -> BaseGeometry:
+    """Ülkenin kara sınırı (``None`` → aktif ülke). Türkiye: 81 ilin birleşimi (``turkiye_geometry``);
+    diğerleri: ``data/boundaries/<ulke>/kara.geojson`` (Natural Earth admin-0, ``make_boundaries --ulke``)."""
+    return _ulke_geom(anahtar or aktif(), "kara")
+
+
+def kutu_kara_geometry(anahtar: str | None = None) -> BaseGeometry:
+    """Ülke kutusundaki bütün kara (komşular dahil); ``ocean`` maskesi bunun tersidir."""
+    return _ulke_geom(anahtar or aktif(), "kutu_kara")
+
+
+def ulke_maskesi(lat, lon, anahtar: str | None = None) -> np.ndarray:
+    """(lat, lon) ızgarasında ülke kara maskesi (hücre merkezi içeride). Fizik tarafı için tek giriş:
+    ``ulke_maskesi(da.lat, da.lon, "yunanistan")``. Yayın paketindeki ``domain: land`` maskesiyle aynıdır."""
+    return domain_mask("land", lat, lon, ulke=anahtar)
+
+
 @lru_cache(maxsize=None)
 def _bolge_geom(key: str) -> BaseGeometry:
     il = _iller()
@@ -204,9 +232,10 @@ def resolve_region(region) -> dict:
         w, s, e, n = map(float, region)
         if not (w < e and s < n):
             raise ValueError(f"bbox (batı, güney, doğu, kuzey) sırasında olmalı: {region}")
-        tw, ts, te, tn = TURKIYE_BBOX
+        kutu = ulke_kutusu()                      # aktif ülke (varsayılan Türkiye: TURKIYE_BBOX)
+        tw, ts, te, tn = kutu
         if e <= tw or w >= te or n <= ts or s >= tn:
-            raise ValueError(f"bbox Türkiye kutusunun {TURKIYE_BBOX} dışında: {region}")
+            raise ValueError(f"bbox {ulke()['ad']} kutusunun {kutu} dışında: {region}")
         return {"kind": "bbox", "key": f"bbox_{w:g}_{s:g}_{e:g}_{n:g}",
                 "label": f"Kutu {w:g},{s:g},{e:g},{n:g}", "geom": None, "bbox": (w, s, e, n)}
     if not isinstance(region, str):
@@ -219,10 +248,10 @@ def resolve_region(region) -> dict:
         return resolve_region(json.loads(Path(text).read_text(encoding="utf-8")))
 
     prefix, _, rest = text.partition(":")
-    if rest and normalize_name(prefix) in ("il", "bolge", "deniz", "demo"):
+    if rest and normalize_name(prefix) in ("il", "bolge", "deniz", "demo", "ulke"):
         kinds, key = [normalize_name(prefix)], normalize_name(rest)
     else:
-        kinds, key = ["turkiye", "bolge", "il", "deniz", "demo"], normalize_name(text)
+        kinds, key = ["turkiye", "ulke", "bolge", "il", "deniz", "demo"], normalize_name(text)
 
     for kind in kinds:
         r = _lookup(kind, key)
@@ -234,6 +263,11 @@ def resolve_region(region) -> dict:
 def _lookup(kind: str, key: str) -> dict | None:
     if kind == "turkiye" and key in ("turkiye", "tr", "turkey", "tum_turkiye", "tumu"):
         return _geom_result("turkiye", "turkiye", "Türkiye (tamamı)", turkiye_geometry())
+    if kind == "ulke":                        # Türkiye dışındaki ülkeler (anahtar, ISO3, ad ya da NE adı)
+        for k in ulke_listesi():
+            u = ulke(k)
+            if k != "turkiye" and key in (k, u["iso3"].lower(), normalize_name(u["ad"]), normalize_name(u["ne_adi"])):
+                return _geom_result("ulke", k, f"{u['ad']} (tamamı)", ulke_geometry(k))
     if kind == "bolge":
         k = re.sub(r"_(bolgesi|bolge)$", "", key)
         if k in _bolgeler():
@@ -302,21 +336,24 @@ def polygon_mask(geom: BaseGeometry, lat, lon, all_touched: bool = False) -> np.
 
 
 @lru_cache(maxsize=16)
-def _domain_mask_cached(domain: str, lat_t: tuple, lon_t: tuple) -> np.ndarray:
+def _domain_mask_cached(domain: str, ulke_: str, lat_t: tuple, lon_t: tuple) -> np.ndarray:
     lat, lon = np.array(lat_t), np.array(lon_t)
     if domain == "land":
-        return polygon_mask(turkiye_geometry(), lat, lon)
+        return polygon_mask(ulke_geometry(ulke_), lat, lon)
     if domain == "ocean":
-        inside = polygon_mask(box(*TURKIYE_BBOX), lat, lon)
-        return inside & ~polygon_mask(land_geometry(), lat, lon)
+        inside = polygon_mask(box(*ulke_kutusu(ulke_)), lat, lon)
+        return inside & ~polygon_mask(kutu_kara_geometry(ulke_), lat, lon)
     raise ValueError(f"Bilinmeyen domain: {domain}")
 
 
-def domain_mask(domain: str, lat, lon) -> np.ndarray | None:
-    """domain maskesi (True = geçerli): "land" = Türkiye karası, "ocean" = kutudaki deniz, "all" = None."""
+def domain_mask(domain: str, lat, lon, ulke: str | None = None) -> np.ndarray | None:
+    """domain maskesi (True = geçerli): "land" = ülkenin karası, "ocean" = ülke kutusundaki deniz, "all" = None.
+
+    ``ulke`` verilmezse aktif ülke (varsayılan Türkiye; davranış eskisiyle aynı).
+    """
     if domain == "all":
         return None
-    return _domain_mask_cached(domain, tuple(np.round(np.asarray(lat, float), 6)),
+    return _domain_mask_cached(domain, ulke or aktif(), tuple(np.round(np.asarray(lat, float), 6)),
                                tuple(np.round(np.asarray(lon, float), 6)))
 
 
@@ -340,12 +377,14 @@ def subset(ds: xr.Dataset | xr.DataArray, region, all_touched: bool = False):
     domain = ds.attrs.get("domain", "all")
     geom = r["geom"]
     method = "merkez"
-    if domain == "ocean" and r["kind"] in ("turkiye", "bolge", "il"):
+    if domain == "ocean" and r["kind"] in ("turkiye", "ulke", "bolge", "il"):
         if r["kind"] == "turkiye":
             geom = box(*TURKIYE_BBOX)
+        elif r["kind"] == "ulke":
+            geom = box(*ulke_kutusu(r["key"]))
         else:
             geom = geom.buffer(OCEAN_BUFFER_DEG)
-        method = f"kıyı tamponu {OCEAN_BUFFER_DEG}°" if r["kind"] != "turkiye" else "tüm kutu"
+        method = f"kıyı tamponu {OCEAN_BUFFER_DEG}°" if r["kind"] not in ("turkiye", "ulke") else "tüm kutu"
     elif domain == "land" and r["kind"] == "deniz":
         warnings.warn(f"Kara değişkeni deniz bölgesiyle ({r['label']}) kesiliyor; sonuç boş olabilir.")
 
