@@ -35,7 +35,7 @@ import xarray as xr
 
 from data.catalog import load_catalog, product, variables
 from data.grid import RAW_DIR, ulke_kutusu
-from data.ulkeler import aktif, varsayilan_mi
+from data.ulkeler import aktif, ulke_yazimi, varsayilan_mi
 
 MARGIN = 1.0              # kesit payı, derece (kaba ürünlerin kenar interpolasyonu için)
 SIZE_LIMIT_GB = 30.0      # bunun üstünde --onay gerekir
@@ -502,7 +502,7 @@ def _process_one(g, p: dict, names: list[str], out: Path, tmp: Path) -> Path:
                 for x in files:
                     Path(x).unlink(missing_ok=True)
     if any(int(ds.sizes.get(d, 0)) == 0 for d in ("lat", "lon")):
-        raise ValueError("Türkiye kesiti boş")
+        raise ValueError(f"{ulke_yazimi()} kesiti boş")
     ds.attrs.update(source_granule=granule_name(g), source_product=p["short_name"],
                     source_version=str(p["version"]))
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -583,7 +583,7 @@ def fetch_product(key: str, start=None, end=None, test_only=False, onay=False,
     total_mb = sum(float(g.size or 0) for g in gs)
     rep["toplam_mb"] = round(total_mb, 1)
     print(f"[{key}] {len(gs)} granül, kaynak toplamı ~{total_mb / 1024:.1f} GB "
-          f"({p['erisim']}: {'tam indirme' if p['erisim'] == 'download' else 'yalnız Türkiye kesiti aktarılır'})")
+          f"({p['erisim']}: {'tam indirme' if p['erisim'] == 'download' else f'yalnız {ulke_yazimi()} kesiti aktarılır'})")
     big = (p["erisim"] == "download" and total_mb / 1024 > SIZE_LIMIT_GB) or p["zaman"] == "gunluk"
     if big and not onay and not test_only:
         rep["durum"] = (f"onay gerekli: ~{total_mb / 1024:.0f} GB / {len(gs)} dosya. "
