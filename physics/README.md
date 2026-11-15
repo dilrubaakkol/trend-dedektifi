@@ -49,6 +49,28 @@ Ekrandaki **ham r** trendi çıkarmadan, **r (trendsiz)** trendi çıkararak hes
 iki serinin aynı dönemdeki trendi ilişkiyi şişiriyor (sahte korelasyon) ya da gizliyor demektir; yorum
 trendsiz r ile yapılır ve komut bunu uyarı olarak yazar.
 
+## Başka ülke (ör. Yunanistan)
+
+```bash
+python -m physics.run --ulke yunanistan --surum v0.1                      # 6 çift, tek "ulke" satırı + haritalar
+python -m physics.ulke_karsilastirma --ulke yunanistan --surum v0.1       # Türkiye ile yan yana
+```
+
+Ülke L1 dosyalarının `ulke` attr'ından okunur (yoksa `turkiye`). Türkiye dışında il ve bölge sınırı yoktur:
+`ciftler.csv` her çift için tek satır yazar (`bolge_turu = ulke`, maske `data.regions.ulke_maskesi`); hücre
+haritaları Türkiye'deki gibi üretilir.
+
+## Motorun geçerliliği: bağımsız sınav ve kalibrasyon
+
+```bash
+python -m physics.bagimsiz_sinav --surum v0.1   # ön kayıtlı 15 yeni çift (physics/sinav/bagimsiz_ciftler.yaml)
+python -m physics.kalibrasyon --surum v0.1      # yapay serilerde yanılma oranları + saptanabilir r (~16 dk; --hizli ~3 dk)
+```
+
+Kalibrasyon `L4_iliski/kalibrasyon/` altına yazar: `yanilma_oranlari.csv` (yanlış alarm, ters alarm, yakalama,
+ortak trend tuzağı), `fdr_81_il.csv`, `saptanabilir_r_tablosu.csv`, `ciftler_saptanabilir_r.csv` (her gerçek satır
+için %80 güçle görülebilecek en küçük |r|; `ciftler.csv` değişmez).
+
 ## Beklentiden sapma haritası
 
 ```bash
