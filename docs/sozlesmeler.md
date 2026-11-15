@@ -600,3 +600,70 @@ Diğer sütunlar: `degisken`, `urun`, `bolge_kodu`, `bolge_adi`, `duzey`, `mevsi
 Sonuç: tek ürünlü değişkenler ve mevsimlik seri çifti en çok `ORTA` olabilir (bağımsız ikinci kaynak / gecikme
 testi yok). Ürünler ortak girdi paylaşabildiği için `a` bağımsız doğrulama değil, tutarlılık göstergesidir.
 
+
+### 2.5 Büyüklük testleri (2026-11-15; `python -m physics.buyukluk --surum v0.1 [--test cc|butce|kar_cizgisi]`)
+
+Yön testinin (L4) yanına "ne kadar" testi: gözlenen büyüklük, fiziğin beklediği bantla karşılaştırılır. L1–L4 ve
+karne dosyalarını **değiştirmez**; L1 (ve `trend_uyarisi` için L2) yalnız okunur. Çıktı `L4_iliski/buyukluk/`:
+
+| Yol | İçerik |
+| --- | --- |
+| `<test>__il.csv` | İl satırları (`cc`, `kar_cizgisi`). Su bütçesinde il yok: GRACE il ölçeğine uygun değil |
+| `<test>__bolge.csv` | 7 bölge + Türkiye satırı |
+| `ozet.csv` | Üç testin bölge ve Türkiye satırları (seçili sütunlar) |
+| `KURAL.txt` | Etiket ve güven kuralı, beklenen bantların kaynakları |
+
+Testler (`yol` sütunu):
+- **`cc`, Clausius-Clapeyron.** Nem: `ozgul_nem_2m` ve `su_buhari_kolon` (MERRA2); sıcaklık `sicaklik_2m` MERRA2.
+  `a_yillar_arasi`: trendi giderilmiş yıllık ln(nem) anomalisinin trendi giderilmiş sıcaklığa EKK eğimi × 100.
+  `b_trend_orani`: Sen eğimi(ln nem) × 100 / Sen eğimi(T). Birim %/K. Beklenen 6,6, bant **5,9–7,3 %/K**
+  (100·L/(R_v T²), 30 °C ve 0 °C; Held ve Soden 2006). "Beklenenden küçük" satırına kara notu yazılır (Simmons vd.
+  2010; Byrne ve O'Gorman 2018); etiket değişmez.
+- **`butce`, su bütçesi kapanışı.** Artık = dS/dt − (P − ET − R); dS/dt GRACE'ten merkezî fark (komşu ay yoksa boş),
+  P GPM, ET `buharlasma`, R `yuzey_akisi` + `taban_akisi` (GLDAS). `ortalama`: artığın ortalaması (mm/yıl).
+  `trend`: aylık artık anomalisinin eğimi ((mm/yıl)/10 yıl) = trend(dS/dt) − trend(P − ET − R); iki terimin ayrı
+  trendi `ek` sütununda. Bant **0 ± ortalama yıllık P'nin %10'u** (trendde /10 yıl). Bu bir proje seçimidir
+  (kaynak metni `KURAL.txt`'te). Bant dışı satıra olası açıklamalar yazılır; hangisi olduğu iddia edilmez.
+- **`kar_cizgisi`, kar çizgisi kayması** (`kis`, `ilkbahar`). Her yıl, bölgedeki 0,25° hücreler 200 m rakım
+  dilimlerine ayrılır (dilimde en az 3 hücre); medyan kar örtüsünün %50'yi aşağıdan yukarı kestiği yükselti
+  (`physics.shift.snowline_series`). Gözlenen: bu serinin Sen eğimi (m/10 yıl). Beklenen: aynı yıllarda aynı
+  bölgenin mevsim sıcaklık trendi (MERRA2) ÷ 6,5 °C/km, bant ÷ **7,5–5,5 °C/km**. En az 4 dolu dilim ve kar
+  çizgisinin en az 10 yılda (ve yılların yarısında) tanımlı olması gerekir; yoksa `hesaplanamadı`. Eksik ayı olan
+  mevsim düşer (MOD10CM boş ayları; düşen yıllar `ek` sütununda).
+
+**Güven aralığı:** dairesel blok bootstrap (Politis ve Romano 1992), blok = ceil(n / etkin n) (Bretherton vd. 1999
+gecikme-1), 999 tekrar, satıra özgü sabit tohum (crc32(anahtar) ^ 2026); GA = 2,5 ve 97,5 yüzdelikleri. Aynı
+girdiyle iki çalıştırma bayt bayt aynı dosyayı verir.
+
+**Etiket** (öncelik sırasıyla; `kural_surumu = buyukluk-v1`, sonuçlar görülmeden sabitlendi):
+
+| `etiket` | Kural |
+| --- | --- |
+| `hesaplanamadı` | GA ya da bant hesaplanamadı (gerekçe `etiket_gerekce`'de) |
+| `belirsiz` | GA genişliği > 3 × bant genişliği |
+| `beklenen büyüklükle tutarlı` | GA bantla kesişiyor |
+| `beklenenden küçük` / `beklenenden büyük` | GA tamamen bandın altında / üstünde |
+
+**Karne kontrolleri ve güven:**
+
+| Sütunlar | Kontrol | Geçti |
+| --- | --- | --- |
+| `a_kaynak_uyumu`, `a_sayi` | Alternatif ürünle tekrar (cc ve kar: sıcaklık GLDAS; bütçe: yağış MERRA2) | Aynı etiket |
+| `b_donem`, `b_sayi` | İlk 3 ve son 3 geçerli yıl ayrı ayrı çıkarılır | İkisinde de aynı etiket |
+| `c_ga_genisligi`, `c_sayi` | GA genişliği / bant genişliği | ≤ 1 |
+| `uyarilar`, `kritik` | Kademe 2, L1 `bilinen_sorunlar`, L2 `trend_uyarisi` → kritik | — |
+
+| `guven` | Kural |
+| --- | --- |
+| `YOK` | Etiket `belirsiz` ya da `hesaplanamadı` (büyüklük iddiası yok) |
+| `DÜŞÜK` | `b` geçmedi ("uygulanamaz" geçti sayılmaz) |
+| `YÜKSEK` | `a`, `b`, `c` geçti; kritik uyarı yok |
+| `ORTA` | `b` geçti ama `YÜKSEK`'in başka bir şartı sağlanmadı |
+
+Nem (Kademe 2) ve GLDAS akı/buharlaşma (Kademe 2, `trend_uyarisi`) kullanan satırlar en çok `ORTA` olabilir.
+
+Sütunlar: `test`, `yol`, `degisken`, `urun`, `bolge_turu`, `bolge_kodu`, `bolge_adi`, `hucre_sayisi`, `donem`,
+`n`, `gozlenen`, `ga_alt`, `ga_ust`, `birim`, `beklenen`, `beklenen_alt`, `beklenen_ust`, `beklenen_kaynak`,
+`etiket`, `etiket_gerekce`, `yorum`, `blok`, `tekrar`, karne sütunları (yukarıda), `guven`, `gerekce`, `ek`,
+`kural_surumu`, `urun_surumu`, `veri_seti_doi`, `lisans`. Bu bir büyüklük tutarlılığı özetidir; nedensellik
+göstermez.
