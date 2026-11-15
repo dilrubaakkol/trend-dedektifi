@@ -365,3 +365,145 @@ referanstan kaynaklanıyor olabilir, ama bu kanıtlanmış değil. Genel bilgiye
 karşılaştırmada v2'nin ilk kümelerinin çoğu bilinen sulama alanlarına (Harran, Ceylanpınar, Konya ovası)
 düşüyor; v1'de bu 10'da 1'di. Bu ikinci karşılaştırma kör değildir ve kanıt olarak kullanılmamalıdır.
 
+## Büyüklük testleri (2026-11-15)
+
+`python -m physics.buyukluk --surum v0.1` → `L4_iliski/buyukluk/`. Kural sözleşme 2.5'te (`buyukluk-v1`). Etiket ve güven
+kuralları, bantlar ve eşikler gerçek veride çalıştırılmadan önce sabitlendi ve commit edildi (`9112ff0`); sonuç
+görüldükten sonra hiçbiri değiştirilmedi. Süre: üç test, 81 il + 7 bölge + Türkiye, yaklaşık 40 sn. Aynı komut iki kez
+çalıştırıldı; dosyalar bayt bayt aynı (sabit tohum). Paketteki mevcut 140 dosyanın md5'i değişmedi, yalnız
+`buyukluk/` altında 7 yeni dosya var.
+**Clausius-Clapeyron, özgül nem** (%/K; bant 5,9–7,3):
+
+| Bölge | Yol | Gözlenen [%95 GA] | Beklenen bant | Etiket | Güven |
+| --- | --- | --- | --- | --- | --- |
+| Marmara | a_yillar_arasi | +4,42 [+1,54, +6,77] | +5,9 … +7,3 | belirsiz | YOK |
+| Ege | a_yillar_arasi | +3,02 [-0,712, +5,91] | +5,9 … +7,3 | belirsiz | YOK |
+| Akdeniz | a_yillar_arasi | +4,04 [+0,709, +6,05] | +5,9 … +7,3 | belirsiz | YOK |
+| İç Anadolu | a_yillar_arasi | +3,11 [+0,0761, +5,78] | +5,9 … +7,3 | belirsiz | YOK |
+| Karadeniz | a_yillar_arasi | +4,19 [+2,66, +5,59] | +5,9 … +7,3 | beklenenden küçük | ORTA |
+| Doğu Anadolu | a_yillar_arasi | +3,04 [+0,213, +5,13] | +5,9 … +7,3 | belirsiz | YOK |
+| Güneydoğu Anadolu | a_yillar_arasi | +2,65 [-1,64, +6,5] | +5,9 … +7,3 | belirsiz | YOK |
+| **Türkiye** | a_yillar_arasi | +4,47 [+1,71, +6,6] | +5,9 … +7,3 | belirsiz | YOK |
+| Marmara | b_trend_orani | +5,34 [+3,19, +10,7] | +5,9 … +7,3 | belirsiz | YOK |
+| Ege | b_trend_orani | +5,39 [+2,39, +15,9] | +5,9 … +7,3 | belirsiz | YOK |
+| Akdeniz | b_trend_orani | +4,36 [+1,3, +8,45] | +5,9 … +7,3 | belirsiz | YOK |
+| İç Anadolu | b_trend_orani | +5,91 [+2,79, +12,6] | +5,9 … +7,3 | belirsiz | YOK |
+| Karadeniz | b_trend_orani | +5,93 [+3,51, +10,6] | +5,9 … +7,3 | belirsiz | YOK |
+| Doğu Anadolu | b_trend_orani | +2,98 [+0,403, +7,96] | +5,9 … +7,3 | belirsiz | YOK |
+| Güneydoğu Anadolu | b_trend_orani | +5,01 [+1,66, +11,7] | +5,9 … +7,3 | belirsiz | YOK |
+| **Türkiye** | b_trend_orani | +4,84 [+2,12, +9,54] | +5,9 … +7,3 | belirsiz | YOK |
+
+**Clausius-Clapeyron, su buharı kolonu** (%/K):
+
+| Bölge | Yol | Gözlenen [%95 GA] | Beklenen bant | Etiket | Güven |
+| --- | --- | --- | --- | --- | --- |
+| Marmara | a_yillar_arasi | +4,8 [+1,06, +7,91] | +5,9 … +7,3 | belirsiz | YOK |
+| Ege | a_yillar_arasi | +4,22 [+0,238, +7,7] | +5,9 … +7,3 | belirsiz | YOK |
+| Akdeniz | a_yillar_arasi | +5,56 [+2,39, +8,65] | +5,9 … +7,3 | belirsiz | YOK |
+| İç Anadolu | a_yillar_arasi | +4,63 [+2,24, +6,76] | +5,9 … +7,3 | belirsiz | YOK |
+| Karadeniz | a_yillar_arasi | +5,33 [+3,29, +6,98] | +5,9 … +7,3 | beklenen büyüklükle tutarlı | DÜŞÜK |
+| Doğu Anadolu | a_yillar_arasi | +4 [+0,542, +6,84] | +5,9 … +7,3 | belirsiz | YOK |
+| Güneydoğu Anadolu | a_yillar_arasi | +4,37 [+0,306, +8,25] | +5,9 … +7,3 | belirsiz | YOK |
+| **Türkiye** | a_yillar_arasi | +5,71 [+2,98, +8,32] | +5,9 … +7,3 | belirsiz | YOK |
+| Marmara | b_trend_orani | +6,05 [+3,06, +13,1] | +5,9 … +7,3 | belirsiz | YOK |
+| Ege | b_trend_orani | +6,11 [+3,52, +18] | +5,9 … +7,3 | belirsiz | YOK |
+| Akdeniz | b_trend_orani | +6,22 [+2,71, +11,7] | +5,9 … +7,3 | belirsiz | YOK |
+| İç Anadolu | b_trend_orani | +7,88 [+4,23, +15,5] | +5,9 … +7,3 | belirsiz | YOK |
+| Karadeniz | b_trend_orani | +6,14 [+3,41, +13,1] | +5,9 … +7,3 | belirsiz | YOK |
+| Doğu Anadolu | b_trend_orani | +4,35 [+1,64, +9,94] | +5,9 … +7,3 | belirsiz | YOK |
+| Güneydoğu Anadolu | b_trend_orani | +6,1 [+2,49, +11,5] | +5,9 … +7,3 | belirsiz | YOK |
+| **Türkiye** | b_trend_orani | +5,77 [+3,17, +10,2] | +5,9 … +7,3 | belirsiz | YOK |
+
+**Su bütçesi** (ortalama: mm/yıl; trend: (mm/yıl)/10 yıl; bant 0 ± P'nin %10'u):
+
+| Bölge | Yol | Gözlenen [%95 GA] | Beklenen bant | Etiket | Güven |
+| --- | --- | --- | --- | --- | --- |
+| Marmara | ortalama | +45,5 [-23,2, +111] | -78 … +78 | beklenen büyüklükle tutarlı | ORTA |
+| Marmara | trend | -36,2 [-98,8, +21,5] | -78 … +78 | beklenen büyüklükle tutarlı | ORTA |
+| Ege | ortalama | -10,8 [-67, +47,8] | -69,3 … +69,3 | beklenen büyüklükle tutarlı | ORTA |
+| Ege | trend | -13,9 [-73,8, +41,3] | -69,3 … +69,3 | beklenen büyüklükle tutarlı | ORTA |
+| Akdeniz | ortalama | -69,5 [-130, -8,83] | -69,7 … +69,7 | beklenen büyüklükle tutarlı | ORTA |
+| Akdeniz | trend | -10 [-63,9, +40,7] | -69,7 … +69,7 | beklenen büyüklükle tutarlı | ORTA |
+| İç Anadolu | ortalama | +95,5 [+48,9, +141] | -51,6 … +51,6 | beklenen büyüklükle tutarlı | DÜŞÜK |
+| İç Anadolu | trend | +0,0106 [-35,1, +38,6] | -51,6 … +51,6 | beklenen büyüklükle tutarlı | ORTA |
+| Karadeniz | ortalama | -102 [-175, -26,2] | -87,4 … +87,4 | beklenen büyüklükle tutarlı | ORTA |
+| Karadeniz | trend | -12,6 [-80,7, +52,4] | -87,4 … +87,4 | beklenen büyüklükle tutarlı | ORTA |
+| Doğu Anadolu | ortalama | +109 [+44,1, +176] | -64 … +64 | beklenen büyüklükle tutarlı | ORTA |
+| Doğu Anadolu | trend | +6,09 [-35,4, +49] | -64 … +64 | beklenen büyüklükle tutarlı | ORTA |
+| Güneydoğu Anadolu | ortalama | -84,7 [-134, -34] | -58,8 … +58,8 | beklenen büyüklükle tutarlı | ORTA |
+| Güneydoğu Anadolu | trend | +10,9 [-44,1, +63,8] | -58,8 … +58,8 | beklenen büyüklükle tutarlı | ORTA |
+| **Türkiye** | ortalama | +14,1 [-39,8, +73,4] | -66,6 … +66,6 | beklenen büyüklükle tutarlı | ORTA |
+| **Türkiye** | trend | -5,72 [-38,7, +28] | -66,6 … +66,6 | beklenen büyüklükle tutarlı | ORTA |
+
+**Kar çizgisi** (m/10 yıl):
+
+| Bölge | Yol | Gözlenen [%95 GA] | Beklenen bant | Etiket | Güven |
+| --- | --- | --- | --- | --- | --- |
+| Marmara | kis | — | — | hesaplanamadı (kar çizgisi yalnız 8 yılda tanımlı (< 13)) | YOK |
+| Ege | kis | — | — | hesaplanamadı (kar çizgisi yalnız 2 yılda tanımlı (< 13)) | YOK |
+| Akdeniz | kis | +116 [-45,3, +219] | +124 … +170 | belirsiz | YOK |
+| İç Anadolu | kis | +174 [+27,1, +309] | +117 … +159 | belirsiz | YOK |
+| Karadeniz | kis | +184 [+55, +354] | +167 … +228 | belirsiz | YOK |
+| Doğu Anadolu | kis | +177 [+61,9, +265] | +187 … +255 | beklenen büyüklükle tutarlı | DÜŞÜK |
+| Güneydoğu Anadolu | kis | +129 [+41,7, +199] | +128 … +175 | belirsiz | YOK |
+| **Türkiye** | kis | +166 [+19,1, +285] | +165 … +225 | belirsiz | YOK |
+| Marmara | ilkbahar | — | — | hesaplanamadı (kar çizgisi yalnız 0 yılda tanımlı (< 13)) | YOK |
+| Ege | ilkbahar | — | — | hesaplanamadı (kar çizgisi yalnız 0 yılda tanımlı (< 13)) | YOK |
+| Akdeniz | ilkbahar | — | — | hesaplanamadı (kar çizgisi yalnız 0 yılda tanımlı (< 13)) | YOK |
+| İç Anadolu | ilkbahar | — | — | hesaplanamadı (kar çizgisi yalnız 0 yılda tanımlı (< 13)) | YOK |
+| Karadeniz | ilkbahar | +97,9 [+7,74, +172] | +100 … +137 | belirsiz | YOK |
+| Doğu Anadolu | ilkbahar | +114 [-18,3, +238] | +89,3 … +122 | belirsiz | YOK |
+| Güneydoğu Anadolu | ilkbahar | — | — | hesaplanamadı (kar çizgisi yalnız 5 yılda tanımlı (< 13)) | YOK |
+| **Türkiye** | ilkbahar | +123 [-24,9, +230] | +83,5 … +114 | belirsiz | YOK |
+
+**İl düzeyi (81 il), etiket ve güven sayıları:**
+
+| Test | Yol | Değişken | Etiket | Güven |
+| --- | --- | --- | --- | --- |
+| cc | a_yillar_arasi | ozgul_nem_2m | belirsiz 57, beklenenden küçük 15, beklenen büyüklükle tutarlı 9 | YOK 57, DÜŞÜK 15, ORTA 9 |
+| cc | b_trend_orani | ozgul_nem_2m | belirsiz 81 | YOK 81 |
+| cc | a_yillar_arasi | su_buhari_kolon | belirsiz 69, beklenen büyüklükle tutarlı 12 | YOK 69, DÜŞÜK 11, ORTA 1 |
+| cc | b_trend_orani | su_buhari_kolon | belirsiz 81 | YOK 81 |
+| kar_cizgisi | kis | kar_ortusu | hesaplanamadı 77, belirsiz 4 | YOK 81 |
+| kar_cizgisi | ilkbahar | kar_ortusu | hesaplanamadı 80, belirsiz 1 | YOK 81 |
+
+**Kısa okuma:**
+- **Clausius-Clapeyron:** bütün bölge nokta tahminleri 7 %/K'nin altında. Yıllar arası yolda özgül nem 2,7–4,5,
+  su buharı kolonu 4,0–5,7 %/K. Ama güven aralıkları çoğunlukla bandın 3 katından geniş: Türkiye yıllar arası satırında
+  GA 4,89 / bant 1,4 = 3,5 kat, yani `belirsiz`. Trend oranı yolu (b) her yerde `belirsiz`, çünkü 25 yılda sıcaklık
+  trendinin belirsizliği oranı çok genişletiyor. Tek ayırt edici satır Karadeniz, özgül nem: `beklenenden küçük`
+  (+4,19 [+2,66, +5,59]), güven ORTA (nem Kademe 2). Karada bağıl nemin azalabileceği notu satırda yazılı;
+  etiket değiştirilmedi.
+- **Su bütçesi:** bütün satırlar kurala göre `beklenen büyüklükle tutarlı`. Ama bu güçlü bir kapanış değil:
+  - 7 bölgenin 5'inde ortalama artığın nokta tahmini bandın dışında: İç Anadolu +95, Doğu Anadolu +109, Karadeniz
+    −102, Güneydoğu Anadolu −85, Akdeniz −70 mm/yıl. Bu satırlar yalnız GA'nın bir ucu banda değdiği için "tutarlı".
+  - Bant (P'nin %10'u) bir proje seçimidir.
+  - Türkiye ortalaması kapanıyor: +14 [−40, +73] mm/yıl. Trend kapanışı her bölgede bandın içinde; Türkiye −5,7
+    (mm/yıl)/10 yıl.
+  - GLDAS akışlarındaki `trend_uyarisi` ve Kademe 2 uyarıları her satırda, bu yüzden güven en çok ORTA.
+- **Kar çizgisi:**
+  - Gözlenen yükselme +98 ile +184 m/10 yıl arasında. Beklenen de büyük, çünkü MERRA-2'de kış ısınması L3'te Türkiye
+    için 1,16 °C/10 yıl.
+  - Ama GA'lar bandın 3,4–8,4 katı geniş, satırlar `belirsiz`. Tek istisna Doğu Anadolu kış: `beklenen
+    büyüklükle tutarlı`, güven DÜŞÜK. Bu satır sınırda: GA bandın 2,98 katı (eşik 3). İlk ya da son 3 yıl çıkınca
+    ve GLDAS sıcaklığıyla etiket `belirsiz` oluyor.
+  - İl düzeyinde 0,25° hücreler yükselti aralığını çözmeye yetmiyor: 162 il satırının 157'si `hesaplanamadı`.
+  - Önceden seçildiği için 0,05° cache dosyaları kullanılmadı (yalnız paket okunur).
+
+**Beklenmedik sonuçlar ve olası açıklamalar** (hangisinin geçerli olduğu belirlenmedi):
+- *CC nokta tahminlerinin hep 7 %/K'nin altında olması:*
+  - karada bağıl nemin azalması (Simmons vd. 2010; Byrne ve O'Gorman 2018);
+  - yıllık ortalamanın farklı sıcaklıktaki mevsimleri karıştırması;
+  - MERRA-2 nem alanının asimilasyonla sınırlanması;
+  - Kademe 2 nem dosyalarının bağımsız doğrulamasının yapılmamış olması.
+- *Su bütçesi artığının bölgeden bölgeye işaret değiştirmesi* (İç ve Doğu Anadolu artı; Güneydoğu Anadolu,
+  Karadeniz ve Akdeniz eksi):
+  - ölçülmeyen yeraltı suyu çekimi ya da sulama (GLDAS-2.1 Noah modellemez);
+  - yağış, buharlaşma ve akış ürünlerinin bölgesel yanlılığı;
+  - GRACE mascon çözünürlüğü (~300 km), komşu bölgeler ve denizle sızıntı;
+  - bölge sınırlarının mascon sınırlarıyla örtüşmemesi.
+- *Kar çizgisinde büyük ama çok belirsiz yükselme:*
+  - 0,25° ızgarada dağ yamaçlarının yumuşaması;
+  - kar örtüsünün yağış yıllarına da bağlı olması;
+  - kışın yüzey sıcaklık azalma oranının 6,5 °C/km'den düşük olabilmesi (bandın alt ucu);
+  - MOD10CM boş aylarının 2004 ve 2016 kışlarını düşürmesi.
