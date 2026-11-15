@@ -523,17 +523,185 @@ def ozet_yazdir(s: dict, yollar: list[Path], sure: float) -> None:
     print(f"  süre: {sure:.1f} sn")
 
 
+# ---------------------------------------------------------------- v2: tarım maskesi + 0,05° (2026-11-15)
+# Önceden tanımlı iki değişiklik (v1 sonuçlarına bakarak ayarlanmadı): (1) tarım maskesi, (2) 0,05° çözünürlük.
+# Bileşenler ve regresyon biçimi v1 ile aynıdır; maske regresyondan SONRA uygulanır (regresyon v1'deki gibi
+# bütün kara hücrelerinde kurulur). Doğrulama katmanı (GFSAD sulanan oran) bu bölümde hiç okunmaz.
+TARIM_ESIK = 0.3            # sabit; 0,2 ve 0,5 yalnız raporda duyarlılık (physics.sapma_dogrulama)
+V2_DOSYALARI = {"025": "sapma_haritasi_v2_025.nc", "005": "sapma_haritasi_v2_005.nc"}
+V2_KUMELER = "sulama_izi_kumeleri_v2.csv"
+V2_NOTU = ("v2: tarım maskesi (MCD12C1 tarim_orani < {esik:g} → NaN, 'tarım dışı') ve {grid} çözünürlük. "
+           "Bileşenler ve regresyon biçimi v1 ile aynı; maske regresyondan sonra uygulanır.")
+NN_NOTU = ("0,05°: NDVI (MOD13C2) ve LST (MOD11C3) 0,05° CMG dosyalarından, rakım SRTM 0,05° ortalamasından, "
+           "tarım oranı MCD12C1 0,05°'den; yağış (GPM) ve T2M (MERRA-2) 0,25° L1'den en yakın komşu ile aktarıldı.")
+
+
+def tarim_maskesi(sulama: dict[str, np.ndarray], tarim: np.ndarray, esik: float = TARIM_ESIK) -> dict:
+    """``tarim_orani < esik`` (ya da tarım oranı bilinmeyen) hücrelerde sulama izi ve bileşenleri NaN.
+
+    Döndürür: aynı anahtarlar + ``tarim_disi`` (bool). Maske dışında değerler değişmez.
+    """
+    m = np.asarray(tarim, float) >= esik                 # NaN → False (tarım dışı sayılır)
+    out = {k: np.where(m, np.asarray(sulama[k], float), np.nan) for k in ("z_yesil", "z_serin", "sulama_izi")}
+    out["n_bilesen"] = np.where(m, sulama["n_bilesen"], 0).astype(np.int8)
+    out["tarim_disi"] = ~m
+    return out
+
+
+def _cache_oku(degisken: str, urun: str, grid: str) -> xr.DataArray | None:
+    from data.grid import processed_path
+    p = processed_path(degisken, urun, grid)
+    return _oku(p.parent, f"{degisken}", f"{urun}__{grid}") if grid != "025" else _oku(p.parent, degisken, urun)
+
+
+def _hizala(da: xr.DataArray, lat, lon, en_yakin: bool) -> xr.DataArray:
+    """``da``yı (lat, lon) hücre merkezlerine taşır: en yakın komşu ya da aynı koordinatların seçimi."""
+    if en_yakin:
+        out = da.sel(lat=xr.DataArray(lat, dims="lat"), lon=xr.DataArray(lon, dims="lon"), method="nearest")
+    else:
+        out = da.sel(lat=xr.DataArray(lat, dims="lat"), lon=xr.DataArray(lon, dims="lon"), method="nearest",
+                     tolerance=1e-4)
+    return out.assign_coords(lat=lat, lon=lon)
+
+
+def sulama_izi_v2(paket: Path, grid: str = "025", maske: bool = True, esik: float = TARIM_ESIK) -> dict:
+    """v2 sulama izi. ``grid``: "025" (L1 paketi) ya da "005" (0,05° CMG dosyaları, cache/processed).
+
+    ``maske=False`` ile v1 yöntemi aynı ızgarada çalışır (0,25°'de sonuç v1 ile birebir aynıdır).
+    Döndürür: {"grid", "lat", "lon", "kara", "il_maskeleri", "il_adlari", "sulama", "tarim", "esik", "maske"}.
+    """
+    from physics.tablo import bolge_listesi, bolge_maskeleri
+    paket = Path(paket)
+    kup = paket / "L1_kup"
+    yagis, t2m = _oku(kup, *GIRDILER["yagis"]), _oku(kup, *GIRDILER["t2m"])
+    if yagis is None or t2m is None:
+        raise ValueError("v2 için L1 yagis__GPM ve sicaklik_2m__MERRA2 gerekli")
+    if grid == "025":
+        ndvi, lst, rakim = (_oku(kup, *GIRDILER[k]) for k in ("ndvi", "lst", "rakim"))
+        tarim = _oku(kup, "tarim_orani", "MCD12C1")
+        lat, lon = yagis["lat"].values, yagis["lon"].values
+    elif grid == "005":
+        ndvi = _cache_oku("ndvi", "MOD13C2", "005")
+        lst = _cache_oku("yuzey_sicakligi_gunduz", "MOD11C3", "005")
+        rakim = _cache_oku("rakim", "SRTM", "005")
+        tarim = _cache_oku("tarim_orani", "MCD12C1", "005")
+        if ndvi is None or rakim is None:
+            raise ValueError("0,05° için cache/processed/turkiye/ndvi__MOD13C2__005.nc ve rakim__SRTM__005.nc gerekli")
+        # yayın kutusu (L1 ile aynı alan): hücre merkezi L1 kutusunun içinde kalan 0,05° hücreler
+        la, lo = yagis["lat"].values, yagis["lon"].values
+        s_, n_, w_, e_ = la.min() - 0.125, la.max() + 0.125, lo.min() - 0.125, lo.max() + 0.125
+        lat = ndvi["lat"].values[(ndvi["lat"].values > s_) & (ndvi["lat"].values < n_)]
+        lon = ndvi["lon"].values[(ndvi["lon"].values > w_) & (ndvi["lon"].values < e_)]
+        ndvi = _hizala(ndvi, lat, lon, False)
+        lst = _hizala(lst, lat, lon, False) if lst is not None else None
+        rakim = _hizala(rakim, lat, lon, False)
+        yagis, t2m = _hizala(yagis, lat, lon, True), _hizala(t2m, lat, lon, True)
+        if tarim is not None:
+            tarim = _hizala(tarim, lat, lon, False)
+    else:
+        raise ValueError(f"bilinmeyen ızgara: {grid}")
+    if maske and tarim is None:
+        raise ValueError("tarım maskesi için tarim_orani__MCD12C1 gerekli; önce: python -m data.arazi --surum v0.1")
+    iller = [b for b in bolge_listesi(iller=True) if b["bolge_turu"] == "il"]
+    maskeler = bolge_maskeleri(lat, lon, True)
+    kara = maskeler["turkiye"]
+    sul = sulama_izi(ndvi, lst, t2m, yagis, rakim, kara)
+    tarim_v = np.asarray(tarim.values, float) if tarim is not None else np.full(kara.shape, np.nan)
+    if maske:
+        sul = tarim_maskesi(sul, tarim_v, esik)
+    return {"grid": grid, "lat": lat, "lon": lon, "kara": kara,
+            "il_maskeleri": {b["anahtar"]: maskeler[b["anahtar"]] for b in iller},
+            "il_adlari": {b["anahtar"]: b["bolge_adi"] for b in iller}, "sulama": sul, "tarim": tarim_v,
+            "esik": esik, "maske": maske}
+
+
+def v2_harita(v: dict, ortak: dict) -> xr.Dataset:
+    """``sapma_haritasi_v2_<grid>.nc`` içeriği (yalnız sulama izi; sapma skoru v1 dosyasında, değişmedi)."""
+    k = {"coords": {"lat": v["lat"], "lon": v["lon"]}, "dims": ("lat", "lon")}
+    kara, s = v["kara"], v["sulama"]
+
+    def f32(x, ad):
+        return xr.DataArray(np.where(kara, x, np.nan).astype(np.float32), **k, attrs={"long_name": ad, "units": "1"})
+    cozunurluk = "0,25°" if v["grid"] == "025" else "0,05°"
+    ds = xr.Dataset({
+        "sulama_izi": f32(s["sulama_izi"], "sulama izi v2: z_yesil ve z_serin ortalaması (tarım dışı NaN)"),
+        "z_yesil": f32(s["z_yesil"], "yaz NDVI'sının yağış ve rakıma göre beklenenden yüksekliği (z)"),
+        "z_serin": f32(s["z_serin"], "yaz (LST gündüz − T2M) farkının beklenenden düşüklüğü (z, işareti ters)"),
+        "n_bilesen": xr.DataArray(np.where(kara, s["n_bilesen"], 0).astype(np.int8), **k,
+                                  attrs={"long_name": "sulama_izi'ne giren bileşen sayısı"}),
+        "tarim_orani": f32(v["tarim"], "MCD12C1 tarım oranı (IGBP 12 + ½·14), 5 yıl ortalaması"),
+        "tarim_disi": xr.DataArray(np.where(kara, s.get("tarim_disi", np.zeros(kara.shape, bool)), 0).astype(np.int8),
+                                   **k, attrs={"long_name": f"1 = tarim_orani < {v['esik']:g} (maskelendi)"}),
+    })
+    ds.attrs.update({k2: x for k2, x in ortak.items() if x})
+    ds.attrs.update({
+        "baslik": f"Beklentiden sapma haritası v2, sulama izi ({cozunurluk})",
+        "yontem": V2_NOTU.format(esik=v["esik"], grid=cozunurluk) + (f" {NN_NOTU}" if v["grid"] == "005" else ""),
+        "uyari": UYARI, "not": f"{MODIS_NOTU} {TOPRAK_NEMI_NOTU} Sapma skoru değişmedi: sapma_haritasi.nc (v1).",
+        "surum": "v2", "tarim_esigi": v["esik"], "uretim": "python -m physics.sapma --v2",
+    })
+    return ds
+
+
+def v2_uret_yaz(paket: Path) -> dict:
+    """v2'yi iki ızgarada üretir; L4_iliski/sapma/ altına YENİ v2 dosyalarını yazar (v1 dosyalarına dokunmaz)."""
+    paket = Path(paket)
+    hedef = paket / "L4_iliski" / KLASOR
+    hedef.mkdir(parents=True, exist_ok=True)
+    yagis = _oku(paket / "L1_kup", *GIRDILER["yagis"])
+    ortak = {k: yagis.attrs.get(k, "") for k in ("urun_surumu", "veri_seti_doi", "lisans")}
+    sonuc, yollar = {}, []
+    for grid in ("025", "005"):
+        v = sulama_izi_v2(paket, grid, maske=True)
+        p = hedef / V2_DOSYALARI[grid]
+        v2_harita(v, ortak).to_netcdf(p)
+        yollar.append(p)
+        sonuc[grid] = v
+    v = sonuc["005"]
+    km = kumeler(v["sulama"]["sulama_izi"], v["lat"], v["lon"], v["il_maskeleri"], v["il_adlari"])
+    p = hedef / V2_KUMELER
+    km.to_csv(p, index=False, encoding="utf-8-sig", float_format="%.4g")
+    yollar.append(p)
+    return {"v2": sonuc, "kumeler": km, "yollar": yollar}
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(prog="python -m physics.sapma", description=__doc__.splitlines()[0])
     ap.add_argument("--surum", default="v0.1")
     ap.add_argument("--paket", type=Path, default=None)
     ap.add_argument("--ciftler", type=Path, default=AYAR_DOSYASI)
     ap.add_argument("--goster", action="store_true", help="HTML harita yaz ve tarayıcıda aç")
+    ap.add_argument("--v2", action="store_true",
+                    help="v2: tarım maskesi + 0,05° (yalnız v2 dosyaları yazılır; v1 dosyalarına dokunulmaz)")
     a = ap.parse_args(argv)
     t0 = time.perf_counter()
     if a.paket is None:
         from data.export import OUTPUTS_DIR
         a.paket = OUTPUTS_DIR / f"trend-dedektifi-turkiye-{a.surum}"
+    if a.v2:
+        try:
+            r = v2_uret_yaz(a.paket)
+        except ValueError as e:
+            raise SystemExit(f"HATA: {e}") from None
+        print("BEKLENTİDEN SAPMA HARİTASI v2 · sulama izi (doğrulanmadı; neden göstermez)")
+        for g, v in r["v2"].items():
+            kara = v["kara"]
+            print(f"  {g}: kara {int(kara.sum())} hücre, tarım dışı (maskeli) {int((v['sulama']['tarim_disi'] & kara).sum())}, "
+                  f"değerli {int((np.isfinite(v['sulama']['sulama_izi']) & kara).sum())}")
+        for x in r["kumeler"].itertuples():
+            print(f"    {x.kume:2d}. {x.il:15s} z={x.tepe_sulama_izi:4.2f} {x.hucre_sayisi:3d} hücre · "
+                  f"tepe {x.tepe_lat:.3f}K {x.tepe_lon:.3f}D")
+        print(f"  ⚠ {UYARI}")
+        dg = Path(a.paket) / "dogrulama" / "sulanan_oran__GFSAD1KCM.nc"
+        if dg.exists():                      # bağımsız doğrulama: sulama izi hesaplandıktan SONRA
+            from physics.sapma_dogrulama import dogrula
+            d = dogrula(a.paket, r)
+            r["yollar"] += d["yollar"]
+            print(d["tablo"].to_string(index=False))
+        for p in r["yollar"]:
+            print(" ", p)
+        print(f"  süre: {time.perf_counter() - t0:.1f} sn")
+        return
     try:
         s = uret(a.paket, a.ciftler)
     except ValueError as e:

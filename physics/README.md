@@ -35,7 +35,14 @@ python -m physics.iliski --x yagis --y ndvi --bolge tum_iller --mevsim ilkbahar 
 `--bolge`: il adı ya da plaka (`Elazığ`, `23`), bölge (`Doğu Anadolu`), `turkiye`, `tum_iller`,
 `tum_bolgeler`. `--mevsim`: `yillik`, `kis`, `ilkbahar`, `yaz`, `sonbahar`, `mevsimlik`, `aylik`.
 Ürün verilmezse Kademe 1 öncelikli ürün seçilir ve ekranda yazılır (`--urun-x`, `--urun-y` ile değişir).
-`--json` makine okunur çıktı verir. Yanlış yazılan değişken, ürün ya da il için mevcut seçenekler listelenir.
+`--json` makine okunur çıktı verir. `--karne` her satırın altına bulgu karnesini basar (kaynak uyumu,
+karıştırma testi, trendden arındırma, gecikme ±1, α = 0,05 ve güven seviyesi; kural: sözleşme 2.4):
+
+```bash
+python -m physics.iliski --x sicaklik_2m --y kar_ortusu --bolge Erzurum --mevsim kis --beklenen - --karne   # ~3 sn
+```
+
+Bütün L3 trendleri ve L4 ilişkileri için karne dosyaları: `python -m stats.karne --surum v0.1` (→ `karne/`). Yanlış yazılan değişken, ürün ya da il için mevcut seçenekler listelenir.
 
 Ekrandaki **ham r** trendi çıkarmadan, **r (trendsiz)** trendi çıkararak hesaplanır. İkisi çok farklıysa
 iki serinin aynı dönemdeki trendi ilişkiyi şişiriyor (sahte korelasyon) ya da gizliyor demektir; yorum
@@ -46,7 +53,12 @@ trendsiz r ile yapılır ve komut bunu uyarı olarak yazar.
 ```bash
 python -m physics.sapma --surum v0.1            # L4_iliski/sapma/: harita (.nc), il tablosu, kümeler (~5 sn)
 python -m physics.sapma --surum v0.1 --goster   # ayrıca HTML harita yazar ve tarayıcıda açar
+python -m physics.sapma --surum v0.1 --v2       # v2: tarım maskesi + 0,05° (önce: python -m data.arazi --surum v0.1)
 ```
+
+v2 yalnız `sapma_haritasi_v2_025.nc`, `sapma_haritasi_v2_005.nc`, `sulama_izi_kumeleri_v2.csv` dosyalarını yazar;
+`dogrulama/` klasöründe GFSAD katmanı varsa bağımsız doğrulamayı (ROC AUC, precision@%5) da çalıştırır.
+Sonuçlar ve sınırlar: `docs/dogrulama.md` "Sapma haritası v2".
 
 Önce `physics.run` çalışmış olmalı (L4 etiketleri okunur). Çıktı **doğrulanmamış** bir göstergedir:
 L4 etiketinin fiziksel beklentiden saptığı yerleri ve yazın yağışın açıkladığından yeşil/serin kalan

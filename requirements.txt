@@ -7,6 +7,7 @@ h5py              # h5netcdf arka ucu, HDF5/HDF-EOS5
 pyhdf             # MODIS HDF4 (indirme kipinde)
 pyyaml
 shapely>=2.1      # bölge çokgenleri, maskeler (coverage_simplify 2.1+)
+rasterio          # GFSAD1KCM GeoTIFF okuma (data/arazi.py, yalnız doğrulama katmanı)
 
 # İstatistik (Kişi 2) ve fizik (Kişi 3)
 numpy

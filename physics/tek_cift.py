@@ -36,6 +36,7 @@ from physics.tablo import EK_SUTUNLAR, SUTUNLAR, bolge_listesi, cift_tablosu, cs
 OZEL = ("turkiye", "tum_iller", "tum_bolgeler")
 BUYUK_FARK = 0.3     # |ham r − trendsiz r| bundan büyükse ortak trend uyarısı
 UYARI_ATTRS = ("bilinen_sorunlar", "trend_uyarisi")
+SABIT_KATMANLAR = {"tarim_orani"}   # zamansız L1 katmanları (rakım KADEME_DISI'de); ilişki serisi kurulamaz
 
 
 class SecimHatasi(ValueError):
@@ -58,7 +59,7 @@ def l1_secenekleri(paket: Path) -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     for f in sorted((Path(paket) / "L1_kup").glob("*__*.nc")):
         d, u = f.stem.split("__", 1)
-        if d not in KADEME_DISI:
+        if d not in KADEME_DISI and d not in SABIT_KATMANLAR:
             out.setdefault(d, []).append(u)
     return out
 
@@ -236,7 +237,45 @@ def hesapla(x: str, y: str, bolge: str, mevsim: str, urun_x: str | None = None,
                       "paket": str(paket)},
             "tablo": df, "uyarilar": uyarilar(a, b, x, ux, y, uy, df),
             "yaml_cifti": eslesen.no if eslesen else None,
-            "sure_sn": round(time.perf_counter() - t0, 2)}
+            "sure_sn": round(time.perf_counter() - t0, 2),
+            "_ic": {"cift": c, "a": a, "b": b, "anahtarlar": anahtarlar, "fdr": fdr, "paket": paket}}
+
+
+def karne_ekle(sonuc: dict) -> dict:
+    """``--karne``: sonucun her satırı için bulgu karnesi (physics.karne; kural: stats.karne.KURAL_METNI)."""
+    from physics.karne import cift_karnesi
+    t0 = time.perf_counter()
+    ic = sonuc["_ic"]
+    sonuc["karne"] = cift_karnesi(ic["cift"], ic["a"], ic["b"], sonuc["tablo"], ic["paket"], iller=True,
+                                  bolgeler=ic["anahtarlar"], fdr=ic["fdr"])
+    sonuc["karne_sure_sn"] = round(time.perf_counter() - t0, 2)
+    return sonuc
+
+
+_ISARET = {"geçti": "✓", "kaldı": "✗", "uygulanamaz": "–"}
+
+
+def karne_yazdir(sonuc: dict, en_cok: int = 15) -> None:
+    """Okunur karne tablosu: her kontrol ✓ geçti, ✗ kaldı, – uygulanamaz."""
+    k = sonuc["karne"]
+    k = k[k["n"].fillna(0) > 0]
+    if sonuc["secim"]["fdr"]:
+        k = k.assign(_s=k["guven"].map({"YÜKSEK": 0, "ORTA": 1, "DÜŞÜK": 2, "YOK": 3})).sort_values(["_s", "p"])
+    tab = pd.DataFrame({
+        "bölge": k["bolge_adi"], "r": k["r"].map(_f), "ham r": k["r_ham"].map(_f),
+        "a kaynak": k["a_kaynak_uyumu"].map(_ISARET), "b karıştırma": k["b_karistirma"].map(_ISARET),
+        "p_perm": k["b_p_perm"].map(lambda v: _f(v, 3)), "c trend": k["c_trend"].map(_ISARET),
+        "d gecikme": k["d_gecikme"].map(_ISARET), "e α=0,05": k["e_esik"].map(_ISARET), "güven": k["guven"]})
+    print("\nBULGU KARNESİ (✓ geçti · ✗ kaldı · – uygulanamaz; sağlamlık özeti, nedensellik göstermez)")
+    print(tab.head(en_cok).to_string(index=False))
+    if len(k) > en_cok:
+        print("  … " + " · ".join(f"{g} {n}" for g, n in k["guven"].value_counts().items()) + f" ({len(k)} satır)")
+    for _, r in k.head(3 if len(k) > 3 else len(k)).iterrows():
+        print(f"  {r['bolge_adi']}: {r['guven']} — {r['gerekce']}")
+        for ad, kol in (("a", "a_sayi"), ("c", "c_sayi"), ("d", "d_sayi")):
+            if r[kol]:
+                print(f"     {ad}) {r[kol]}")
+    print(f"  karne süresi: {sonuc['karne_sure_sn']:.1f} sn")
 
 
 # ---------------------------------------------------------------- çıktı
@@ -311,9 +350,11 @@ def kaydet(sonuc: dict) -> Path:
 
 def json_metni(sonuc: dict) -> str:
     satirlar = json.loads(sonuc["tablo"].to_json(orient="records", force_ascii=False))
-    return json.dumps({"secim": sonuc["secim"], "yaml_cifti": sonuc["yaml_cifti"],
-                       "uyarilar": sonuc["uyarilar"], "satirlar": satirlar,
-                       "sure_sn": sonuc["sure_sn"]}, ensure_ascii=False, indent=1)
+    veri = {"secim": sonuc["secim"], "yaml_cifti": sonuc["yaml_cifti"], "uyarilar": sonuc["uyarilar"],
+            "satirlar": satirlar, "sure_sn": sonuc["sure_sn"]}
+    if "karne" in sonuc:
+        veri["karne"] = json.loads(sonuc["karne"].to_json(orient="records", force_ascii=False))
+    return json.dumps(veri, ensure_ascii=False, indent=1)
 
 
 def main(argv=None) -> None:
@@ -330,6 +371,8 @@ def main(argv=None) -> None:
     ap.add_argument("--beklenen", default=None, help="beklenen yön: + / - / 0 (isteğe bağlı)")
     ap.add_argument("--kaydet", action="store_true", help="L4_iliski/ozel/ altına CSV yaz")
     ap.add_argument("--json", action="store_true", help="makine okunur JSON çıktı")
+    ap.add_argument("--karne", action="store_true",
+                    help="bulgu karnesi: kaynak uyumu, karıştırma testi, trend, gecikme, eşik kontrolleri")
     ap.add_argument("--surum", default="v0.1")
     ap.add_argument("--paket", type=Path, default=None, help="paket kökü (varsayılan outputs/…-<surum>)")
     a = ap.parse_args(argv)
@@ -339,10 +382,14 @@ def main(argv=None) -> None:
     except (SecimHatasi, ValueError) as e:
         print(f"HATA: {e}", file=sys.stderr)
         raise SystemExit(2) from None
+    if a.karne:
+        karne_ekle(sonuc)
     yol = kaydet(sonuc) if a.kaydet else None
     if a.json:
         print(json_metni(sonuc))
     else:
         yazdir(sonuc)
+        if a.karne:
+            karne_yazdir(sonuc)
         if yol:
             print(f"  kaydedildi: {yol}")

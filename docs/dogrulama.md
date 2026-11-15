@@ -258,3 +258,110 @@ geniş. Bu bir hata değil: doğrusal trend tanımının sınırını gösteriyo
   - Kış ve sonbaharda üç ürün de azalma, yazda artma gösteriyor; hiçbiri anlamlı değil.
 - **Yağış, il düzeyi (yıllık):** 0/3 73 il, 1/3 8 il. Üç ürünün aynı işarette olduğu il sayısı 29.
 - **NDVI:** Türkiye genelinde anlamlı yeşillenme. Kışta anlamlı değil.
+
+## Bulgu karnesi (2026-11-15)
+
+`python -m stats.karne --surum v0.1` → `karne/` (kural: `docs/sozlesmeler.md` 2.4, `karne-v1`; sonuçlar görülmeden
+sabitlendi, sonradan ayarlanmadı). Süre: trend 2,7 dk (12 015 satır), ilişki 1,1 dk (542 satır), toplam 3,8 dk.
+L2/L3/L4'ün 96 dosyası karne üretiminden önce ve sonra bayt bayt aynı. Yeniden kurulan serilerin Sen eğimi L3
+dosyalarıyla en çok 4,9·10⁻⁶ (göreli; CSV yuvarlaması) farklı.
+
+**Türkiye × yıllık** (✓ geçti · ✗ kaldı · – uygulanamaz):
+
+| Değişken | Ürün | Sen eğimi / 10 yıl | a kaynak | b karıştırma (p_perm) | c dönem | d α=0,05 | e veri | Uyarı | Güven |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| sicaklik_2m | MERRA2 | +0,70 °C | ✓ 2/2 | ✓ 0,002 | ✓ | ✓ | ✓ (16 ≤ 25) | — | **YÜKSEK** |
+| sicaklik_2m | GLDAS | +0,98 °C | ✓ 2/2 | ✓ 0,002 | ✓ | ✓ | ✓ | trend uyarısı | ORTA |
+| toplam_su_depolama | GRACE | −7,55 cm | – tek kaynak | ✓ 0,008 | ✗ | ✓ | ✓ (18 ≤ 22) | — | **DÜŞÜK** |
+| yagis | GPM | −15,1 mm | – | ✗ 0,47 | ✗ | ✗ | ✗ (59 > 24) | — | YOK (veri henüz yetmiyor) |
+| yagis | GLDAS | −42,7 mm | – | ✓ 0,05 | ✗ | ✗ | ✗ (31 > 25) | trend uyarısı, bilinen sorun | YOK (veri henüz yetmiyor) |
+| yagis | MERRA2 | −16,8 mm | – | ✗ 0,43 | ✗ | ✗ | ✗ (54 > 25) | — | YOK (veri henüz yetmiyor) |
+| ndvi | MOD13C2 | +0,018 | – tek kaynak | ✓ 0,006 | ✓ | ✓ | ✓ | — | ORTA |
+
+- **GRACE neden DÜŞÜK (kural değişmeden):** son 3 yıl çıkarılınca eğim −6,1 cm/10 yıl, anlamsız (ilk 3 yıl
+  çıkarılınca −8,3, anlamlı). Seri 22 geçerli yıl; azalış son yıllarda hızlanmış ve kısaltılmış seride
+  genişletilmiş güven aralığı sıfırı içeriyor. Yön sağlam, büyüklük ve anlamlılık son yıllara duyarlı.
+- **Yağış:** üç üründe de işaret uyumu 1,00 (hepsi negatif) ama hiçbiri anlamlı değil; Weatherhead'e göre
+  31–59 yıl veri gerekiyor.
+
+**İller, MERRA2 sıcaklık yıllık:** 68 YÜKSEK · 5 ORTA (kaynak uyumu kaldı: GLDAS bu illerde anlamlı değil) ·
+8 DÜŞÜK · 0 YOK. DÜŞÜK illerin hepsi aynı kuşakta (Bilecik, Bolu, Düzce, Eskişehir, Kocaeli, Kütahya, Sakarya,
+Zonguldak) ve hepsinde son 3 yıl (2023–2025) çıkarılınca eğim ≈ +0,6'dan ≈ +0,4 °C/10 yıla iniyor ve anlamlılık
+kayboluyor; karıştırma testi hepsinde geçiyor. Bu kuşakta ısınma sinyali büyük ölçüde son birkaç çok sıcak yıla
+dayanıyor.
+
+**Genel tablo:** il düzeyinde anlamlı 2 892 trendin 1 379'u DÜŞÜK. Bunların 1 352'si yalnız c'den (dönem
+duyarlılığı) kalıyor; c'den kalan satırların **hiçbirinde işaret dönmüyor** (1 378/1 378 işaret korunuyor),
+yalnız 22 yıla kısalan seride anlamlılık kayboluyor (449 son 3, 379 ilk 3, 550 ikisinde). Yani DÜŞÜK çoğunlukla
+"yön belirsiz" değil, "kısa seride istatistiksel güç sınırda" demektir. YÜKSEK yalnız çok ürünlü değişkenlerde
+mümkün (kural: tek kaynak en çok ORTA); il düzeyinde 145 YÜKSEK'in 143'ü MERRA2 sıcaklık (68 yıllık, 47 sonbahar, 16 yaz, 12 kış), 2'si MERRA2 sonbahar yağışı.
+
+**İlişkiler (L4):** 81 YÜKSEK · 323 ORTA · 0 DÜŞÜK · 138 YOK.
+
+| Satır | r (ham r) | a | b (p_perm) | c | d | e | Uyarı | Güven |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Çift 1 Türkiye (kış sıcaklığı ~ kar) | −0,90 (−0,93) | ✓ 2/2 | ✓ 0,002 | ✓ | ✓ (gecikme 1: −0,87) | ✓ | — | **YÜKSEK** |
+| Çift 5 Türkiye (yaz sıcaklığı ~ buharlaşma) | −0,36 (−0,22) | – (anlamsız) | ✓ 0,058 | ✓ | ✓ | ✓ | Kademe 2, rejime bağlı | YOK (anlamsız) |
+| Sıcaklık ~ GRACE, Türkiye yıllık (tek çift komutu) | −0,24 (−0,70) | – (anlamsız) | ✗ 0,31 | **✗** | ✓ | ✓ | — | YOK |
+
+- Çift 1: 79 YÜKSEK satır (il ve bölge). Çift 2 tümü ORTA (mevsimlik seride gecikme testi uygulanamaz), çift 6
+  tümü ORTA (MOD11C3 Kademe 2), çift 5'in ters yönlü il satırları ORTA (rejime bağlı çift + Kademe 2 kritik uyarı).
+- Sıcaklık ~ GRACE: beklendiği gibi c kalıyor; ham −0,70 korelasyonunun büyük kısmı iki serinin aynı dönemde
+  trendli olmasından geliyor (sahte korelasyon örneği).
+
+## Sapma haritası v2: bağımsız doğrulama (2026-11-15, gece işi)
+
+**Önceden tanımlı değişiklikler (v1 sonuçlarına bakılarak ayarlanmadı):** (1) tarım maskesi: MCD12C1 v061
+`tarim_orani` = (%IGBP 12 + ½·%14)/100, 2021–2025 ortalaması; `tarim_orani < 0,3` → sulama izi NaN. Maske
+regresyondan **sonra** uygulanır (regresyon v1'deki gibi bütün kara hücrelerinde). (2) 0,05° çözünürlük: NDVI
+(MOD13C2) ve LST (MOD11C3) 0,05° CMG dosyaları, rakım SRTM 0,05°; yağış (GPM) ve T2M (MERRA-2) 0,25°'den en yakın
+komşu. Bileşenler ve regresyon biçimi v1 ile aynı. Maskesiz 0,25° v2, v1 dosyasıyla birebir aynı (fark 0).
+
+**Referans:** GFSAD1KCM v001 (2010 nominal, ~1 km), sulanan = sınıf 1 (Irrigation major) + 2 (Irrigation minor),
+payda = kara pikselleri (1–5 ve 9; 0 = veri yok; User Guide v1, 2.2.4). Hedef hücre: sulanan oran ≥ 0,2 (sabit).
+Maskeli ya da skorsuz hücre en düşük skoru alır. Referans sulama izi hesabına girmez (testle doğrulandı).
+
+| Yapılandırma | Hücre | Hedef (taban oran) | ROC AUC | precision@%5 | Kaldıraç (p@5 / taban) |
+| --- | --- | --- | --- | --- | --- |
+| v1 (0,25°, maskesiz) | 1 302 | 105 (%8,1) | 0,577 | 0,061 | 0,75 |
+| maske (0,25°) | 1 302 | 105 (%8,1) | 0,545 | 0,152 | 1,88 |
+| 0,05° (maskesiz) | 32 472 | 3 151 (%9,7) | 0,581 | 0,121 | 1,25 |
+| maske + 0,05° | 32 472 | 3 151 (%9,7) | 0,548 | 0,215 | 2,21 |
+| *duyarlılık: maske 0,2 / 0,5 (0,25°)* | | | *0,571 / 0,504* | *0,136 / 0,167* | |
+| *duyarlılık: maske 0,2 / 0,5 (0,05°)* | | | *0,556 / 0,534* | *0,213 / 0,205* | |
+
+Rastgele beklenti: AUC 0,5; precision@%5 = taban oran.
+
+- **AUC ≈ 0,55–0,58: yöntem sulanan alanı genel sıralamada çok zayıf ayırt ediyor.** Maske AUC'yi düşürüyor,
+  çünkü GFSAD'ın sulanan dediği hücrelerin yalnız %38'i MCD12C1 tarım ≥ 0,3 maskesinin içinde kalıyor; kalan %62'si
+  maskelenip en düşük skoru alıyor.
+- **Listenin tepesi zenginleşiyor:** en yüksek %5'te isabet v1'de taban oranın altında (0,75×), maske + 0,05°'de
+  taban oranın 2,2 katı. Katkı: çözünürlük 0,75× → 1,25×, maske 0,75× → 1,88×, ikisi birlikte 2,21×.
+- *Tanı (önceden tanımlı yapılandırma değil):* yalnız tarım hücreleri içinde sulama izinin AUC'si 0,70 (0,25°) /
+  0,67 (0,05°). Bileşen AUC'leri (maskesiz 0,05°): z_yesil 0,59, z_serin 0,55.
+
+**En yüksek 10 küme (maske + 0,05°) ve referansın o noktadaki sınıfları** (tepe hücre, ±0,075° pencere):
+
+| # | Tepe (K, D) | İl(ler) | Hücre | Tepe z | GFSAD sulanan oran (tepe / 3×3) | GFSAD sınıf karışımı |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 36,98 · 39,02 | Şanlıurfa | 85 | 4,12 | 0,16 / 0,22 | sulama majör %21, yağmur %78 |
+| 2 | 36,98 · 40,12 | Şanlıurfa, Mardin | 165 | 4,04 | 0,00 / 0,00 | yağmur %99 |
+| 3 | 37,67 · 33,27 | Konya | 74 | 2,65 | 0,00 / 0,00 | yağmur %80, tarım dışı %16 |
+| 4 | 38,62 · 31,12 | Afyonkarahisar, Konya | 21 | 2,48 | 0,00 / 0,01 | yağmur %72 (küçük parçalar dahil), tarım dışı %25 |
+| 5 | 38,42 · 33,02 | Konya, Aksaray | 48 | 2,22 | 0,00 / 0,00 | yağmur %99 |
+| 6 | 39,38 · 43,67 | Ağrı, Van | 14 | 2,12 | **1,00** / 0,58 | sulama minör %58 |
+| 7 | 38,98 · 43,33 | Van | 2 | 2,07 | 0,10 / 0,11 | tarım dışı %70 |
+| 8 | 40,08 · 35,27 | Yozgat | 8 | 2,01 | 0,04 / 0,00 | tarım dışı %40, yağmur %60 |
+| 9 | 38,48 · 38,27 | Malatya | 13 | 2,01 | **0,24** / 0,05 | yağmur %88 |
+| 10 | 40,98 · 35,98 | Samsun, Amasya | 53 | 1,98 | 0,00 / 0,07 | tarım dışı %49, yağmur %45 |
+
+GFSAD'a göre tepe hücresi hedef olan küme: 2/10 (6 ve 9).
+
+**Referansın sınırı (yalnız yorum; yöntem değiştirilmedi):** GFSAD 2010, genel bilgiye göre yeraltı suyu ve
+GAP sulamasının yoğun olduğu Konya ovasını ve Ceylanpınar–Viranşehir bölgesini neredeyse tamamen "yağmura dayalı"
+sınıflıyor; Harran'da bile sulanan payı %21. Ürünün kendi kılavuzu sulanan/yağmura dayalı ayrımındaki belirsizliği
+açıkça yazıyor; ayrıca 2010 haritası 2021–2025 tarım örtüsüyle aynı dönem değil. Bu yüzden düşük AUC'nin bir kısmı
+referanstan kaynaklanıyor olabilir, ama bu kanıtlanmış değil. Genel bilgiye dayalı (bağımsız olmayan) bir
+karşılaştırmada v2'nin ilk kümelerinin çoğu bilinen sulama alanlarına (Harran, Ceylanpınar, Konya ovası)
+düşüyor; v1'de bu 10'da 1'di. Bu ikinci karşılaştırma kör değildir ve kanıt olarak kullanılmamalıdır.
+
