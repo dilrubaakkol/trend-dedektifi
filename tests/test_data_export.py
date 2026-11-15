@@ -74,6 +74,38 @@ def test_export_package(src, tmp_path):
     assert rows[0]["donem"] == "2001-01 … 2001-12" and rows[-1]["donem"] == "sabit"
 
 
+def _sabit_katman(out, ad, kademe_attr):
+    """export'un yazmadığı sabit katman (data.arazi gibi); değerler yer tutucu."""
+    ds = _fake_real("yagis").isel(time=0, drop=True).rename({"yagis": ad})
+    ds = export.crop_to_bbox(ds)
+    ds.attrs.update(source_product="MCD12C1", source_version="061", doi="10.5067/MODIS/MCD12C1.061", units="1")
+    if kademe_attr is not None:
+        ds.attrs["kademe"] = np.int32(kademe_attr)
+    write_netcdf(ds, out / f"{ad}__MCD12C1.nc")
+    return out / f"{ad}__MCD12C1.nc"
+
+
+def test_yeniden_uretimde_sabit_katman_satiri_korunur(src, tmp_path):
+    out = export.export("v0.1", src_dir=src, out_root=tmp_path / "outputs")
+    tarim = _sabit_katman(out, "tarim_orani", 2)
+    deneme = _sabit_katman(out, "deneme_sabit", 1)     # kademe() 2 derdi: attr'dan okunduğu sınanır
+    attrsiz = _sabit_katman(out, "attrsiz_sabit", None)  # kademe attr'ı yok: listelenmez
+    once = {p: p.read_bytes() for p in (tarim, deneme, attrsiz)}
+    export.export("v0.1", src_dir=src, out_root=tmp_path / "outputs")   # yeniden üretim
+    with open(out / "ICINDEKILER.csv", encoding="utf-8-sig") as f:
+        rows = {r["dosya"]: r for r in csv.DictReader(f)}
+    t = rows["tarim_orani__MCD12C1.nc"]
+    assert (t["degisken"], t["birim"], t["kaynak"], t["kaynak_doi"], t["donem"], t["kademe"]) == \
+        ("tarim_orani", "1", "MCD12C1 061", "10.5067/MODIS/MCD12C1.061", "sabit", "2")
+    assert rows["deneme_sabit__MCD12C1.nc"]["kademe"] == "1"
+    assert "attrsiz_sabit__MCD12C1.nc" not in rows
+    assert [r["kademe"] for r in rows.values()] == ["1", "1", "1", "1", "2", "2", "0"]  # sıralama korunur
+    assert all(p.read_bytes() == b for p, b in once.items())          # sabit katmanlara dokunulmadı
+    # L2 girdisi değişmez: sabit katman trend listesine girmez
+    from stats.l2 import icindekiler
+    assert "tarim_orani__MCD12C1.nc" not in set(icindekiler(out.parent)["dosya"])
+
+
 def test_known_issue_attr_carried(src, tmp_path):
     p = src / "yagis__GLDAS.nc"
     with xr.open_dataset(p) as ds:

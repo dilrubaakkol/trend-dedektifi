@@ -125,6 +125,12 @@ Domain: `land` = Türkiye kara maskeli, `ocean` = deniz maskeli, `all` = kutunun
   (GLDAS), `kar_ortusu` (MOD10CM), `kar_su_esdegeri` (GLDAS), `ndvi` (MOD13C2), `toplam_su_depolama`
   (GRACE). Liste: `data/export.py` içinde `KADEME_1`.
 - **Kademe 2:** Paketteki diğer bütün gerçek dosyalar.
+- **`tarim_orani__MCD12C1.nc`** (2026-11-15, `python -m data.arazi --surum v0.1`): zamansız (lat, lon) 28 × 78,
+  birim `1`. Değer: MCD12C1 061 `Land_Cover_Type_1_Percent` için (IGBP %12 tarım + ½·%14 mozaik) / 100,
+  2021–2025 ortalaması. Kademe 2, `dogrulanmadi = evet`. `ICINDEKILER.csv`'de `donem = sabit`, `kademe = 2`;
+  `donem = sabit` olduğu için L2/L3 trend hesabına girmez. Yalnız sapma v2 tarım maskesinde kullanılır (bölüm 2.3).
+  Dosyayı `data.arazi` yazar. `data.export` dosyaya dokunmaz ama yeniden üretimde onu `ICINDEKILER.csv`'ye
+  ekler: `L1_kup/` içindeki ayrıca yazılmış sabit katmanlar listelenir ve kademe dosyanın `kademe` attr'ından okunur.
 - **`L1_kup/ICINDEKILER.csv`:** UTF-8 (BOM'lu), bir satır = bir dosya. Sıralama: önce kademe (1, 2,
   sonra 0), sonra dosya adı.
 
@@ -513,6 +519,33 @@ attrs: `yontem`, `uyari` ("Doğrulanmadı; neden göstermez. …"), `not` (MODIS
 
 `sulama_izi_kumeleri.csv` sütunları: `kume`, `hucre_sayisi`, `tepe_sulama_izi`, `ortalama_sulama_izi`, `tepe_lat`,
 `tepe_lon`, `merkez_lat`, `merkez_lon` (skor ağırlıklı), `il` (tepe hücrenin ili), `iller`, `esik`.
+
+**Sapma v2: DENEYSEL, bağımsız doğrulamada başarısız (AUC 0,55)** (2026-11-15,
+`python -m physics.sapma --surum v0.1 --v2`). Yöntem v1 sulama iziyle aynıdır. Fark iki noktadadır: (1) regresyondan
+sonra tarım maskesi uygulanır; `tarim_orani` < 0,3 olan hücre boş bırakılır. (2) Ek bir 0,05° sürüm üretilir;
+bu sürümde NDVI, LST, rakım ve tarım oranı kendi 0,05° dosyalarından, yağış ve T2M ise 0,25°'den en yakın komşu
+ile alınır. Bağımsız referansa (GFSAD1KCM 2010, sulanan oran ≥ 0,2) göre maske + 0,05° yapılandırmasında
+ROC AUC 0,548'dir (rastgele 0,5) ve en üst %5'teki isabet taban oranın 2,2 katıdır (`docs/dogrulama.md`).
+Sunumda yalnız "deneysel" etiketiyle kullanılır. v1 dosyaları değişmez.
+
+| Yol | İçerik |
+| --- | --- |
+| `sapma/sapma_haritasi_v2_025.nc` | (lat, lon) 28 × 78 |
+| `sapma/sapma_haritasi_v2_005.nc` | (lat, lon) 140 × 390 |
+| `sapma/sulama_izi_kumeleri_v2.csv` | Küme listesi, 0,05° maskeli sürümden. Sütunlar `sulama_izi_kumeleri.csv` ile aynı |
+
+v2 değişkenleri: `sulama_izi`, `z_yesil`, `z_serin`, `n_bilesen` (v1 gibi; tarım dışı hücre boş), `tarim_orani`
+(float32), `tarim_disi` (`1` = maskelendi). attrs: v1'deki gibi, ek olarak `surum = v2`, `tarim_esigi`, `uretim`.
+
+**Doğrulama klasörü `<paket>/dogrulama/`** (yalnız rapor). Bu klasördeki hiçbir dosya sulama izi hesabına girmez;
+bunu `tests/test_physics_sapma_v2.py` sınar. Kademe yoktur ve klasör L1 paketinin parçası değildir.
+
+| Yol | İçerik |
+| --- | --- |
+| `sulanan_oran__GFSAD1KCM.nc` | (lat, lon) 0,25°, `sulanan_oran`: GFSAD1KCM 001 (2010) sınıf 1–2 piksel oranı. Payda sınıf 1–5 ve 9; sınıf 0 (veri yok) paydaya girmez |
+| `sulanan_oran__GFSAD1KCM__005.nc` | Aynısı, 0,05° (170 × 410; kutuya kırpılmamış, değerlendirmede hizalanır) |
+| `sapma_v2_dogrulama.csv` | `yapilandirma`, `tur` (`ana` \| `duyarlılık`), `izgara`, `tarim_esigi`, `hucre`, `hedef_hucre`, `taban_oran`, `skorlu_hucre`, `auc`, `precision_ust5`, `rastgele_auc`, `kaldirac_ust5` |
+| `kume_dogrulama_v2.csv` | `sulama_izi_kumeleri_v2.csv` sütunları + `sulanan_oran_tepe`, `sulanan_oran_3x3`, `hedef_tepe` |
 
 ### 2.4 Bulgu karnesi (2026-11-15; `python -m stats.karne --surum v0.1`)
 
