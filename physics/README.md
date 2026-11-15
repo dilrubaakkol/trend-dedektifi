@@ -18,6 +18,7 @@ p < 0,05 → etiket `beklenen_yonde` / `ters_yonde` / `anlamsiz`.
 | `run.py` | Bütün çiftler → `L4_iliski/` |
 | `tek_cift.py` | Tek çift komutu → ekran / JSON / `L4_iliski/ozel/` |
 | `sapma.py` | Beklentiden sapma haritası ve sulama izi → `L4_iliski/sapma/` |
+| `buyukluk.py` | Büyüklük testleri (Clausius-Clapeyron, su bütçesi, kar çizgisi) → `L4_iliski/buyukluk/` |
 
 ## Komutlar
 
@@ -65,3 +66,22 @@ L4 etiketinin fiziksel beklentiden saptığı yerleri ve yazın yağışın aç�
 hücreleri ("sulama izi") gösterir. Bunlar insan müdahalesiyle (sulama, baraj, yeraltı suyu çekimi)
 tutarlı olabilir; iklim rejimi ve veri/ürün sorunu da olası açıklamalardır. Yöntemde yer adı yoktur.
 
+
+## Büyüklük testleri
+
+Yön testinin yanına "ne kadar" testi. Gözlenen büyüklük, blok bootstrap ile %95 güven aralığı (999 tekrar, sabit
+tohum) ve literatürden bir beklenen bantla karşılaştırılır. Etiketler: `beklenen büyüklükle tutarlı`,
+`beklenenden küçük`, `beklenenden büyük`, `belirsiz`. Her satırda kısa bir karne de var: kaynak uyumu, dönem
+duyarlılığı, GA genişliği. Kural sözleşme 2.5'te.
+
+```bash
+python -m physics.buyukluk --surum v0.1                    # üç test, il + bölge + Türkiye (~40 sn)
+python -m physics.buyukluk --surum v0.1 --test cc          # yalnız Clausius-Clapeyron (~23 sn)
+python -m physics.buyukluk --surum v0.1 --test butce       # yalnız su bütçesi, bölge + Türkiye (~14 sn)
+python -m physics.buyukluk --surum v0.1 --test kar_cizgisi # yalnız kar çizgisi (~3 sn)
+python -m physics.buyukluk --surum v0.1 --il-yok           # il satırları olmadan, daha hızlı
+```
+
+Bu komut yalnız `L4_iliski/buyukluk/` altına yazar. Yol haritasındaki eski kod buraya bağlandı: kar çizgisi serisi
+`shift.snowline_series`'ten alınır. `tests_physical.py` ve `run_yol_haritasi.py` değişmedi.
+Sonuçlar: `docs/dogrulama.md` "Büyüklük testleri".
