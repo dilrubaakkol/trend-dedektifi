@@ -7,8 +7,8 @@ Adımlar (değişken başına):
   4. Birim dönüşümü (UNIT_CONVERSIONS; ay uzunluğuna bağlı olanlar dahil).
   5. Izgara: 0,25° analiz ızgarası (ince üründe alan-örtüşmeli ortalama, kaba üründe bilineer
      interpolasyon) + katalogda grids: ["005"] olan ince ürünlerde 0,05°.
-  6. domain'e göre maske (land = Türkiye kara sınırı, ocean = kutudaki deniz).
-  7. Zorunlu attrs, cache/processed/turkiye/<degisken>__<urun>[__005].nc
+  6. domain'e göre maske (land = aktif ülkenin kara sınırı, ocean = kutudaki deniz).
+  7. Zorunlu attrs, cache/processed/<ulke>/<degisken>__<urun>[__005].nc (varsayılan ülke: turkiye).
 """
 
 from __future__ import annotations
@@ -222,7 +222,8 @@ def harmonize_variable(v: dict, grids=None, raw: xr.Dataset | None = None) -> li
     ds = raw if raw is not None else open_raw(v["urun"], names)
     da = ds[safe_name(v["dosya_degiskeni"])]
     q = ds[safe_name(v["kalite"]["degisken"])] if v.get("kalite") else None
-    steps = [f"earthaccess ile Türkiye kesiti ({p['erisim']})"]
+    from data.ulkeler import ulke_yazimi
+    steps = [f"earthaccess ile {ulke_yazimi()} kesiti ({p['erisim']})"]   # Türkiye: metin eskisiyle aynı
 
     da = apply_flags(da, v, q)
     if v.get("bayraklar") or v.get("gecerli_aralik"):
@@ -309,9 +310,12 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="Ham kesitleri sözleşmeye uygun NetCDF'e çevir.")
     ap.add_argument("--vars", default="all")
     ap.add_argument("--urun", default=None, help="yalnız bu ürünler (virgülle)")
+    ap.add_argument("--ulke", default=None, help="data/ulkeler.yaml anahtarı (varsayılan turkiye)")
     a = ap.parse_args(argv)
+    from data.ulkeler import ulke_baglami
     names = None if a.vars == "all" else a.vars.split(",")
-    harmonize(names, products=a.urun.split(",") if a.urun else None)
+    with ulke_baglami(a.ulke):
+        harmonize(names, products=a.urun.split(",") if a.urun else None)
 
 
 if __name__ == "__main__":
