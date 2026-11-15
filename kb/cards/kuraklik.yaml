@@ -1,6 +1,7 @@
 id: kuraklik
 baslik: Toprakta kuraklık
 konu: Kuraklık ve su
+buyukluk_testleri: [butce]   # L4_iliski/buyukluk/ (sözleşme 2.5)
 sade_tanim: Toprak, bitkilerin kullanabileceği suyu tutan bir depo gibidir; depo boşalıyorsa kuraklık artıyordur.
 soru_kaliplari: ["kurak", "kuraklık", "kuruyor", "toprak nemi", "tarım", "susuz", "ekin"]
 ornek_sorular:

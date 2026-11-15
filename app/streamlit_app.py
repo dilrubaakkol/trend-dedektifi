@@ -592,9 +592,19 @@ def _pick_example() -> None:
         st.session_state["q_text"] = st.session_state["q_example"]
 
 
+ROADMAP_PAGES = {"soru"}   # v0.1 kapsamı dışında, "yol haritası" olarak işaretlenen sayfalar
+
+
 def page_soru() -> None:
     """Serbest soru → plan → NASA verisinden kanıt → doğrulanmış açıklama (Kişi 4'ün llm.answer katmanı)."""
     kitle = "akademisyen" if academic else "genel"
+    # Yol haritası: sayfa çalışır ve her sayı doğrulanır, ama gerçek bir LLM ile v0.1'de sınanmadı.
+    st.markdown('<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">'
+                '<span class="td-badge warn">🧭 yol haritası</span>'
+                '<span style="color:var(--muted);font-size:14px">Bu özellik v0.1 kapsamı dışındadır: '
+                "çalışır ve metindeki her sayı doğrulanır, ancak yapay zekâ ile soru yorumlama ve metin yazma "
+                "henüz sınanmadı. Veri paketi, harita ve il sayfaları bundan etkilenmez.</span></div>",
+                unsafe_allow_html=True)
     answer("Sorunu yaz, <span class='ember'>kanıtı getirelim.</span>",
            "Soru bir konuya ve bölgeye çevrilir, ilgili trend ve ilişki sonuçları analiz paketinden okunur. Metindeki "
            "her sayı bir kanıt satırına bağlıdır ve doğrulayıcıdan geçer; yapay zekâ sayı uydurmaz.")
@@ -947,7 +957,8 @@ with st.container(key="content"):
     pages = auth.pages_for(user)
     st.markdown('<div style="height:14px"></div>', unsafe_allow_html=True)
     page = st.segmented_control("Sayfa", pages, default=pages[0], key="page",
-                                format_func=lambda k: auth.PAGES[k],
+                                format_func=lambda k: auth.PAGES[k]
+                                + (" · yol haritası" if k in ROADMAP_PAGES else ""),
                                 label_visibility="collapsed") or pages[0]
     PAGE_FUNCS[page]()
     footer()

@@ -1,8 +1,7 @@
 # Ortak sözleşmeler
 
-> **TASLAK (2026-11-14), ekip onayına sunuldu.** Bölüm 1'e L1 yayın paketi eklendi. Bölüm 2'deki
-> eski `results.json` sözleşmesi kaldırıldı; yerine L2/L3/L4 şeması yazıldı. Onaylanana kadar
-> L2–L4 bölümleri öneridir.
+> **Sürüm v0.1 (2026-11-14), ekip onaylı.** L1 yayın paketi (bölüm 1.1) ve L2/L3/L4 analiz katmanları
+> (bölüm 2) kesinleşmiştir. Eski `results.json` sözleşmesi kaldırılmıştır.
 
 Modüller birbirleriyle yalnızca bu biçimler üzerinden konuşur: içeride veri küpleri (bölüm 1) ve
 yayın paketindeki L1–L4 katmanları (bölüm 1.1 ve bölüm 2). Değişiklik ekip onayıyla yapılır.
@@ -169,7 +168,7 @@ kurallar Türkiye için aynen geçerli. Türkiye paketi yeniden export edildiği
   Komut yayın kutusunu da hesaplayıp ekrana yazar; o kutu ulkeler.yaml'a girilir.
 - Komutlar ve Yunanistan paketi: `docs/ulke_parametresi.md`.
 
-## 2. Analiz katmanları L2–L4 (Kişi 2, 3 → Kişi 4, 5) — TASLAK
+## 2. Analiz katmanları L2–L4 (Kişi 2, 3 → Kişi 4, 5)
 
 Bütün katmanlar L1 küplerinden üretilir ve aynı paket köküne yazılır:
 `outputs/trend-dedektifi-turkiye-<surum>/`. Çerçeve **ilişki**dir, neden değil. Hiçbir sütun ya da
