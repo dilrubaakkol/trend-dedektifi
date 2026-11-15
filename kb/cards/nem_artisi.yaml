@@ -1,8 +1,9 @@
 id: nem_artisi
 baslik: Isınan havada nem artışı
 konu: Isınma
+buyukluk_testleri: [cc]   # L4_iliski/buyukluk/ (sözleşme 2.5)
 sade_tanim: Sıcak hava daha çok su buharı taşıyabilir; ısınan bölgelerde havadaki nemin de artması beklenir.
-soru_kaliplari: ["nem", "nemli", "bunaltıcı", "su buharı", "rutubet"]
+soru_kaliplari: ["nem", "nemli", "bunaltıcı", "su buharı", "rutubet", "clausius", "clapeyron"]
 ornek_sorular:
   - "Karadeniz'de hava daha nemli mi oluyor?"
 belirti:

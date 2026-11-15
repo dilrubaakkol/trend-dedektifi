@@ -27,6 +27,14 @@ LABELS = {
     "uyumlu": "tüm ürünler aynı yönde anlamlı",
     "kismen": "ürünlerin bir kısmı aynı yönde anlamlı",
     "uyumsuz": "ürünler arasında anlamlı ortak yön yok",
+    # bulgu karnesi güveni (2.4) — etiket olarak aynen
+    "YÜKSEK": "güven yüksek", "ORTA": "güven orta", "DÜŞÜK": "güven düşük", "YOK": "güven iddiası yok",
+    # büyüklük testleri (2.5)
+    "beklenen büyüklükle tutarlı": "gözlenen büyüklük fiziğin beklediği bantla tutarlı",
+    "beklenenden küçük": "gözlenen büyüklük beklenen bandın altında",
+    "beklenenden büyük": "gözlenen büyüklük beklenen bandın üstünde",
+    "belirsiz": "güven aralığı çok geniş, büyüklük hakkında karar verilemiyor",
+    "hesaplanamadı": "test hesaplanamadı",
     # eski results.json (geriye uyum)
     "celiskili": "beklenenle çelişiyor",
 }
@@ -41,7 +49,12 @@ paragraf yaz. KURALLAR (çiğnersen cevabın reddedilir):
 3. Etiketlerin anlamını değiştirme. "anlamsiz" bir trendi artış/azalış diye sunma.
 4. Nedensellik dili kullanma ("neden oldu", "yol açtı" yok); "ilişkili", "eşzamanlı", "tutarlı" kullan.
 5. Doğrulanmamış (dogrulanmadi=true) ürünleri ve ürünler arası uyumsuzluğu açıkça belirt.
-6. 120–200 kelime; madde işareti yok, tek paragraf. Yöntem ve kaynakça YAZMA (ayrıca ekleniyor).""",
+6. 120–200 kelime; madde işareti yok, tek paragraf. Yöntem ve kaynakça YAZMA (ayrıca ekleniyor).
+7. type=karne kanıtı bir sonucun güven karnesidir ("about" o sonucun id'si): güven seviyesini (YÜKSEK/ORTA/
+   DÜŞÜK/YOK) ve hangi kontrollerin geçtiğini söyle, [ref:karne__…] ile bağla. Güven seviyesini değiştirme.
+8. type=buyukluk kanıtı gözlenen büyüklüğü fiziğin beklediği bantla karşılaştırır: gözleneni, GA'yı ve bandı
+   kanıttan kopyala, etiketi aynen kullan.
+9. "odak" "guven" ise önce güven seviyelerini, "buyukluk" ise önce büyüklük testlerini anlat.""",
     "genel": """Sen bir NASA veri dedektifisin. Lise öğrencisinin anlayacağı sade bir Türkçeyle aşağıdaki
 analiz kanıtlarını açıkla. KURALLAR: sayıları yalnızca kanıtlardan kopyala (Türkçe biçim: −2,1), yeni sayı
 türetme; sayı içeren her cümlenin sonuna [ref:<id>] ekle; ilişkinin kesin neden olmadığını söyle;
@@ -61,6 +74,12 @@ SERI = {"yillik_ortalama": "yıllık ortalama", "yillik": "yıllık", "aylik_ano
 def seri_adi(code) -> str:
     """Seri kodunun okunur hali: "yillik_ortalama" -> "yıllık ortalama"."""
     return SERI.get(str(code), str(code).replace("_", " "))
+
+
+TEST_ADI = {"cc": "Clausius-Clapeyron (nem–sıcaklık)", "butce": "Su bütçesi kapanışı",
+            "kar_cizgisi": "Kar çizgisi kayması"}
+YOL_ADI = {"a_yillar_arasi": "yıllar arası", "b_trend_orani": "trend oranı", "ortalama": "ortalama artık",
+           "trend": "artığın trendi", "kis": "kış", "ilkbahar": "ilkbahar"}
 
 
 def _title(kb: KnowledgeBase, name: str | None) -> str:
@@ -106,6 +125,21 @@ def evidence_table(results: dict, kb: KnowledgeBase) -> list[dict]:
                        deger=f"{a['k']}/{a['m']}", birim="ürün aynı yönde")
         elif t == "boundary_shift":
             row.update(degisken=a.get("axis"), deger=a.get("observed_shift_m_per_decade"), birim="m/10 yıl")
+        elif t == "karne":
+            # Karıştırma testinin p'si sıradan bir p değeri değildir: "Anlamlılık" sütununa değil açıklamaya yazılır.
+            about = next((x for x in results.get("analyses", []) if x.get("id") == a["about"]), {})
+            konu = (" ~ ".join(_title(kb, v) for v in about["variables"]) if about.get("variables")
+                    else _title(kb, about.get("variable")))
+            perm = (f"karıştırma p_perm = {format_tr(a['b_p_perm'], digits=3)}"
+                    if a.get("b_p_perm") is not None else "")
+            row.update(degisken=f"Bulgu karnesi · {konu}", urun=perm, deger=a.get("guven"), birim="güven",
+                       kontroller=a.get("kontroller"), gerekce=a.get("gerekce"), bagli_kanit=a["about"])
+        elif t == "buyukluk":
+            row.update(degisken=f"{TEST_ADI.get(a['test'], a['test'])} · {YOL_ADI.get(a['yol'], a['yol'])}",
+                       urun=a.get("product"), deger=a.get("gozlenen"), birim=a.get("birim"),
+                       aralik_95=[a.get("ga_alt"), a.get("ga_ust")],
+                       beklenen=[a.get("beklenen_alt"), a.get("beklenen_ust")], guven=a.get("guven"),
+                       bolge=a.get("bolge_adi"))
         rows.append(row)
     return rows
 
@@ -175,6 +209,39 @@ def _sentence(a: dict, kb: KnowledgeBase) -> str | None:
         if a.get("label") == "ters_yonde" and a.get("not"):
             s += f" Not: {a['not']}"
         return s
+    if t == "karne":
+        parts = []
+        for k in a.get("kontroller", []):
+            if not k.get("durum"):
+                continue
+            txt = f"{k['ad']} {k['durum']}"
+            if k["ad"] == "karıştırma testi" and a.get("b_p_perm") is not None:
+                txt += f" (p_perm = {format_tr(a['b_p_perm'], digits=3)})"
+            parts.append(txt)
+        s = f"Bulgu karnesi: güven {a.get('guven') or 'YOK'}"
+        if parts:
+            s += " — " + ", ".join(parts)
+        if a.get("gerekce"):
+            s += f"; gerekçe: {str(a['gerekce']).replace('. ', '; ').rstrip('.')}"
+        return s + f" [ref:{rid}]."
+    if t == "buyukluk" and a.get("gozlenen") is not None:
+        ad = f"{TEST_ADI.get(a['test'], a['test'])} ({YOL_ADI.get(a['yol'], a['yol'])}"
+        if a.get("variable") and a["test"] == "cc":
+            ad += f", {_title(kb, a['variable'])}"
+        ad += f", {a.get('bolge_adi')})" if a.get("bolge_adi") else ")"
+        birim = a.get("birim") or ""
+        s = f"{ad}: gözlenen {format_tr(a['gozlenen'], birim)}"
+        if a.get("ga_alt") is not None and a.get("ga_ust") is not None:
+            s += f" (%95 GA {format_tr([a['ga_alt'], a['ga_ust']])})"
+        if a.get("beklenen_alt") is not None and a.get("beklenen_ust") is not None:
+            s += f", beklenen bant {format_tr([a['beklenen_alt'], a['beklenen_ust']], birim)}"
+            if a.get("beklenen_kaynak"):
+                s += f" ({a['beklenen_kaynak']})"
+        if a.get("guven"):
+            s += f"; güven {a['guven']}"
+        return s + f" [ref:{rid}]. Sonuç: {lab}."
+    if t == "buyukluk":
+        return f"{TEST_ADI.get(a.get('test'), a.get('test'))}: {lab} [ref:{rid}]."
     if t == "boundary_shift" and a.get("observed_shift_m_per_decade"):
         o, p = a["observed_shift_m_per_decade"], a.get("predicted_shift_m_per_decade")
         s = f"{a.get('axis', 'eksen')} boyunca gözlenen sınır kayması {format_tr(o, 'm/10 yıl', 0)}"
@@ -186,6 +253,31 @@ def _sentence(a: dict, kb: KnowledgeBase) -> str | None:
     return None
 
 
+def _ordered(results: dict, odak: str | None) -> list[tuple[dict, list[dict]]]:
+    """(kanıt, altındaki karneler) listesi. Karne kendi sonucunun hemen altına gelir; odak "buyukluk" ise
+    büyüklük testleri en üste alınır."""
+    analyses = results.get("analyses", [])
+    karne = {}
+    for a in analyses:
+        if a.get("type") == "karne":
+            karne.setdefault(a["about"], []).append(a)
+    main = [a for a in analyses if a.get("type") != "karne"]
+    if odak == "buyukluk":
+        main = [a for a in main if a.get("type") == "buyukluk"] + [a for a in main if a.get("type") != "buyukluk"]
+    return [(a, karne.get(a.get("id"), [])) for a in main]
+
+
+def _guven_ozeti(results: dict) -> str | None:
+    """Odak "güven" iken özet satırı: bulunan güven seviyeleri. Sayım YAZILMAZ (türetilmiş sayı olurdu);
+    her seviye kendi sonucunun altında kanıtıyla durur."""
+    k = [a.get("guven") or "YOK" for a in results.get("analyses", []) if a.get("type") == "karne"]
+    if not k:
+        return None
+    sira = [g for g in ("YÜKSEK", "ORTA", "DÜŞÜK", "YOK") if g in k]
+    return ("**Güven özeti (bulgu karnesi):** bu sorudaki sonuçların güven seviyeleri " + ", ".join(sira)
+            + ". Her seviyenin gerekçesi ve kontrolleri ilgili sonucun altında.")
+
+
 def template_explanation(plan: dict, results: dict, kb: KnowledgeBase, kitle: str = "akademisyen") -> str:
     """LLM'siz yedek açıklama. Yalnızca kanıtlardaki sayıları kullanır, her sayılı cümle kanıta bağlıdır."""
     region = plan.get("region_name") or (results.get("region") or {}).get("name") or ""
@@ -194,19 +286,29 @@ def template_explanation(plan: dict, results: dict, kb: KnowledgeBase, kitle: st
         lines.append(plan["sade_tanim"])
     if not results.get("analyses"):
         lines.append("Bu bölge ve değişkenler için analiz paketinde sonuç bulunamadı.")
-    for a in results.get("analyses", []):
+    if plan.get("odak") == "guven":
+        oz = _guven_ozeti(results)
+        lines.append(oz or "Bu sonuçlar için bulgu karnesi bulunamadı; güven seviyesi verilemiyor.")
+    for a, karneler in _ordered(results, plan.get("odak")):
         s = _sentence(a, kb)
         if s:
             lines.append("- " + s)
+        for k in karneler:
+            ks = _sentence(k, kb)
+            if ks:
+                lines.append("  - " + ks)
     if any(a.get("type") == "iliski" for a in results.get("analyses", [])) or plan.get("supheliler"):
         lines.append("Not: Değişkenler arası sonuçlar istatistiksel ilişki gösterir, nedensellik göstermez.")
+    if any(a.get("type") == "karne" for a in results.get("analyses", [])):
+        lines.append("Not: Bulgu karnesi bir sağlamlık ve tutarlılık özetidir; sonucun doğruluğunu ya da "
+                     "nedenselliğini göstermez.")
     return "\n".join(lines)
 
 
 # --------------------------------------------------------------------------- LLM
 def _compact(a: dict) -> dict:
     """LLM'e gidecek kanıt: dosya yolu ve künye gibi metin dışı alanlar çıkarılır, sayılar aynen kalır."""
-    skip = {"file", "provenance", "veri_seti_doi", "doi", "lisans", "urun_surumu"}
+    skip = {"file", "provenance", "veri_seti_doi", "doi", "lisans", "urun_surumu", "sayi_metinleri"}
     return {k: v for k, v in a.items() if k not in skip and v is not None}
 
 
@@ -221,6 +323,7 @@ def llm_explanation(question: str, plan: dict, results: dict, kb: KnowledgeBase,
         "soru": question,
         "bolge": plan.get("region_name"),
         "surec": {k: plan.get(k) for k in ("card_title", "supheliler", "alternatifler")},
+        "odak": plan.get("odak"),
         "degisken_kartlari": var_cards,
         "etiket_anlamlari": LABELS,
         "kanitlar": [_compact(a) for a in results.get("analyses", [])],

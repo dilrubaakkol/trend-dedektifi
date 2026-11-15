@@ -4,6 +4,7 @@ id: kar_isinma
 baslik: Kar örtüsü azalımı ve ısınma
 konu: Kar
 mevsim: kis   # varsayılan L3 mevsimi: kar kışın anlamlı (soruda başka mevsim geçerse o kullanılır)
+buyukluk_testleri: [kar_cizgisi]   # L4_iliski/buyukluk/ (sözleşme 2.5)
 sade_tanim: Isınan bir dağda kar çizgisi yukarı çekilir; alçak yerlerde kar azalır.
 soru_kaliplari: ["kar", "kar örtüsü", "kar çizgisi", "kar eriyor", "kayak", "kar su"]
 ornek_sorular:

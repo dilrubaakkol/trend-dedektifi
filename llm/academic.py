@@ -19,6 +19,10 @@ METHOD_REFS = {
     "weatherhead": "Weatherhead, E. C., et al. (1998). Factors affecting the detection of trends: "
                    "Statistical considerations and applications to environmental data. "
                    "Journal of Geophysical Research, 103(D14), 17149–17161.",
+    "politis": "Politis, D. N., & Romano, J. P. (1992). A circular block-resampling procedure for stationary "
+               "data. In R. LePage & L. Billard (Eds.), Exploring the Limits of Bootstrap (pp. 263–270). Wiley.",
+    "held_soden": "Held, I. M., & Soden, B. J. (2006). Robust responses of the hydrological cycle to global "
+                  "warming. Journal of Climate, 19(21), 5686–5699.",
     "bretherton": "Bretherton, C. S., et al. (1999). The effective number of spatial degrees of freedom "
                   "of a time-varying field. Journal of Climate, 12(7), 1990–2009.",
 }
@@ -95,13 +99,42 @@ def methods_paragraph(results: dict, kb) -> str:
         if levels & {"bolge", "turkiye"}:
             txt += " Bölge ve Türkiye satırlarında anlamlılık eşiği p < 0,05'tir (az sayıda test)."
         p.append(txt + " Bu sonuçlar nedensellik değil istatistiksel ilişki gösterir.")
+    karne = _of(results, "karne")
+    if karne:
+        surum = sorted({str(a.get("kural_surumu")) for a in karne if a.get("kural_surumu")})
+        p.append("Her sonuç için sonuçlar görülmeden sabitlenmiş bir bulgu karnesi"
+                 + (f" ({', '.join(surum)})" if surum else "") + " hesaplanmıştır: ürünler arası uyum, "
+                 "dairesel blok permütasyonuyla karıştırma testi (499 tekrar), ilk ve son üç yılın çıkarıldığı dönem "
+                 "kırpması, α = 0,05 sıkı eşik ve veri yeterliliği (trendlerde) ya da trendden arındırma ve ±1 ay "
+                 "gecikme (ilişkilerde). Güven seviyesi (YÜKSEK, ORTA, DÜŞÜK, YOK) bu kontrollerden kurala göre "
+                 "atanır; karne bir sağlamlık özetidir, doğruluk ya da nedensellik göstermez.")
+    buy = _of(results, "buyukluk")
+    if buy:
+        tests = sorted({a["test"] for a in buy})
+        t_txt = {"cc": "Clausius-Clapeyron nem–sıcaklık oranı (beklenen bant 5,9–7,3 %/K; Held ve Soden, 2006)",
+                 "butce": "su bütçesi kapanışı (GRACE depo değişimi ile yağış − buharlaşma − akış farkı; bant, "
+                          "ortalama yıllık yağışın ±%10'u)",
+                 "kar_cizgisi": "kar çizgisi kayması (sıcaklık trendinin 5,5–7,5 °C/km sıcaklık azalma oranına "
+                                "bölümüyle beklenen kayma)"}
+        p.append("Yön testlerine ek olarak gözlenen büyüklük fiziğin beklediği bantla karşılaştırılmıştır: "
+                 + "; ".join(t_txt[t] for t in tests if t in t_txt)
+                 + ". Güven aralıkları dairesel blok bootstrap ile (Politis ve Romano, 1992; 999 tekrar) "
+                 "hesaplanmış, aralık bantla kesişiyorsa sonuç beklenen büyüklükle tutarlı sayılmıştır.")
     return " ".join(p)
+
+
+def _of(results, kind):
+    return [a for a in results.get("analyses", []) if a.get("type") == kind]
 
 
 def method_references(results: dict) -> list[str]:
     refs = ["sen", "hamed_rao", "bh", "weatherhead"] if _trends(results) else []
-    if _relations(results):
+    if _relations(results) or _of(results, "buyukluk"):
         refs.append("bretherton")
+    if _of(results, "buyukluk"):
+        refs.append("politis")
+        if any(a.get("test") == "cc" for a in _of(results, "buyukluk")):
+            refs.append("held_soden")
     return [METHOD_REFS[r] for r in refs]
 
 
@@ -185,6 +218,15 @@ def academic_warnings(results: dict, kb) -> list[str]:
         note = kb.variables.get(v, {}).get("dikkat")
         if note:
             w.append(f"{title(v)}: {note}")
+    for a in _of(results, "karne"):
+        if a.get("f_kritik") and str(a["f_kritik"]).strip() not in ("", "nan", "—"):
+            w.append(f"Karne kritik uyarı ({a['about']}): {a['f_kritik']} [ref:{a['id']}].")
+        if a.get("guven") in ("DÜŞÜK",):
+            w.append(f"{a['about']}: güven DÜŞÜK — sonuç karıştırma ya da dönem kırpma testinden geçmedi "
+                     f"[ref:{a['id']}].")
+    for a in _of(results, "buyukluk"):
+        if a.get("yorum"):
+            w.append(f"{a['test']} ({a['yol']}, {a.get('bolge_adi')}): {a['yorum']} [ref:{a['id']}].")
     return w + list(results.get("warnings", []))
 
 

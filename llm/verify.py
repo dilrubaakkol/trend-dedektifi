@@ -94,6 +94,11 @@ def verify_text(text: str, results: dict, extra_allowed: set[float] | None = Non
     unknown = sorted({r for r in REF.findall(text) if r not in ids})
 
     ref_numbers = _numbers_in(results.get("analyses", []))
+    # Karne/büyüklük kanıtlarının metin sütunlarındaki paket sayıları ("2/3 ürün", "Held ve Soden 2006").
+    for a in results.get("analyses", []):
+        for t in a.get("sayi_metinleri", []) or []:
+            for tok in NUM.findall(re.sub(r"((?:19|20)\d\d)-(?:0[1-9]|1[0-2])(?!\d)", r"\1", str(t))):
+                ref_numbers += [v for v, _ in parse_tr(tok)]
     candidates = set()
     for r in ref_numbers:
         candidates.update({abs(r), abs(r) * 100})

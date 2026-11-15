@@ -123,7 +123,8 @@ def _levels(region: dict) -> list[tuple[str, str, str]]:
 
 def _l3_row(pkg: Path, stem: str, region: dict, mevsim: str) -> tuple[dict | None, str | None, str]:
     """Bölge × mevsim satırı. `stem`: "<degisken>__<urun>" ya da "<degisken>__kaynak_uyumu".
-    Dönen: (satır, paket köküne göreli dosya yolu, kullanılan düzey "il"|"bolge"|"turkiye")."""
+    Dönen: (satır, paket köküne göreli dosya yolu, kullanılan düzey "il"|"bolge"|"turkiye").
+    Kullanılan bölge anahtarı satıra `_anahtar` olarak eklenir (karne eşleşmesi için)."""
     for file_level, row_level, key in _levels(region):
         f = pkg / "L3_ozet" / f"{stem}__{file_level}.csv"
         df = _read_l3(f)
@@ -133,7 +134,9 @@ def _l3_row(pkg: Path, stem: str, region: dict, mevsim: str) -> tuple[dict | Non
                  & (df["mevsim"] == mevsim)]
         if len(hit):
             level = "turkiye" if row_level == "ulke" else row_level
-            return hit.iloc[0].to_dict(), f.relative_to(pkg).as_posix(), level
+            row = hit.iloc[0].to_dict()
+            row["_anahtar"] = key
+            return row, f.relative_to(pkg).as_posix(), level
     return None, None, region["level"]
 
 
@@ -161,8 +164,8 @@ def _trend_evidence(pkg, degisken, urun, region, mevsim) -> dict | None:
     if row is None:
         return None
     e = {"id": f"trend__{degisken}__{urun}{_suffix(mevsim)}", "type": "trend", "variable": degisken,
-         "product": urun, "region_level": level, "region_name": row.get("bolge_adi"), "file": path,
-         "label": trend_label(row)}
+         "product": urun, "region_level": level, "region_key": row["_anahtar"],
+         "region_name": row.get("bolge_adi"), "file": path, "label": trend_label(row)}
     e.update({k: _num(row.get(k)) for k in L3_FIELDS})
     e.update(_meta(row, META_FIELDS))
     if e.get("donem_baslangic") is not None and e.get("donem_bitis") is not None:
@@ -278,6 +281,123 @@ def _relation_evidence(pkg: Path, variables: set[str], targets: set[str], region
     return out
 
 
+# --------------------------------------------------------------------------- karne ve büyüklük (2.4, 2.5)
+KONTROL_ADLARI = {
+    "trend": [("a_kaynak_uyumu", "a_sayi", "kaynak uyumu"), ("b_karistirma", "b_p_perm", "karıştırma testi"),
+              ("c_donem", "c_sayi", "dönem kırpma"), ("d_esik", "d_sayi", "sıkı eşik (α = 0,05)"),
+              ("e_yeterlilik", "e_sayi", "veri yeterliliği")],
+    "iliski": [("a_kaynak_uyumu", "a_sayi", "kaynak uyumu"), ("b_karistirma", "b_p_perm", "karıştırma testi"),
+               ("c_trend", "c_sayi", "trendden arındırma"), ("d_gecikme", "d_sayi", "gecikme ±1 ay"),
+               ("e_esik", "e_sayi", "sıkı eşik (α = 0,05)")],
+    "buyukluk": [("a_kaynak_uyumu", "a_sayi", "kaynak uyumu"), ("b_donem", "b_sayi", "dönem kırpma"),
+                 ("c_ga_genisligi", "c_sayi", "güven aralığı genişliği")],
+}
+# Metin sütunlarında paketten gelen sayılar (ör. "2/3 ürün", "Held ve Soden 2006"): doğrulayıcı bunları da
+# kanıt sayısı kabul eder. Yalnız bu sütunlar açılır; rakam içeren her metin değil.
+SAYI_METIN_SUTUNLARI = ["gerekce", "a_sayi", "c_sayi", "d_sayi", "e_sayi", "b_sayi", "f_uyarilar",
+                        "beklenen_kaynak", "etiket_gerekce", "yorum", "donem"]
+BUYUKLUK_TESTLERI = ("cc", "butce", "kar_cizgisi")
+
+
+def _read_any(f: Path, str_cols=("bolge_kodu",)) -> pd.DataFrame | None:
+    """Karne/büyüklük CSV'si; yoksa ya da boşsa None."""
+    if not f.exists():
+        return None
+    try:
+        df = pd.read_csv(f, dtype={c: str for c in str_cols}, encoding="utf-8-sig")
+    except pd.errors.EmptyDataError:
+        return None
+    return None if df.empty else df
+
+
+def _same_region(df: pd.DataFrame, key: str) -> pd.Series:
+    return (df["bolge_adi"].map(norm_key) == key) | (df["bolge_kodu"].map(norm_key) == key)
+
+
+def _checks(row: dict, kind: str) -> list[dict]:
+    """Karne kontrolleri: [{"ad", "durum" (geçti/kaldı/uygulanamaz), "sayi"}]."""
+    out = []
+    for durum_col, sayi_col, ad in KONTROL_ADLARI[kind]:
+        if durum_col in row:
+            out.append({"ad": ad, "durum": None if pd.isna(row.get(durum_col)) else str(row[durum_col]),
+                        "sayi": None if pd.isna(row.get(sayi_col)) else row.get(sayi_col)})
+    return out
+
+
+def _karne_evidence(row: dict, about: str, kind: str, path: str) -> dict:
+    e = {"id": f"karne__{about}", "type": "karne", "about": about, "kind": kind, "file": path,
+         "label": str(row.get("guven") or "YOK"), "guven": row.get("guven"),
+         "gerekce": None if pd.isna(row.get("gerekce")) else str(row.get("gerekce")),
+         "kontroller": _checks(row, kind), "b_p_perm": _num(row.get("b_p_perm")),
+         "f_kritik": None if pd.isna(row.get("f_kritik")) else row.get("f_kritik"),
+         "kural_surumu": row.get("kural_surumu")}
+    e["sayi_metinleri"] = [str(row[c]) for c in SAYI_METIN_SUTUNLARI if c in row and not pd.isna(row[c])]
+    return e
+
+
+def _trend_karne(pkg: Path, t: dict, mevsim: str) -> dict | None:
+    """Trend kanıtının karne satırı (karne/trend_karne_{il,bolge}.csv)."""
+    level = t["region_level"]
+    f = pkg / "karne" / f"trend_karne_{'il' if level == 'il' else 'bolge'}.csv"
+    df = _read_any(f)
+    if df is None:
+        return None
+    duzey = {"il": "il", "bolge": "bolge", "turkiye": "ulke"}[level]
+    hit = df[(df["degisken"] == t["variable"]) & (df["urun"] == t["product"]) & (df["mevsim"] == mevsim)
+             & (df["duzey"].astype(str) == duzey) & _same_region(df, t["region_key"])]
+    return _karne_evidence(hit.iloc[0].to_dict(), t["id"], "trend", f.relative_to(pkg).as_posix()) if len(hit) else None
+
+
+def _relation_karne(pkg: Path, r: dict) -> dict | None:
+    """İlişki kanıtının karne satırı (karne/iliski_karne.csv): çift + gecikme + bölge."""
+    f = pkg / "karne" / "iliski_karne.csv"
+    df = _read_any(f)
+    if df is None:
+        return None
+    gec = pd.to_numeric(df.get("gecikme_ay", 0), errors="coerce").fillna(0).astype(int)
+    hit = df[(df["cift"] == r["pair"]) & (gec == int(r.get("gecikme_ay") or 0))
+             & (df["bolge_turu"].astype(str) == r["region_level"]) & _same_region(df, r["region_key"])]
+    return _karne_evidence(hit.iloc[0].to_dict(), r["id"], "iliski", f.relative_to(pkg).as_posix()) if len(hit) else None
+
+
+def _buyukluk_evidence(pkg: Path, tests: list[str], region: dict, mevsim: str) -> tuple[list[dict], list[str]]:
+    """Büyüklük testleri (L4_iliski/buyukluk/<test>__{il,bolge}.csv). İl satırı yoksa (ör. su bütçesinde
+    hiç yok) ilin bölgesine, o da yoksa Türkiye'ye düşülür. Kar çizgisinde `yol` mevsimdir: soru/kart mevsimi
+    kis ya da ilkbahar ise yalnız o yol alınır."""
+    out, warn = [], []
+    for test in tests:
+        hit, used = None, None
+        for file_level, row_level, key in _levels(region):
+            f = pkg / "L4_iliski" / "buyukluk" / f"{test}__{file_level}.csv"
+            df = _read_any(f)
+            if df is None:
+                continue
+            turu = df["bolge_turu"].astype(str)
+            m = (turu == ("turkiye" if row_level == "ulke" else row_level)) & _same_region(df, key)
+            if test == "kar_cizgisi" and mevsim in set(df["yol"].astype(str)):
+                m &= df["yol"].astype(str) == mevsim
+            if m.any():
+                hit, used = df[m], (f, "turkiye" if row_level == "ulke" else row_level)
+                break
+        if hit is None:
+            continue
+        if used[1] != region["level"]:
+            warn.append(f"Büyüklük testi '{test}' için seçilen düzeyde satır yok; daha geniş bölge kullanıldı.")
+        for row in hit.to_dict("records"):
+            e = {"id": f"buyukluk__{test}__{row['yol']}__{row['degisken']}", "type": "buyukluk",
+                 "test": test, "yol": str(row["yol"]), "variable": row.get("degisken"),
+                 "product": row.get("urun"), "region_level": used[1], "bolge_adi": row.get("bolge_adi"),
+                 "file": used[0].relative_to(pkg).as_posix(), "label": row.get("etiket"),
+                 "kontroller": _checks(row, "buyukluk")}
+            e.update({k: _num(row.get(k)) for k in ("gozlenen", "ga_alt", "ga_ust", "beklenen", "beklenen_alt",
+                                                    "beklenen_ust", "n", "hucre_sayisi")})
+            e.update(_meta(row, ["birim", "beklenen_kaynak", "etiket_gerekce", "yorum", "guven", "gerekce",
+                                 "kritik", "donem", "kural_surumu", "urun_surumu", "veri_seti_doi", "lisans"]))
+            e["sayi_metinleri"] = [str(row[c]) for c in SAYI_METIN_SUTUNLARI if c in row and not pd.isna(row[c])]
+            out.append(e)
+    return out, warn
+
+
 # --------------------------------------------------------------------------- ana giriş
 def collect_evidence(plan: dict, pkg: Path | str | None = None) -> dict:
     """Plan için kanıt listesi (answer() bunu `results` olarak kullanır).
@@ -319,6 +439,18 @@ def collect_evidence(plan: dict, pkg: Path | str | None = None) -> dict:
             out["analyses"].append(a)
     rel = _relation_evidence(pkg, variables, targets, region)
     out["analyses"] += rel
+    # Bulgu karnesi (2.4): her trend ve ilişki kanıtının hemen ardından kendi karne satırı.
+    karneler = [k for k in ([_trend_karne(pkg, t, t.get("mevsim") or mevsim) for t in trends]
+                            + [_relation_karne(pkg, r) for r in rel]) if k]
+    out["analyses"] += karneler
+    if (trends or rel) and not karneler and (pkg / "karne").exists():
+        out["warnings"].append("Bu sonuçlar için bulgu karnesi satırı bulunamadı.")
+    # Büyüklük testleri (2.5): kartın listesindeki testler.
+    tests = [t for t in plan.get("buyukluk_testleri", []) if t in BUYUKLUK_TESTLERI]
+    if tests:
+        buy, w = _buyukluk_evidence(pkg, tests, region, mevsim)
+        out["analyses"] += buy
+        out["warnings"] += w
     fell = sorted({f"{a['pair']} → {a.get('bolge_adi') or a['region_key']}" for a in rel
                    if a["region_level"] != region["level"]})
     if fell:

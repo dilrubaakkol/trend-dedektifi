@@ -72,6 +72,71 @@ def _l3(pkg, deg, urun, il_rows, bolge_rows, birim, kademe=1, kis=None, uyari=""
         pd.DataFrame(recs).to_csv(d / f"{deg}__{urun}__{kind}.csv", index=False, encoding="utf-8-sig")
 
 
+def _karne_ve_buyukluk(p):
+    """Bulgu karnesi (2.4) ve büyüklük testleri (2.5) — YER TUTUCU değerler. Sütun listeleri doğrudan
+    stats.karne / physics.karne / physics.buyukluk'tan alınır: onlar değişirse bu testler de haber verir."""
+    from stats.karne import TREND_SUTUNLARI
+    from physics.karne import SUTUNLAR as ILISKI_SUTUNLARI
+    from physics.buyukluk import SUTUNLAR as BUYUKLUK_SUTUNLARI
+
+    def satir(cols, **kw):
+        return {c: kw.get(c, "") for c in cols}
+
+    (p / "karne").mkdir()
+    ortak = dict(a_kaynak_uyumu="uygulanamaz", a_sayi="tek kaynak", b_karistirma="geçti", b_p_perm=0.004,
+                 b_blok=2, c_donem="geçti", c_sayi="−1,7 / −1,9", d_esik="geçti", d_sayi="q = 0,03",
+                 e_yeterlilik="geçti", e_sayi="31 ≤ 25 değil", f_uyarilar="", f_kritik="",
+                 kural_surumu="karne-v1")
+    pd.DataFrame([
+        satir(TREND_SUTUNLARI, degisken="toprak_nemi", urun="GLDAS", bolge_kodu="42", bolge_adi="Konya",
+              duzey="il", mevsim="yillik", sen_egimi=-1.84, egim_birimi="kg/m² / 10 yıl", anlamli=1,
+              guven="ORTA", gerekce="tek kaynak (ikinci bağımsız ürün yok)", **ortak),
+        satir(TREND_SUTUNLARI, degisken="toprak_nemi", urun="GLDAS", bolge_kodu="42", bolge_adi="Konya",
+              duzey="il", mevsim="kis", sen_egimi=99.0, anlamli=0, guven="YOK", gerekce="sonuç anlamlı değil",
+              **ortak),
+        satir(TREND_SUTUNLARI, degisken="sicaklik_2m", urun="MERRA2", bolge_kodu="42", bolge_adi="Konya",
+              duzey="il", mevsim="yillik", sen_egimi=0.48, anlamli=1, guven="YÜKSEK",
+              gerekce="2/2 kaynak uyumlu, karıştırma testi geçti", **{**ortak, "a_kaynak_uyumu": "geçti",
+                                                                     "a_sayi": "2/2"}),
+    ]).to_csv(p / "karne" / "trend_karne_il.csv", index=False, encoding="utf-8-sig")
+    pd.DataFrame([
+        satir(TREND_SUTUNLARI, degisken="buharlasma", urun="GLDAS", bolge_kodu="ic_anadolu",
+              bolge_adi="İç Anadolu Bölgesi", duzey="bolge", mevsim="yillik", sen_egimi=0.7, anlamli=1,
+              guven="DÜŞÜK", gerekce="dönem kırpmada işaret değişti",
+              **{**ortak, "c_donem": "kaldı", "f_kritik": "Kademe 2 (doğrulanmadı)"}),
+    ]).to_csv(p / "karne" / "trend_karne_bolge.csv", index=False, encoding="utf-8-sig")
+    pd.DataFrame([
+        satir(ILISKI_SUTUNLARI, cift="yagis__GPM~toprak_nemi__GLDAS", gecikme_ay=0, bolge_turu="il",
+              bolge_kodu="42", bolge_adi="Konya", r=0.57, etiket="beklenen_yonde", guven="YÜKSEK",
+              gerekce="5 kontrolün 5'i geçti", a_kaynak_uyumu="geçti", a_sayi="2/3 kombinasyon",
+              b_karistirma="geçti", b_p_perm=0.002, c_trend="geçti", d_gecikme="uygulanamaz", e_esik="geçti",
+              kural_surumu="karne-v1"),
+        satir(ILISKI_SUTUNLARI, cift="toprak_nemi__GLDAS~ndvi__MOD13C2", gecikme_ay=2, bolge_turu="il",
+              bolge_kodu="42", bolge_adi="Konya", r=0.21, etiket="anlamsiz", guven="YOK",
+              gerekce="ilişki anlamlı değil", kural_surumu="karne-v1"),
+    ]).to_csv(p / "karne" / "iliski_karne.csv", index=False, encoding="utf-8-sig")
+
+    b = p / "L4_iliski" / "buyukluk"
+    b.mkdir()
+    bk = dict(a_kaynak_uyumu="geçti", a_sayi="GLDAS ile aynı etiket", b_donem="geçti", c_ga_genisligi="kaldı",
+              c_sayi="1,8", guven="ORTA", gerekce="GA bant genişliğinin 1,8 katı", kural_surumu="buyukluk-v1",
+              urun_surumu="v0.1", veri_seti_doi="(yayında doldurulacak)", lisans="CC BY 4.0")
+    pd.DataFrame([   # su bütçesinin il dosyası yok (sözleşme 2.5): il sorusunda bölgeye düşülmeli
+        satir(BUYUKLUK_SUTUNLARI, test="butce", yol="trend", degisken="su_butcesi", urun="GRACE~GPM",
+              bolge_turu="bolge", bolge_kodu="ic_anadolu", bolge_adi="İç Anadolu Bölgesi", donem="2003–2024",
+              n=22, gozlenen=-31.0, ga_alt=-55.0, ga_ust=-8.0, birim="(mm/yıl) / 10 yıl", beklenen=0.0,
+              beklenen_alt=-36.0, beklenen_ust=36.0, beklenen_kaynak="proje seçimi (KURAL.txt)",
+              etiket="beklenen büyüklükle tutarlı", yorum="", **bk),
+    ]).to_csv(b / "butce__bolge.csv", index=False, encoding="utf-8-sig")
+    pd.DataFrame([
+        satir(BUYUKLUK_SUTUNLARI, test="kar_cizgisi", yol=m, degisken="kar_ortusu", urun="MOD10CM~sicaklik_2m:MERRA2",
+              bolge_turu="il", bolge_kodu="25", bolge_adi="Erzurum", donem="2002–2025", n=23, gozlenen=g,
+              ga_alt=g - 20, ga_ust=g + 25, birim="m / 10 yıl", beklenen=74.0, beklenen_alt=64.0,
+              beklenen_ust=87.0, beklenen_kaynak="6,5 °C/km (bant 5,5–7,5)", etiket="beklenen büyüklükle tutarlı",
+              **bk) for m, g in (("kis", 61.0), ("ilkbahar", 110.0))
+    ]).to_csv(b / "kar_cizgisi__il.csv", index=False, encoding="utf-8-sig")
+
+
 @pytest.fixture(scope="module")
 def pkg(tmp_path_factory):
     """Konya + İç Anadolu için yer tutucu L3/L4. Konya'nın buharlaşma il özeti yok (bölgeye düşmeli),
@@ -126,6 +191,7 @@ def pkg(tmp_path_factory):
         l4(1, "sicaklik_2m__MERRA2~kar_ortusu__MOD10CM", "kis_DJF", 0, "il", "42", "Konya",
            -0.3, 0.1, 0.2, 0, "anlamsiz"),
     ]).to_csv(p / "L4_iliski" / "ciftler.csv", index=False, encoding="utf-8-sig")
+    _karne_ve_buyukluk(p)
     return p
 
 
@@ -320,9 +386,18 @@ def test_agreement_from_l3_file_and_trend_warning(kb, regions, pkg):
     assert out["verified"]
 
 
-def test_real_l3_from_stats_pipeline(kb, regions, tmp_path):
-    """Kişi 2'nin kendi kodu (stats.l2 + stats.l3) ile üretilen L3 paketini adaptör doğru okumalı.
-    Küp ve bölgeler sentetik (YER TUTUCU); bölge anahtarları gerçek (konya / ic_anadolu / turkiye)."""
+def TEST_BOLGELER():
+    """Küçük sentetik ızgara için üç bölge (gerçek anahtarlarla)."""
+    from shapely.geometry import box
+    g = box(32.0, 38.0, 33.5, 39.0)
+    return [{"duzey": "il", "anahtar": "konya", "ad": "Konya", "kod": "42", "ust": "ic_anadolu", "sorgu": g},
+            {"duzey": "bolge", "anahtar": "ic_anadolu", "ad": "İç Anadolu", "kod": "ic_anadolu", "ust": "",
+             "sorgu": g},
+            {"duzey": "ulke", "anahtar": "turkiye", "ad": "Türkiye", "kod": "turkiye", "ust": "", "sorgu": g}]
+
+
+def _stats_package(tmp_path):
+    """stats.l2 + stats.l3 ile gerçek biçimli bir paket (sentetik yağış küpleri, YER TUTUCU)."""
     np = pytest.importorskip("numpy")
     xr = pytest.importorskip("xarray")
     pytest.importorskip("shapely")
@@ -345,17 +420,18 @@ def test_real_l3_from_stats_pipeline(kb, regions, tmp_path):
         rows.append({"dosya": f"yagis__{urun}.nc", "degisken": "yagis", "birim": "mm/ay", "kaynak": urun,
                      "kaynak_doi": "x", "donem": "2001-01 … 2025-12", "kademe": 1})
     pd.DataFrame(rows).to_csv(l1 / "ICINDEKILER.csv", index=False, encoding="utf-8-sig")
-    bolgeler = [
-        {"duzey": "il", "anahtar": "konya", "ad": "Konya", "kod": "42", "ust": "ic_anadolu",
-         "sorgu": box(32.0, 38.0, 33.5, 39.0)},
-        {"duzey": "bolge", "anahtar": "ic_anadolu", "ad": "İç Anadolu", "kod": "ic_anadolu", "ust": "",
-         "sorgu": box(32.0, 38.0, 33.5, 39.0)},
-        {"duzey": "ulke", "anahtar": "turkiye", "ad": "Türkiye", "kod": "turkiye", "ust": "",
-         "sorgu": box(32.0, 38.0, 33.5, 39.0)},
-    ]
+    bolgeler = TEST_BOLGELER()
     st_l2.uret("v0.1", kok=tmp_path / "outputs")
     st_l3.uret("v0.1", kok=tmp_path / "outputs", bolgeler=bolgeler)
-    pkg = tmp_path / "outputs" / "trend-dedektifi-turkiye-v0.1"
+    return tmp_path / "outputs" / "trend-dedektifi-turkiye-v0.1"
+
+
+
+def test_real_l3_from_stats_pipeline(kb, regions, tmp_path):
+    """Kişi 2'nin kendi kodu (stats.l2 + stats.l3) ile üretilen L3 paketini adaptör doğru okumalı.
+    Küp ve bölgeler sentetik (YER TUTUCU); bölge anahtarları gerçek (konya / ic_anadolu / turkiye)."""
+    pytest.importorskip("shapely")
+    pkg = _stats_package(tmp_path)
 
     plan = plan_question("Konya'da yağış nasıl değişti?", kb, None, regions)
     r = collect_evidence(plan, pkg)
@@ -371,6 +447,73 @@ def test_real_l3_from_stats_pipeline(kb, regions, tmp_path):
     assert out["verified"], out["warnings"]
     tr = collect_evidence(plan_question("Türkiye genelinde yağış nasıl değişti?", kb, None, regions), pkg)
     assert next(a for a in tr["analyses"] if a["type"] == "trend")["region_level"] == "turkiye"
+
+
+@pytest.mark.parametrize("q,odak", [
+    ("Konya'daki ısınma ne kadar güvenilir?", "guven"), ("Bu sonuçtan ne kadar emin olabiliriz?", "guven"),
+    ("Karadeniz'de nem ne kadar artmalı, beklenen büyüklükte mi?", "buyukluk"),
+    ("Konya'da kuraklık artıyor mu?", None),
+])
+def test_plan_odak(kb, regions, q, odak):
+    assert plan_question(q, kb, None, regions).get("odak") == odak
+
+
+def test_karne_attached_to_trends_and_relations(kb, regions, pkg):
+    plan = plan_question("Konya'da kuraklık artıyor mu?", kb, None, regions)
+    r = collect_evidence(plan, pkg)
+    k = {a["about"]: a for a in r["analyses"] if a["type"] == "karne"}
+    assert k["trend__toprak_nemi__GLDAS"]["guven"] == "ORTA"            # yıllık satır, kış değil
+    assert k["trend__buharlasma__GLDAS"]["guven"] == "DÜŞÜK"            # bölgeye düşen trendin karnesi
+    assert k["iliski__yagis__GPM__toprak_nemi__GLDAS"]["guven"] == "YÜKSEK"
+    assert k["iliski__toprak_nemi__GLDAS__ndvi__MOD13C2__g2"]["guven"] == "YOK"   # gecikme eşleşmesi
+    assert "iliski__toprak_nemi__GLDAS__ndvi__MOD13C2__g1" not in k     # karnesi yok -> eklenmez
+
+
+def test_guven_question_answer(kb, regions, pkg):
+    """Görev örneği: "Konya'daki ısınma ne kadar güvenilir?" -> güven özeti + karne satırı, doğrulanmış."""
+    out = answer("Konya'daki ısınma ne kadar güvenilir?", None, kb, None, regions, package=pkg)
+    t = out["explanation"]
+    assert out["plan"]["card_id"] == "isinma" and out["plan"]["odak"] == "guven"
+    assert "Güven özeti" in t and "güven YÜKSEK" in t and "p_perm = 0,004" in t
+    assert "2/2 kaynak uyumlu" in t and "[ref:karne__trend__sicaklik_2m__MERRA2]" in t
+    assert out["verified"], out["warnings"]
+    assert any(e["id"] == "karne__trend__sicaklik_2m__MERRA2" for e in out["evidence"])
+    assert "bulgu karnesi" in out["methods"] and "karne/trend_karne_il.csv" in out["files"]
+
+
+def test_buyukluk_tests(kb, regions, pkg):
+    # kar çizgisi: kart varsayılanı kış -> yalnız kış yolu
+    r = collect_evidence(plan_question("Erzurum'da kar azalıyor mu?", kb, None, regions), pkg)
+    buy = [a for a in r["analyses"] if a["type"] == "buyukluk"]
+    assert [(a["test"], a["yol"], a["gozlenen"]) for a in buy] == [("kar_cizgisi", "kis", 61.0)]
+    # su bütçesi: il dosyası yok -> İç Anadolu; odak büyüklük -> en üstte; doğrulanmış
+    out = answer("Konya'da kuraklık beklenen büyüklükte mi, su bütçesi kapanıyor mu?", None, kb, None,
+                 regions, package=pkg)
+    b = next(a for a in out["results"]["analyses"] if a["type"] == "buyukluk")
+    assert (b["id"], b["region_level"]) == ("buyukluk__butce__trend__su_butcesi", "bolge")
+    satirlar = [l for l in out["explanation"].splitlines() if l.startswith("- ")]
+    assert satirlar[0].startswith("- Su bütçesi kapanışı") and "beklenen bant −36 … 36" in satirlar[0]
+    assert out["verified"], out["warnings"]
+    assert any("Politis" in r for r in out["method_references"])
+
+
+def test_real_trend_karne_from_stats(kb, regions, tmp_path, monkeypatch):
+    """Halime'nin stats.karne'si ile üretilen gerçek trend karnesi adaptörle eşleşmeli. Karne bölge listesini
+    parametre almadığı için (gerçek 81 il), küçük sentetik ızgarada test bölgeleriyle değiştirilir."""
+    pytest.importorskip("shapely")
+    pkg = _stats_package(tmp_path)
+    from stats import karne as st_karne
+    from stats import l3 as st_l3
+    monkeypatch.setattr(st_l3, "bolge_listesi", TEST_BOLGELER)
+    st_karne.uret(pkg, yalniz="trend", tekrar=19)
+    plan = plan_question("Konya'da yağış nasıl değişti?", kb, None, regions)
+    r = collect_evidence(plan, pkg)
+    k = next(a for a in r["analyses"] if a["type"] == "karne" and a["about"] == "trend__yagis__GPM")
+    df = pd.read_csv(pkg / "karne" / "trend_karne_il.csv", dtype={"bolge_kodu": str}, encoding="utf-8-sig")
+    row = df[(df["degisken"] == "yagis") & (df["urun"] == "GPM") & (df["mevsim"] == "yillik")].iloc[0]
+    assert k["guven"] == row["guven"] and k["kural_surumu"] == row["kural_surumu"]
+    out = answer("Konya'da yağış ne kadar güvenilir?", None, kb, None, regions, package=pkg)
+    assert out["verified"], out["warnings"]
 
 
 def test_collect_evidence_without_package(konya_plan, tmp_path):
