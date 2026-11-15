@@ -22,7 +22,7 @@ ROLES = {
             "Türkiye haritasında sıcaklık, yağış, kar, su",
             "Her sonuç sade bir cümleyle",
         ],
-        "sayfalar": ["kesfet", "soru", "il", "iliski", "indir", "yontem"],
+        "sayfalar": ["kesfet", "il", "iliski", "lab", "fizik", "soru", "indir", "yontem"],
     },
     "akademisyen": {
         "ad": "Araştırmacıyım",
@@ -33,17 +33,19 @@ ROLES = {
             "Seçtiğin veriyi tek tıkla indir (CSV + NetCDF)",
             "Hazır atıf metni (APA / BibTeX)",
         ],
-        "sayfalar": ["kesfet", "soru", "il", "iliski", "indir", "makale", "yontem"],
+        "sayfalar": ["kesfet", "il", "iliski", "lab", "fizik", "soru", "indir", "makale", "yontem"],
     },
 }
 PAGES = {
-    "kesfet": "🗺️  Türkiye haritası",
-    "soru": "💬  Soru sor",
-    "il": "📍  İlimi bul",
-    "iliski": "🔗  Birlikte değişenler",
-    "indir": "⬇️  Veriyi indir",
-    "makale": "📝  Makalelerim",
-    "yontem": "🧪  Nasıl hesaplıyoruz?",
+    "kesfet": "Genel bakış",
+    "il": "İl profili",
+    "iliski": "İlişkiler",
+    "lab": "İlişki laboratuvarı",
+    "fizik": "Büyüklük testleri",
+    "soru": "Soru sor",
+    "indir": "Veri indir",
+    "makale": "Çalışmalarım",
+    "yontem": "Yöntem",
 }
 ACADEMIC_DOMAINS = (".edu", ".edu.tr", ".ac.uk", ".ac.jp", ".ac.at", ".ac.il", ".ac.nz", ".ac.za", ".ac.kr",
                     ".ac.in", ".edu.au", ".edu.cn", ".gov.tr")

@@ -105,7 +105,9 @@
     .btn { padding: 14px 22px; font-size: 15px; }
   }
   /* Arka plan kipi (giriş ekranı): orta metin ve kaydırma işareti gizlenir, Dünya sola kayar */
-  body.bg-mode .center, body.bg-mode .scroll-cue, body.bg-mode .bl { display: none; }
+  body.bg-mode .center, body.bg-mode .scroll-cue, body.bg-mode .bl, body.bg-mode .sat-label { display: none; }
+  /* Uygulama içi arka plan: yalnız Dünya ve yıldızlar; köşe bilgileri ve çerçeve yok */
+  body.ambient-mode .hud, body.ambient-mode .corner { display: none; }
   body.bg-mode .vignette { background: radial-gradient(ellipse at 70% 50%, transparent 40%, rgba(0,0,0,.55) 100%); }
   @media (prefers-reduced-motion: reduce) {
     .pill, h1, .lead, .btns, .hud { animation: none; }
@@ -176,6 +178,7 @@
   st.textContent = TD.status_label || "";
   if (TD.is_placeholder) st.classList.add("warn");
   if (TD.mode === "bg") document.body.classList.add("bg-mode");
+  if (TD.mode === "ambient") document.body.classList.add("bg-mode", "ambient-mode");
   if (TD.headline_html) $("headline").innerHTML = TD.headline_html;
   if (TD.pill_html) $("pill").innerHTML = TD.pill_html;
   // Düğmeler yapılandırmadan gelebilir: [{label, target, primary}]
