@@ -49,6 +49,17 @@ Ekrandaki **ham r** trendi çıkarmadan, **r (trendsiz)** trendi çıkararak hes
 iki serinin aynı dönemdeki trendi ilişkiyi şişiriyor (sahte korelasyon) ya da gizliyor demektir; yorum
 trendsiz r ile yapılır ve komut bunu uyarı olarak yazar.
 
+## Başka ülke (ör. Yunanistan)
+
+```bash
+python -m physics.run --ulke yunanistan --surum v0.1                      # 6 çift, tek "ulke" satırı + haritalar
+python -m physics.ulke_karsilastirma --ulke yunanistan --surum v0.1       # Türkiye ile yan yana
+```
+
+Ülke L1 dosyalarının `ulke` attr'ından okunur (yoksa `turkiye`). Türkiye dışında il ve bölge sınırı yoktur:
+`ciftler.csv` her çift için tek satır yazar (`bolge_turu = ulke`, maske `data.regions.ulke_maskesi`); hücre
+haritaları Türkiye'deki gibi üretilir.
+
 ## Motorun geçerliliği: bağımsız sınav ve kalibrasyon
 
 ```bash

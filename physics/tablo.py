@@ -38,8 +38,30 @@ NOT_KALITE = "Kalite kontrolü beklenen güçlü ilişkiyi vermedi: veri sorunu 
 # Çifte özel etiket notları (ör. çift 5'in su/enerji sınırı açıklaması) ciftler.yaml'dadır.
 
 
+ULKE = "turkiye"   # L1 paketinin ülkesi (``ulke_ayarla``); Türkiye dışında yalnız tek "ulke" satırı
+
+
+def ulke_ayarla(ulke: str | None) -> str:
+    """Bölge listesinin ülkesini seçer (L1 attr'ı ``ulke``; boş = turkiye). Türkiye dışı ülkelerde il ve
+    bölge sınırı yoktur: tek satır ``bolge_turu = "ulke"``, maske ``data.regions.ulke_maskesi``."""
+    global ULKE
+    ULKE = (ulke or "turkiye").strip().lower()
+    return ULKE
+
+
+def _ulke_satiri(ulke: str) -> dict:
+    try:
+        from data.ulkeler import ulke as ulke_kaydi
+        ad = ulke_kaydi(ulke).get("ad", ulke.title())
+    except Exception:  # noqa: BLE001 — ad yalnız görüntü içindir
+        ad = ulke.title()
+    return {"bolge_turu": "ulke", "bolge_kodu": ulke, "bolge_adi": ad, "anahtar": f"ulke:{ulke}"}
+
+
 def bolge_listesi(iller: bool = True) -> list[dict]:
     """``[{bolge_turu, bolge_kodu, bolge_adi, anahtar}]``: 81 il (plakaya göre), 7 bölge, Türkiye."""
+    if ULKE != "turkiye":
+        return [_ulke_satiri(ULKE)]
     from data.regions import _iller, list_regions  # Kişi 1
     out = []
     if iller:
@@ -54,10 +76,13 @@ def bolge_listesi(iller: bool = True) -> list[dict]:
 
 
 @lru_cache(maxsize=8)
-def _maskeler(lat_t: tuple, lon_t: tuple, iller: bool) -> dict[str, np.ndarray]:
-    """Her bölge için tam ızgarada boolean maske (``data.regions.subset`` ile)."""
+def _maskeler(lat_t: tuple, lon_t: tuple, iller: bool, ulke: str = "turkiye") -> dict[str, np.ndarray]:
+    """Her bölge için tam ızgarada boolean maske (``data.regions.subset`` ile; başka ülkede ülke maskesi)."""
     from data.regions import subset
     lat, lon = np.array(lat_t), np.array(lon_t)
+    if ulke != "turkiye":
+        from data.regions import ulke_maskesi
+        return {f"ulke:{ulke}": np.asarray(ulke_maskesi(lat, lon, ulke), bool)}
     sablon = xr.DataArray(np.ones((lat.size, lon.size)), coords={"lat": lat, "lon": lon},
                           dims=("lat", "lon"), attrs={"domain": "land"})
     out = {}
@@ -70,7 +95,7 @@ def _maskeler(lat_t: tuple, lon_t: tuple, iller: bool) -> dict[str, np.ndarray]:
 def bolge_maskeleri(lat, lon, iller: bool = True) -> dict[str, np.ndarray]:
     """``{anahtar: (lat, lon) boolean}`` — önbellekli."""
     r = lambda v: tuple(np.round(np.asarray(v, float), 6))  # noqa: E731
-    return _maskeler(r(lat), r(lon), iller)
+    return _maskeler(r(lat), r(lon), iller, ULKE)
 
 
 def _ortak_alanlar(c: Cift, a: xr.DataArray, b: xr.DataArray) -> dict:

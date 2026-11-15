@@ -132,6 +132,8 @@ def main(argv=None) -> None:
     ap.add_argument("--sentetik", action="store_true",
                     help="sentetik deneme verisi; çıktı yalnız cache/physics/ altına")
     ap.add_argument("--iller-yok", action="store_true", help="il satırlarını atla (hızlı deneme)")
+    ap.add_argument("--ulke", default=None,
+                    help="ülke anahtarı (data/ulkeler.yaml); paket verilmezse outputs/trend-dedektifi-<ulke>-<surum>")
     ap.add_argument("--ciftler", type=Path, default=AYAR_DOSYASI,
                     help="çift ayar dosyası (varsayılan physics/ciftler.yaml)")
     a = ap.parse_args(argv)
@@ -145,7 +147,7 @@ def main(argv=None) -> None:
         veri = ornek_veri()
         hedef = Path(CACHE_DIR) / "physics" / "L4_iliski__YER_TUTUCU"
     else:
-        paket = a.paket or OUTPUTS_DIR / f"trend-dedektifi-turkiye-{a.surum}"
+        paket = a.paket or OUTPUTS_DIR / f"trend-dedektifi-{a.ulke or 'turkiye'}-{a.surum}"
         if not (paket / "L1_kup").exists():
             raise SystemExit(f"L1 paketi yok: {paket / 'L1_kup'}. Önce Kişi 1'in "
                              f"'python -m data.export --surum {a.surum}' komutu çalışmalı.")
@@ -154,6 +156,11 @@ def main(argv=None) -> None:
             raise SystemExit("L1_kup içinde çiftlerin hiçbir girdisi yok.")
         if any(sentetik_mi(v) for v in veri.values()):
             raise SystemExit("L1_kup içinde sentetik dosya var; yayın paketine yazılmadı.")
+        ulkeler = {str(v.attrs.get("ulke") or "turkiye") for v in veri.values()}
+        if len(ulkeler) > 1 or (a.ulke and a.ulke not in ulkeler):
+            raise SystemExit(f"L1 dosyalarının ülkesi tutarsız: {sorted(ulkeler)} (--ulke {a.ulke})")
+        from physics.tablo import ulke_ayarla
+        print(f"Ülke: {ulke_ayarla(ulkeler.pop())}")
         hedef = paket / "L4_iliski"
     _yazdir(l4_yaz(veri, hedef, iller=not a.iller_yok, ciftler=ciftler))
 
