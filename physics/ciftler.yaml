@@ -94,6 +94,10 @@ ciftler:
       Yalnız 7 bölge + Türkiye (8 satır), il satırı ve harita yok: GRACE uydusunun gerçek
       çözünürlüğü yaklaşık 300 km, çoğu il tek bir GRACE hücresinden küçük. En az 9 ayı dolu
       olmayan yıllar (GRACE ile GRACE-FO arasındaki boşluk) atılır.
+    not_ulke: >-
+      Yalnız ülke satırı, harita yok: GRACE uydusunun gerçek çözünürlüğü yaklaşık 300 km; küçük ve
+      kıyısı uzun bir ülkede değer komşu ülke ve deniz sinyalini de taşır, kaba okunmalı. En az 9 ayı
+      dolu olmayan yıllar (GRACE ile GRACE-FO arasındaki boşluk) atılır.
 
   - no: 5
     ad: Yaz sıcaklığı ~ buharlaşma
