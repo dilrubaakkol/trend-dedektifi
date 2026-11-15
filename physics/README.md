@@ -53,7 +53,12 @@ trendsiz r ile yapılır ve komut bunu uyarı olarak yazar.
 ```bash
 python -m physics.sapma --surum v0.1            # L4_iliski/sapma/: harita (.nc), il tablosu, kümeler (~5 sn)
 python -m physics.sapma --surum v0.1 --goster   # ayrıca HTML harita yazar ve tarayıcıda açar
+python -m physics.sapma --surum v0.1 --v2       # v2: tarım maskesi + 0,05° (önce: python -m data.arazi --surum v0.1)
 ```
+
+v2 yalnız `sapma_haritasi_v2_025.nc`, `sapma_haritasi_v2_005.nc`, `sulama_izi_kumeleri_v2.csv` dosyalarını yazar;
+`dogrulama/` klasöründe GFSAD katmanı varsa bağımsız doğrulamayı (ROC AUC, precision@%5) da çalıştırır.
+Sonuçlar ve sınırlar: `docs/dogrulama.md` "Sapma haritası v2".
 
 Önce `physics.run` çalışmış olmalı (L4 etiketleri okunur). Çıktı **doğrulanmamış** bir göstergedir:
 L4 etiketinin fiziksel beklentiden saptığı yerleri ve yazın yağışın açıkladığından yeşil/serin kalan

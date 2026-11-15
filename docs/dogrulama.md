@@ -309,3 +309,59 @@ mümkün (kural: tek kaynak en çok ORTA); il düzeyinde 145 YÜKSEK'in 143'ü M
 - Sıcaklık ~ GRACE: beklendiği gibi c kalıyor; ham −0,70 korelasyonunun büyük kısmı iki serinin aynı dönemde
   trendli olmasından geliyor (sahte korelasyon örneği).
 
+## Sapma haritası v2: bağımsız doğrulama (2026-11-15, gece işi)
+
+**Önceden tanımlı değişiklikler (v1 sonuçlarına bakılarak ayarlanmadı):** (1) tarım maskesi: MCD12C1 v061
+`tarim_orani` = (%IGBP 12 + ½·%14)/100, 2021–2025 ortalaması; `tarim_orani < 0,3` → sulama izi NaN. Maske
+regresyondan **sonra** uygulanır (regresyon v1'deki gibi bütün kara hücrelerinde). (2) 0,05° çözünürlük: NDVI
+(MOD13C2) ve LST (MOD11C3) 0,05° CMG dosyaları, rakım SRTM 0,05°; yağış (GPM) ve T2M (MERRA-2) 0,25°'den en yakın
+komşu. Bileşenler ve regresyon biçimi v1 ile aynı. Maskesiz 0,25° v2, v1 dosyasıyla birebir aynı (fark 0).
+
+**Referans:** GFSAD1KCM v001 (2010 nominal, ~1 km), sulanan = sınıf 1 (Irrigation major) + 2 (Irrigation minor),
+payda = kara pikselleri (1–5 ve 9; 0 = veri yok; User Guide v1, 2.2.4). Hedef hücre: sulanan oran ≥ 0,2 (sabit).
+Maskeli ya da skorsuz hücre en düşük skoru alır. Referans sulama izi hesabına girmez (testle doğrulandı).
+
+| Yapılandırma | Hücre | Hedef (taban oran) | ROC AUC | precision@%5 | Kaldıraç (p@5 / taban) |
+| --- | --- | --- | --- | --- | --- |
+| v1 (0,25°, maskesiz) | 1 302 | 105 (%8,1) | 0,577 | 0,061 | 0,75 |
+| maske (0,25°) | 1 302 | 105 (%8,1) | 0,545 | 0,152 | 1,88 |
+| 0,05° (maskesiz) | 32 472 | 3 151 (%9,7) | 0,581 | 0,121 | 1,25 |
+| maske + 0,05° | 32 472 | 3 151 (%9,7) | 0,548 | 0,215 | 2,21 |
+| *duyarlılık: maske 0,2 / 0,5 (0,25°)* | | | *0,571 / 0,504* | *0,136 / 0,167* | |
+| *duyarlılık: maske 0,2 / 0,5 (0,05°)* | | | *0,556 / 0,534* | *0,213 / 0,205* | |
+
+Rastgele beklenti: AUC 0,5; precision@%5 = taban oran.
+
+- **AUC ≈ 0,55–0,58: yöntem sulanan alanı genel sıralamada çok zayıf ayırt ediyor.** Maske AUC'yi düşürüyor,
+  çünkü GFSAD'ın sulanan dediği hücrelerin yalnız %38'i MCD12C1 tarım ≥ 0,3 maskesinin içinde kalıyor; kalan %62'si
+  maskelenip en düşük skoru alıyor.
+- **Listenin tepesi zenginleşiyor:** en yüksek %5'te isabet v1'de taban oranın altında (0,75×), maske + 0,05°'de
+  taban oranın 2,2 katı. Katkı: çözünürlük 0,75× → 1,25×, maske 0,75× → 1,88×, ikisi birlikte 2,21×.
+- *Tanı (önceden tanımlı yapılandırma değil):* yalnız tarım hücreleri içinde sulama izinin AUC'si 0,70 (0,25°) /
+  0,67 (0,05°). Bileşen AUC'leri (maskesiz 0,05°): z_yesil 0,59, z_serin 0,55.
+
+**En yüksek 10 küme (maske + 0,05°) ve referansın o noktadaki sınıfları** (tepe hücre, ±0,075° pencere):
+
+| # | Tepe (K, D) | İl(ler) | Hücre | Tepe z | GFSAD sulanan oran (tepe / 3×3) | GFSAD sınıf karışımı |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 36,98 · 39,02 | Şanlıurfa | 85 | 4,12 | 0,16 / 0,22 | sulama majör %21, yağmur %78 |
+| 2 | 36,98 · 40,12 | Şanlıurfa, Mardin | 165 | 4,04 | 0,00 / 0,00 | yağmur %99 |
+| 3 | 37,67 · 33,27 | Konya | 74 | 2,65 | 0,00 / 0,00 | yağmur %80, tarım dışı %16 |
+| 4 | 38,62 · 31,12 | Afyonkarahisar, Konya | 21 | 2,48 | 0,00 / 0,01 | yağmur %72 (küçük parçalar dahil), tarım dışı %25 |
+| 5 | 38,42 · 33,02 | Konya, Aksaray | 48 | 2,22 | 0,00 / 0,00 | yağmur %99 |
+| 6 | 39,38 · 43,67 | Ağrı, Van | 14 | 2,12 | **1,00** / 0,58 | sulama minör %58 |
+| 7 | 38,98 · 43,33 | Van | 2 | 2,07 | 0,10 / 0,11 | tarım dışı %70 |
+| 8 | 40,08 · 35,27 | Yozgat | 8 | 2,01 | 0,04 / 0,00 | tarım dışı %40, yağmur %60 |
+| 9 | 38,48 · 38,27 | Malatya | 13 | 2,01 | **0,24** / 0,05 | yağmur %88 |
+| 10 | 40,98 · 35,98 | Samsun, Amasya | 53 | 1,98 | 0,00 / 0,07 | tarım dışı %49, yağmur %45 |
+
+GFSAD'a göre tepe hücresi hedef olan küme: 2/10 (6 ve 9).
+
+**Referansın sınırı (yalnız yorum; yöntem değiştirilmedi):** GFSAD 2010, genel bilgiye göre yeraltı suyu ve
+GAP sulamasının yoğun olduğu Konya ovasını ve Ceylanpınar–Viranşehir bölgesini neredeyse tamamen "yağmura dayalı"
+sınıflıyor; Harran'da bile sulanan payı %21. Ürünün kendi kılavuzu sulanan/yağmura dayalı ayrımındaki belirsizliği
+açıkça yazıyor; ayrıca 2010 haritası 2021–2025 tarım örtüsüyle aynı dönem değil. Bu yüzden düşük AUC'nin bir kısmı
+referanstan kaynaklanıyor olabilir, ama bu kanıtlanmış değil. Genel bilgiye dayalı (bağımsız olmayan) bir
+karşılaştırmada v2'nin ilk kümelerinin çoğu bilinen sulama alanlarına (Harran, Ceylanpınar, Konya ovası)
+düşüyor; v1'de bu 10'da 1'di. Bu ikinci karşılaştırma kör değildir ve kanıt olarak kullanılmamalıdır.
+
