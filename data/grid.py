@@ -3,8 +3,9 @@
 Tüm veri modülleri (synthetic, harmonize, dem, build) aynı ızgarayı ve aynı dosya adlarını
 bu modülden alır. Sözleşme: docs/sozlesmeler.md.
 
-Izgara tanımı: Türkiye + çevre denizler kutusu TURKIYE_BBOX = (25.0, 34.5, 45.5, 43.0)
-(batı, güney, doğu, kuzey). Hücre kenarları kutu sınırlarına oturur; koordinatlar hücre
+Izgara tanımı: aktif ülkenin işleme kutusu (data/ulkeler.yaml, ``ic_kutu``). Varsayılan Türkiye + çevre
+denizler kutusu TURKIYE_BBOX = (25.0, 34.5, 45.5, 43.0) (batı, güney, doğu, kuzey); TURKIYE_BBOX geriye
+dönük uyumluluk için durur. Hücre kenarları kutu sınırlarına oturur; koordinatlar hücre
 merkezidir (0,25° için lon 25.125 … 45.375, lat 34.625 … 42.875). lat güneyden kuzeye artar.
 """
 
@@ -38,11 +39,19 @@ REQUIRED_ATTRS = (
 )
 
 
-def grid_coords(grid: str = "025", bbox=TURKIYE_BBOX) -> tuple[np.ndarray, np.ndarray]:
+def ulke_kutusu(ulke: str | None = None) -> tuple[float, float, float, float]:
+    """Ülkenin işleme kutusu (``None`` → aktif ülke; varsayılan Türkiye = TURKIYE_BBOX)."""
+    from data.ulkeler import ic_kutu
+    return ic_kutu(ulke)
+
+
+def grid_coords(grid: str = "025", bbox=None) -> tuple[np.ndarray, np.ndarray]:
     """Verilen ızgara kodu ("025" / "005") için (lat, lon) hücre merkezlerini döndürür.
 
+    ``bbox`` verilmezse aktif ülkenin işleme kutusu (varsayılan Türkiye: TURKIYE_BBOX).
     lat güneyden kuzeye artar. Kayan nokta hatasını önlemek için koordinatlar yuvarlanır.
     """
+    bbox = ulke_kutusu() if bbox is None else bbox
     res = GRID_RES[grid]
     west, south, east, north = bbox
     nlon = int(round((east - west) / res))
@@ -68,14 +77,21 @@ def empty_grid_dataarray(grid: str = "025", time=None, fill=np.nan, name="x") ->
                         dims=("time", "lat", "lon"), name=name)
 
 
-def processed_path(degisken: str, urun: str, grid: str = "025", bolge: str = "turkiye") -> Path:
+def ulke_dir(ulke: str | None = None) -> Path:
+    """İşlenmiş dosyaların klasörü: ``cache/processed/<ulke>/`` (``None`` → aktif ülke)."""
+    from data.ulkeler import aktif
+    return PROCESSED_DIR / (ulke or aktif())
+
+
+def processed_path(degisken: str, urun: str, grid: str = "025", bolge: str | None = None) -> Path:
     """İşlenmiş dosyanın yolu.
 
     0,25° dosyalar sözleşmedeki adla durur: ``cache/processed/<bolge>/<degisken>__<urun>.nc``.
     0,05° dosyalara ``__005`` eki gelir: ``<degisken>__<urun>__005.nc``.
+    ``bolge`` verilmezse aktif ülke (varsayılan ``turkiye``).
     """
     suffix = "" if grid == "025" else f"__{grid}"
-    return PROCESSED_DIR / bolge / f"{degisken}__{urun}{suffix}.nc"
+    return ulke_dir(bolge) / f"{degisken}__{urun}{suffix}.nc"
 
 
 def today_iso() -> str:
@@ -166,5 +182,5 @@ def truth(ds: xr.Dataset) -> dict | None:
 __all__ = [
     "TURKIYE_BBOX", "GRID_RES", "PERIOD", "REQUIRED_ATTRS", "grid_coords", "monthly_time",
     "processed_path", "finalize", "write_netcdf", "check_contract", "truth", "today_iso",
-    "TURKIYE_DIR", "RAW_DIR", "PROCESSED_DIR", "CACHE_DIR",
+    "TURKIYE_DIR", "RAW_DIR", "PROCESSED_DIR", "CACHE_DIR", "ulke_kutusu", "ulke_dir",
 ]
