@@ -129,7 +129,8 @@ Domain: `land` = Türkiye kara maskeli, `ocean` = deniz maskeli, `all` = kutunun
   birim `1`. Değer: MCD12C1 061 `Land_Cover_Type_1_Percent` için (IGBP %12 tarım + ½·%14 mozaik) / 100,
   2021–2025 ortalaması. Kademe 2, `dogrulanmadi = evet`. `ICINDEKILER.csv`'de `donem = sabit`, `kademe = 2`;
   `donem = sabit` olduğu için L2/L3 trend hesabına girmez. Yalnız sapma v2 tarım maskesinde kullanılır (bölüm 2.3).
-  `data.export` bu dosyayı üretmez; dosyayı `data.arazi` ayrıca yazar.
+  Dosyayı `data.arazi` yazar. `data.export` dosyaya dokunmaz ama yeniden üretimde onu `ICINDEKILER.csv`'ye
+  ekler: `L1_kup/` içindeki ayrıca yazılmış sabit katmanlar listelenir ve kademe dosyanın `kademe` attr'ından okunur.
 - **`L1_kup/ICINDEKILER.csv`:** UTF-8 (BOM'lu), bir satır = bir dosya. Sıralama: önce kademe (1, 2,
   sonra 0), sonra dosya adı.
 

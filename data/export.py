@@ -13,6 +13,8 @@ Kurallar:
 - Kademe 1 = ekip belgesindeki çekirdek dosyalar (``KADEME_1``); diğerleri Kademe 2 ve
   ``dogrulanmadi="evet"`` attr'ı taşır. Sabit alanlar (rakım) kademesizdir: ``kademe=0``.
 - ``kademe`` her dosyada int32'dir: 1, 2 ya da 0 (kademesiz).
+- ``L1_kup/`` içinde başka modülün ayrıca yazdığı sabit katmanlar (ör. ``data.arazi`` →
+  ``tarim_orani__MCD12C1.nc``) korunur ve ICINDEKILER.csv'ye kendi ``kademe`` attr'larıyla eklenir.
 - Katalog kaydının doğrulanmadığını gösteren ayrı bayrak ``katalog_dogrulanmadi``'dır (harmonize
   yazar); yayın paketindeki ``dogrulanmadi`` yalnız Kademe 2 anlamına gelir.
 - Mevcut ``doi`` attr'ı NASA kaynak ürününün DOI'si olarak kalır; yayın DOI'si ``veri_seti_doi``.
@@ -132,6 +134,36 @@ def candidates(src_dir: Path = TURKIYE_DIR) -> list[tuple[str, str, Path]]:
     return out
 
 
+def icindekiler_satiri(ds: xr.Dataset, dosya: str, degisken: str, kademe_: int) -> dict:
+    """ICINDEKILER.csv için bir satır (yayın attr'ları yazılmış Dataset'ten)."""
+    return {"dosya": dosya, "degisken": degisken, "birim": ds.attrs.get("units", ""),
+            "kaynak": f"{ds.attrs['source_product']} {ds.attrs['source_version']}",
+            "kaynak_doi": ds.attrs.get("doi", ""), "donem": data_period(ds), "kademe": int(kademe_)}
+
+
+def sabit_katmanlar(out_dir: Path, yazilan: set[str]) -> list[dict]:
+    """L1_kup/ içinde export'un yazmadığı, ayrıca üretilmiş sabit (zamansız) katmanların satırları.
+
+    Örnek: ``data.arazi`` ile yazılan ``tarim_orani__MCD12C1.nc``. Dosyaya dokunulmaz; yalnız okunur.
+    Kademe dosyanın ``kademe`` attr'ından gelir (yoksa katman atlanır ve uyarı basılır). Zamanlı ya da
+    sentetik dosyalar listeye alınmaz (zamanlı L1 dosyalarının tek kaynağı export'tur).
+    """
+    rows = []
+    for p in sorted(Path(out_dir).glob("*.nc")):
+        if p.name in yazilan or "__005" in p.stem or p.stem.count("__") != 1:
+            continue
+        with xr.open_dataset(p) as ds:
+            if "time" in ds.dims or is_synthetic(ds):
+                continue
+            if "kademe" not in ds.attrs:
+                print(f"  ICINDEKILER'e alınmadı (kademe attr'ı yok): {p.name}")
+                continue
+            degisken = p.stem.split("__")[0]
+            rows.append(icindekiler_satiri(ds, p.name, degisken, ds.attrs["kademe"]))
+        print(f"  listelendi (sabit katman): {p.name} (kademe {rows[-1]['kademe']})")
+    return rows
+
+
 def export(surum: str, src_dir: Path = TURKIYE_DIR, out_root: Path = OUTPUTS_DIR,
            bbox=YAYIN_BBOX) -> Path:
     """Yayın paketini yazar; L1_kup klasörünün yolunu döndürür."""
@@ -150,11 +182,9 @@ def export(surum: str, src_dir: Path = TURKIYE_DIR, out_root: Path = OUTPUTS_DIR
         if problems:
             raise ValueError(f"{path.name} sözleşmeye uymuyor: {problems}")
         write_netcdf(cut, out_dir / path.name)
-        rows.append({"dosya": path.name, "degisken": degisken, "birim": cut.attrs.get("units", ""),
-                     "kaynak": f"{cut.attrs['source_product']} {cut.attrs['source_version']}",
-                     "kaynak_doi": cut.attrs.get("doi", ""), "donem": data_period(cut),
-                     "kademe": kademe(degisken, urun)})
+        rows.append(icindekiler_satiri(cut, path.name, degisken, kademe(degisken, urun)))
         print(f"  yazıldı: {path.name} (kademe {rows[-1]['kademe']}, {rows[-1]['donem']})")
+    rows += sabit_katmanlar(out_dir, {r["dosya"] for r in rows})
     rows.sort(key=lambda r: (r["kademe"] or 9, r["dosya"]))  # 1, 2, sonra kademesiz (0)
     with open(out_dir / "ICINDEKILER.csv", "w", newline="", encoding="utf-8-sig") as f:
         wr = csv.DictWriter(f, fieldnames=ICINDEKILER_COLS)
