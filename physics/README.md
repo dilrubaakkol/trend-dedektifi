@@ -61,6 +61,16 @@ v2 yalnız `sapma_haritasi_v2_025.nc`, `sapma_haritasi_v2_005.nc`, `sulama_izi_k
 `dogrulama/` klasöründe GFSAD katmanı varsa bağımsız doğrulamayı (ROC AUC, precision@%5) da çalıştırır.
 Sonuçlar ve sınırlar: `docs/dogrulama.md` "Sapma haritası v2".
 
+```bash
+python -m physics.sapma_v3 --surum v0.1         # v3: bitki takvimi (~3 sn; 0,05° dosyaları varsa onları da işler)
+```
+
+v3 (`physics/sapma_v3.py`) regresyon yerine bitki takvimine bakar: yazı kurak (Haz–Ağu yağışı < 80 mm, rakım
+< 1500 m) bir hücrede NDVI temmuz–ağustosta nisan–mayıstan yüksekse yağmur bunu açıklayamaz. Yalnız
+`sapma_haritasi_v3_*.nc`, `sulama_izi_kumeleri_v3.csv`, `KURAL_v3.txt` yazar; `dogrulama/` klasöründe GFSAD1KCM
+ve/veya LGRIP30 katmanı varsa `dogrulama/sapma_v3_dogrulama.csv` ölçütlerini de üretir. Eşikler 0,25° NDVI ve
+yağışa bakılarak seçildi (keşif notu modülde); doğrulama katmanlarına bakılmadı.
+
 Önce `physics.run` çalışmış olmalı (L4 etiketleri okunur). Çıktı **doğrulanmamış** bir göstergedir:
 L4 etiketinin fiziksel beklentiden saptığı yerleri ve yazın yağışın açıkladığından yeşil/serin kalan
 hücreleri ("sulama izi") gösterir. Bunlar insan müdahalesiyle (sulama, baraj, yeraltı suyu çekimi)

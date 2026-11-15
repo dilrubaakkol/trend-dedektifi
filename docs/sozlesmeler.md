@@ -143,6 +143,31 @@ Domain: `land` = Türkiye kara maskeli, `ocean` = deniz maskeli, `all` = kutunun
 | `donem` | `2001-01 … 2025-09` | Kutuda en az bir geçerli hücresi olan ilk ve son ay; sabit alanda `sabit` |
 | `kademe` | `1` | `1`, `2` ya da `0` |
 
+### 1.2 Ülke parametresi (2026-11-15)
+
+Veri katmanı ülkeden bağımsızdır. Ülkeler `data/ulkeler.yaml`'da tanımlıdır. Her kayıtta şunlar var: anahtar,
+ad, ISO3, işleme kutusu (`ic_kutu`), yayın kutusu (`yayin_kutusu`, 0,25°'ye hizalı), Natural Earth adı, kara
+maskesi kaynağı ve ülkeye özgü uyarılar. **Varsayılan `turkiye`** ve davranışı değişmedi; yukarıdaki bütün
+kurallar Türkiye için aynen geçerli. Türkiye paketi yeniden export edildiğinde bayt bayt aynı çıkar.
+
+| | Türkiye (varsayılan) | Diğer ülke (`<ulke>`, ör. `yunanistan`) |
+| --- | --- | --- |
+| Komut | `--ulke` verilmez | `python -m data.build --ulke <ulke> …`, `python -m data.export --ulke <ulke> --surum v0.1` |
+| Ham kesit | `cache/raw/<urun>/` | `cache/raw/<ulke>/<urun>/` |
+| İşlenmiş | `cache/processed/turkiye/` | `cache/processed/<ulke>/` |
+| Paket | `outputs/trend-dedektifi-turkiye-<surum>/` | `outputs/trend-dedektifi-<ulke>-<surum>/` |
+| Kara maskesi (`domain: land`) | 81 ilin birleşimi (`data/boundaries/iller.geojson`) | `data/boundaries/<ulke>/kara.geojson` (Natural Earth 10m admin-0, kamu malı) |
+| Ek attr'lar | yok (attr yoksa Türkiye) | `ulke`, `ulke_adi`, `ulke_iso3`; `ek_uyarilar` → `bilinen_sorunlar` |
+
+- Izgara, birim, zaman, attr ve kademe kuralları bütün ülkelerde aynıdır. Paketin boyutu yayın kutusundan gelir:
+  Türkiye 28 × 78, Yunanistan 29 × 35 hücre.
+- İl, bölge ve deniz adları yalnız Türkiye içindir. Başka ülkede bölge = ülkenin tamamı (`subset(ds, "yunanistan")`).
+- Fizik ve istatistik tarafında ülke kara maskesi: `data.regions.ulke_maskesi(lat, lon, "<ulke>")`.
+  Bu fonksiyon yayın paketindeki `domain: land` maskesiyle aynı maskeyi verir.
+- Yeni ülke: `ulkeler.yaml`'a kayıt ekleyin, sonra `python -m data.make_boundaries --ulke <ulke>` çalıştırın.
+  Komut yayın kutusunu da hesaplayıp ekrana yazar; o kutu ulkeler.yaml'a girilir.
+- Komutlar ve Yunanistan paketi: `docs/ulke_parametresi.md`.
+
 ## 2. Analiz katmanları L2–L4 (Kişi 2, 3 → Kişi 4, 5)
 
 Bütün katmanlar L1 küplerinden üretilir ve aynı paket köküne yazılır:

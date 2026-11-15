@@ -3,7 +3,8 @@
 Kaynak: Natural Earth 10m (kamu malı), sabit commit'ten indirilir. Ayrıntı: data/boundaries/README.md
 Sonuç dosyaları repoya girer; bu betiği yalnızca sınırları yenilemek gerekirse çalıştırın:
 
-    python -m data.make_boundaries
+    python -m data.make_boundaries                    # Türkiye (iller, kara, denizler)
+    python -m data.make_boundaries --ulke yunanistan  # başka ülke: boundaries/<ulke>/{kara,kutu_kara}.geojson
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from pathlib import Path
 
 import shapely
 from shapely.geometry import box, mapping, shape
+from shapely.geometry.base import BaseGeometry
 
 from data.grid import TURKIYE_BBOX
 
@@ -114,5 +116,59 @@ def build(out_dir: Path = OUT_DIR) -> None:
     _write(out_dir / "denizler.geojson", _fc(feats))
 
 
+def _admin0(fc: dict, iso3: str, ne_adi: str) -> BaseGeometry:
+    """Natural Earth admin-0 içinden ülke çokgeni (ADM0_A3 = iso3; ad tutarlılık için denetlenir)."""
+    for f in fc["features"]:
+        p = {k.upper(): v for k, v in f["properties"].items()}
+        if p.get("ADM0_A3") == iso3:
+            if ne_adi not in (p.get("NAME"), p.get("ADMIN"), p.get("NAME_LONG")):
+                raise RuntimeError(f"{iso3}: Natural Earth adı {p.get('NAME')!r}, ulkeler.yaml'da {ne_adi!r}")
+            return shapely.make_valid(shape(f["geometry"]))
+    raise RuntimeError(f"Natural Earth admin-0'da {iso3} yok")
+
+
+def build_ulke(anahtar: str, out_dir: Path = OUT_DIR) -> dict:
+    """Türkiye dışındaki bir ülke için ``boundaries/<ulke>/kara.geojson`` (Natural Earth admin-0 ülke sınırı,
+    adalar dahil) ve ``kutu_kara.geojson`` (kutudaki bütün kara; deniz maskesi için) yazar.
+
+    Türkiye dosyalarına dokunmaz (Türkiye için ``build()``). Döndürür: {"sinir": dış kutu, "yayin_kutusu": …}.
+    """
+    from data.ulkeler import ulke, varsayilan_mi, yayin_kutusu_hesapla
+    if varsayilan_mi(anahtar):
+        raise ValueError("Türkiye sınırları build() ile üretilir; bu fonksiyon Türkiye dosyalarına dokunmaz")
+    u = ulke(anahtar)
+    hedef = out_dir / anahtar
+    hedef.mkdir(parents=True, exist_ok=True)
+    clip = box(*u["ic_kutu"]).buffer(1.0)
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        adm0 = _download("ne_10m_admin_0_countries", tmp)
+        land = _download("ne_10m_land", tmp)
+        islands = _download("ne_10m_minor_islands", tmp)
+    g = _admin0(adm0, u["iso3"], u["ne_adi"]).intersection(clip)
+    g = shapely.make_valid(g.simplify(TOL, preserve_topology=True))
+    _write(hedef / "kara.geojson", _fc([{"type": "Feature",
+                                          "properties": {"ad": u["ad"], "iso3": u["iso3"], "kaynak":
+                                                         "Natural Earth 10m admin-0 (kamu malı)"},
+                                          "geometry": mapping(g)}]))
+    polys = [shape(f["geometry"]) for f in land["features"] + islands["features"]]
+    polys = [p.intersection(clip) for p in polys if p.intersects(clip)]
+    land_u = shapely.make_valid(shapely.union_all(polys).simplify(TOL, preserve_topology=True))
+    _write(hedef / "kutu_kara.geojson",
+           _fc([{"type": "Feature", "properties": {"ad": "kara"}, "geometry": mapping(land_u)}]))
+    sinir = tuple(round(v, 4) for v in g.bounds)
+    yk = yayin_kutusu_hesapla(sinir)
+    w, s, e, n = u["ic_kutu"]
+    if not (yk[0] >= w and yk[1] >= s and yk[2] <= e and yk[3] <= n):
+        raise RuntimeError(f"yayın kutusu {yk} işleme kutusunun {u['ic_kutu']} dışına taşıyor")
+    print(f"  {u['ad']} sınırının dış kutusu: {sinir}; 0,25° hizalı yayın kutusu: {list(yk)} "
+          f"(ulkeler.yaml yayin_kutusu ile aynı olmalı)")
+    return {"sinir": sinir, "yayin_kutusu": yk}
+
+
 if __name__ == "__main__":
-    build()
+    import argparse
+    ap = argparse.ArgumentParser(description="Sınır dosyalarını üretir (Natural Earth, kamu malı).")
+    ap.add_argument("--ulke", default=None, help="Türkiye dışında bir ülke: boundaries/<ulke>/ yazılır")
+    a = ap.parse_args()
+    build_ulke(a.ulke) if a.ulke else build()
