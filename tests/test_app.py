@@ -336,3 +336,33 @@ def test_placeholder_rows_in_real_folder_are_flagged(tmp_path, monkeypatch):
     monkeypatch.delenv("TD_PAKET", raising=False)
     t = U.load_tables()
     assert "ciftler.csv" in t["yer_tutucu_tablolar"] and t["yer_tutucu"]
+
+
+def test_karne_and_magnitude_loaders(tmp_path, monkeypatch):
+    """karne/ ve L4_iliski/buyukluk/ okunur; paket ek dosyaları zip'e aynen girer (değerler sentetik)."""
+    import io
+    import zipfile
+    import pandas as pd
+    pkg = tmp_path / "pkg"
+    (pkg / "karne").mkdir(parents=True)
+    (pkg / "L4_iliski" / "buyukluk").mkdir(parents=True)
+    pd.DataFrame([{"degisken": "yagis", "urun": "GPM", "bolge_kodu": "06", "mevsim": "kis", "guven": "ORTA",
+                   "gerekce": "tek kaynak", "a_kaynak_uyumu": "uygulanamaz"}]).to_csv(
+        pkg / "karne" / "trend_karne_il.csv", index=False, encoding="utf-8-sig")
+    pd.DataFrame([{"test": "cc", "yol": "a_yillar_arasi", "bolge_adi": "Türkiye", "gozlenen": 5.7,
+                   "etiket": "belirsiz"}]).to_csv(pkg / "L4_iliski" / "buyukluk" / "ozet.csv", index=False,
+                                                  encoding="utf-8-sig")
+    monkeypatch.setattr(U, "SEARCH_DIRS", [pkg])
+    monkeypatch.delenv("TD_PAKET", raising=False)
+    k = U.load_karne()
+    assert k["iliski"] is None and k["trend_il"]["bolge_kodu"].iloc[0] == "06"
+    c = U.trend_confidence(k["trend_il"], "yagis", "GPM", "kis")
+    assert c.loc["06", "guven"] == "ORTA" and U.GUVEN_CLASS["ORTA"] == "warn"
+    m = U.load_magnitude()
+    assert m["cc_il"] is None and m["ozet"]["etiket"].iloc[0] == "belirsiz"
+    tables = {**dict(zip(("il", "bolge", "iliski"), U.synthetic_tables())), "yer_tutucu": True,
+              "kaynak": {"trend_iller.csv": None}}
+    extra = [(pkg / "karne" / "trend_karne_il.csv", "karne/trend_karne_il.csv")]
+    data, _ = U.build_bundle(tables, ["yagis"], ["kis"], [], {"rol": "vatandas"}, extra=extra)
+    z = zipfile.ZipFile(io.BytesIO(data))
+    assert "karne/trend_karne_il.csv" in z.namelist()

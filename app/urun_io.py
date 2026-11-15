@@ -500,6 +500,77 @@ def has_placeholder_rows(df: pd.DataFrame) -> bool:
     return "urun_surumu" in df and df["urun_surumu"].astype(str).str.contains("YER TUTUCU", case=False).any()
 
 
+# ------------------------------------------------------------------ bulgu karnesi ve büyüklük testleri
+GUVEN = ("YÜKSEK", "ORTA", "DÜŞÜK", "YOK")
+GUVEN_CLASS = {"YÜKSEK": "ok", "ORTA": "warn", "DÜŞÜK": "bad", "YOK": "info"}
+KARNE_STATES = {"geçti": "ok", "kaldı": "bad", "uygulanamaz": "info"}
+TREND_CHECKS = [("a_kaynak_uyumu", "a_sayi", "Başka NASA ürünleri aynı sonucu veriyor mu?"),
+                ("b_karistirma", "b_p_perm", "Yıllar karıştırılınca trend kayboluyor mu?"),
+                ("c_donem", "c_sayi", "İlk ya da son 3 yıl çıkarılınca sonuç değişiyor mu?"),
+                ("d_esik", "d_sayi", "Daha sıkı eşikte (α = 0,05) de anlamlı mı?"),
+                ("e_yeterlilik", "e_sayi", "Yıl sayısı bu büyüklükte trend için yeterli mi?")]
+PAIR_CHECKS = [("a_kaynak_uyumu", "a_sayi", "Başka NASA ürünleriyle aynı etiket çıkıyor mu?"),
+               ("b_karistirma", "b_p_perm", "Yıllar karıştırılınca ilişki kayboluyor mu?"),
+               ("c_trend", "c_sayi", "Ortak trend çıkarılınca ilişki duruyor mu?"),
+               ("d_gecikme", "d_sayi", "±1 ay kaydırınca yön korunuyor mu?"),
+               ("e_esik", "e_sayi", "Daha sıkı eşikte (α = 0,05) etiket aynı mı?")]
+
+
+def _pkg_file(*parts: str) -> Path | None:
+    """Paket köklerinde (`package_dirs`) bir dosyanın ilk bulunduğu yer."""
+    for base in package_dirs():
+        p = base.joinpath(*parts)
+        if p.exists():
+            return p
+    return None
+
+
+def _read_text_csv(p: Path) -> pd.DataFrame:
+    """BOM'lu UTF-8 CSV; kodlar metin, metin alanlarındaki boşluklar boş metin."""
+    df = pd.read_csv(p, encoding="utf-8-sig", dtype={"bolge_kodu": str})
+    for c in df.columns:
+        if df[c].dtype == object:
+            df[c] = df[c].fillna("")
+    return df
+
+
+def load_karne() -> dict:
+    """Bulgu karnesi (sözleşme 2.4): {"trend_il", "trend_bolge", "iliski": DataFrame | None}."""
+    out = {}
+    for key, name in (("trend_il", "trend_karne_il.csv"), ("trend_bolge", "trend_karne_bolge.csv"),
+                      ("iliski", "iliski_karne.csv")):
+        p = _pkg_file("karne", name)
+        out[key] = _read_text_csv(p) if p else None
+    return out
+
+
+def trend_confidence(karne: pd.DataFrame | None, var: str, prod: str, season: str) -> pd.DataFrame:
+    """Bir değişken × ürün × mevsim için karne satırları (bolge_kodu → guven, gerekce, kontroller)."""
+    if karne is None or karne.empty:
+        return pd.DataFrame()
+    k = karne[(karne["degisken"] == var) & (karne["urun"] == prod) & (karne["mevsim"] == season)]
+    return k.drop_duplicates("bolge_kodu").set_index("bolge_kodu")
+
+
+def pair_confidence(karne: pd.DataFrame | None, no: int, lag: int) -> pd.DataFrame:
+    """Bir çift × gecikme için karne satırları (bolge_kodu → guven, ...)."""
+    if karne is None or karne.empty:
+        return pd.DataFrame()
+    k = karne[(karne["cift_no"] == no) & (karne["gecikme_ay"] == lag)]
+    return k.drop_duplicates("bolge_kodu").set_index("bolge_kodu")
+
+
+def load_magnitude() -> dict:
+    """Büyüklük testleri (sözleşme 2.5): {"ozet", "cc_il", "cc_bolge", "butce_bolge", "kar_il", "kar_bolge"}."""
+    names = {"ozet": "ozet.csv", "cc_il": "cc__il.csv", "cc_bolge": "cc__bolge.csv", "butce_bolge": "butce__bolge.csv",
+             "kar_il": "kar_cizgisi__il.csv", "kar_bolge": "kar_cizgisi__bolge.csv"}
+    out = {}
+    for key, name in names.items():
+        p = _pkg_file("L4_iliski", "buyukluk", name)
+        out[key] = _read_text_csv(p) if p else None
+    return out
+
+
 def read_pairs(path) -> pd.DataFrame:
     """`ciftler.csv` okur: BOM'lu UTF-8, bölge kodu metin; beklenen yön '+'/'-' biçimine getirilir."""
     df = pd.read_csv(path, encoding="utf-8-sig", dtype={"bolge_kodu": str, "etiket": str, "not": str,
@@ -639,7 +710,7 @@ def _rel(v) -> str:
 
 
 def build_bundle(tables: dict, variables, seasons, provinces_sel, user: dict, include_nc: bool = False,
-                 git_commit: str | None = None) -> tuple[bytes, str]:
+                 git_commit: str | None = None, extra: list[tuple[Path, str]] | None = None) -> tuple[bytes, str]:
     """Akademisyen için seçime göre hazır veri paketi (zip) üretir. Dönüş: (zip baytları, dosya adı).
 
     İçerik: süzülmüş trend_iller.csv / trend_bolgeler.csv / ciftler.csv, BENIOKU.txt,
@@ -681,7 +752,8 @@ def build_bundle(tables: dict, variables, seasons, provinces_sel, user: dict, in
                   "iller": list(provinces_sel or []) or "hepsi"},
         "satir_sayisi": {"trend_iller": len(il_f), "trend_bolgeler": len(bolge_f), "ciftler": len(rel_f)},
         "kaynak_dosyalar": {k: ("SENTETİK YER TUTUCU" if not v else _rel(v)) for k, v in tables["kaynak"].items()},
-        "netcdf": [r["dosya"] for r in files_nc], "git_commit": git_commit,
+        "netcdf": [r["dosya"] for r in files_nc], "ek_dosyalar": [a for _, a in extra or []],
+        "git_commit": git_commit,
         "kullanici_rolu": user.get("rol"),
     }
     warn = ("UYARI: Bu paketteki sayılar SENTETİK YER TUTUCUDUR, gerçek analiz sonucu değildir. "
@@ -718,6 +790,8 @@ def build_bundle(tables: dict, variables, seasons, provinces_sel, user: dict, in
         z.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
         for r in files_nc:
             z.write(r["yol"], f"L1_kup/{r['dosya']}")
+        for path, arcname in extra or []:  # bulgu karnesi, büyüklük testleri (paketteki dosyalar aynen)
+            z.write(path, arcname)
     name = f"{prefix}trend-dedektifi-turkiye-{VERSION}-paket.zip"
     return buf.getvalue(), name
 
