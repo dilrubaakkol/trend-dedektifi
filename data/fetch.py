@@ -34,7 +34,8 @@ import pandas as pd
 import xarray as xr
 
 from data.catalog import load_catalog, product, variables
-from data.grid import RAW_DIR, TURKIYE_BBOX
+from data.grid import RAW_DIR, ulke_kutusu
+from data.ulkeler import aktif, ulke_yazimi, varsayilan_mi
 
 MARGIN = 1.0              # kesit payı, derece (kaba ürünlerin kenar interpolasyonu için)
 SIZE_LIMIT_GB = 30.0      # bunun üstünde --onay gerekir
@@ -74,11 +75,13 @@ def granule_name(g) -> str:
 
 
 def raw_dir(key: str) -> Path:
-    return RAW_DIR / key
+    """Ham kesit klasörü: Türkiye ``cache/raw/<urun>/`` (eskisi gibi), diğer ülkeler ``cache/raw/<ulke>/<urun>/``."""
+    return RAW_DIR / key if varsayilan_mi() else RAW_DIR / aktif() / key
 
 
 def _bbox_margin():
-    w, s, e, n = TURKIYE_BBOX
+    """Aktif ülkenin işleme kutusu + ``MARGIN`` pay (Türkiye: TURKIYE_BBOX + 1°)."""
+    w, s, e, n = ulke_kutusu()
     return w - MARGIN, s - MARGIN, e + MARGIN, n + MARGIN
 
 
@@ -249,11 +252,11 @@ def read_srtm_dem(path, p: dict, names: list[str], when) -> xr.Dataset:
     xdim, ydim = float(hdr["XDIM"]), float(hdr["YDIM"])
     lon_all = np.round(float(hdr["ULXMAP"]) + xdim * np.arange(ncols), 7)  # ULXMAP = ilk hücre merkezi
     lat_all = np.round(float(hdr["ULYMAP"]) - ydim * np.arange(nrows), 7)
-    w, s, e, n = TURKIYE_BBOX
+    w, s, e, n = ulke_kutusu()
     ri = np.where((lat_all >= s) & (lat_all <= n))[0]
     ci = np.where((lon_all >= w) & (lon_all <= e))[0]
     if ri.size == 0 or ci.size == 0:
-        raise ValueError("karo Türkiye kutusuyla kesişmiyor")
+        raise ValueError(f"karo {aktif()} kutusuyla kesişmiyor")
     sub = arr[ri.min():ri.max() + 1, ci.min():ci.max() + 1].astype("int16")
     da = xr.DataArray(sub, dims=("lat", "lon"),
                       coords={"lat": lat_all[ri.min():ri.max() + 1],
@@ -360,9 +363,10 @@ def _read_nc_var(path: Path, basename: str, decode: bool) -> np.ndarray:
 
 def _opendap_plan(key: str, url: str, names: list[str], tmp: Path) -> dict:
     """Ürün için (bir kez) DMR'yi okuyup değişken yollarını ve Türkiye indeks aralığını belirler."""
+    plan_key = f"{aktif()}:{key}"          # indeks aralığı ülkeye özgü: başka ülkenin planı kullanılmasın
     with _plan_lock:
-        if key in _PLANS:
-            return _PLANS[key]
+        if plan_key in _PLANS:
+            return _PLANS[plan_key]
         r = _session().get(url + ".dmr.xml", timeout=120)
         r.raise_for_status()
         dmr = _parse_dmr(r.text)
@@ -403,7 +407,7 @@ def _opendap_plan(key: str, url: str, names: list[str], tmp: Path) -> dict:
         ci = _index_window(lon_all, w, e)
         plan = {"vars": vars_, "dmr": dmr, "lat_dim": lat_dim, "lon_dim": lon_dim, "ri": ri, "ci": ci,
                 "lat": np.round(lat_all[ri], 6), "lon": np.round(lon_all[ci], 6), "two_d": two_d}
-        _PLANS[key] = plan
+        _PLANS[plan_key] = plan
         return plan
 
 
@@ -498,7 +502,7 @@ def _process_one(g, p: dict, names: list[str], out: Path, tmp: Path) -> Path:
                 for x in files:
                     Path(x).unlink(missing_ok=True)
     if any(int(ds.sizes.get(d, 0)) == 0 for d in ("lat", "lon")):
-        raise ValueError("Türkiye kesiti boş")
+        raise ValueError(f"{ulke_yazimi()} kesiti boş")
     ds.attrs.update(source_granule=granule_name(g), source_product=p["short_name"],
                     source_version=str(p["version"]))
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -531,7 +535,8 @@ def search(key: str, start: str | None = None, end: str | None = None) -> list:
     p, cat = product(key), load_catalog()
     s = max(pd.Period(start or cat["donem"][0]), pd.Period(p["valid_start"]))
     e = pd.Period(end or cat["donem"][1])
-    kw = dict(short_name=p["short_name"], version=str(p["version"]), bounding_box=tuple(cat["bbox"]))
+    # Türkiye'de ulke_kutusu() = catalog.yaml bbox = TURKIYE_BBOX (testle sınanır)
+    kw = dict(short_name=p["short_name"], version=str(p["version"]), bounding_box=tuple(ulke_kutusu()))
     if p["zaman"] not in ("sabit",) and not p.get("tek_dosya"):
         kw["temporal"] = (s.start_time.strftime("%Y-%m-%d"), e.end_time.strftime("%Y-%m-%d"))
     gs = earthaccess.search_data(**kw)
@@ -578,7 +583,7 @@ def fetch_product(key: str, start=None, end=None, test_only=False, onay=False,
     total_mb = sum(float(g.size or 0) for g in gs)
     rep["toplam_mb"] = round(total_mb, 1)
     print(f"[{key}] {len(gs)} granül, kaynak toplamı ~{total_mb / 1024:.1f} GB "
-          f"({p['erisim']}: {'tam indirme' if p['erisim'] == 'download' else 'yalnız Türkiye kesiti aktarılır'})")
+          f"({p['erisim']}: {'tam indirme' if p['erisim'] == 'download' else f'yalnız {ulke_yazimi()} kesiti aktarılır'})")
     big = (p["erisim"] == "download" and total_mb / 1024 > SIZE_LIMIT_GB) or p["zaman"] == "gunluk"
     if big and not onay and not test_only:
         rep["durum"] = (f"onay gerekli: ~{total_mb / 1024:.0f} GB / {len(gs)} dosya. "
@@ -664,7 +669,8 @@ def products_for(var_names=None, categories=None, include_secondary=True) -> lis
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="NASA verisini Türkiye için çek (earthaccess).")
+    ap = argparse.ArgumentParser(description="NASA verisini seçili ülke için çek (earthaccess; varsayılan Türkiye).")
+    ap.add_argument("--ulke", default=None, help="data/ulkeler.yaml anahtarı (varsayılan turkiye)")
     ap.add_argument("--urun", help="virgülle ürün anahtarları (catalog.yaml 'urunler')")
     ap.add_argument("--vars", help="ya da değişken adları (virgülle)")
     ap.add_argument("--baslangic", default=None)
@@ -673,8 +679,10 @@ def main(argv=None):
     ap.add_argument("--onay", action="store_true", help="büyük/ertelenmiş ürünleri de indir")
     ap.add_argument("--workers", type=int, default=WORKERS)
     a = ap.parse_args(argv)
+    from data.ulkeler import ulke_baglami
     keys = a.urun.split(",") if a.urun else products_for(a.vars.split(",") if a.vars else None)
-    reps = [fetch_product(k, a.baslangic, a.bitis, a.test, a.onay, a.workers) for k in keys]
+    with ulke_baglami(a.ulke):
+        reps = [fetch_product(k, a.baslangic, a.bitis, a.test, a.onay, a.workers) for k in keys]
     print("\nÖZET")
     for r in reps:
         print(f"  {r['urun']:14s} {r['tamam']}/{r['granul']}  {r['durum']}")

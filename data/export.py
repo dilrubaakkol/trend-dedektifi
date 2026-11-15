@@ -1,15 +1,19 @@
 """Yayın paketi: işlenmiş 0,25° gerçek veri küplerini yayın kutusuna kırpıp tek klasöre yazar.
 
-    python -m data.export --surum v0.1
+    python -m data.export --surum v0.1                      # Türkiye (varsayılan)
+    python -m data.export --ulke yunanistan --surum v0.1
 
 Çıktı:
-    outputs/trend-dedektifi-turkiye-<surum>/L1_kup/<degisken>__<urun>.nc
-    outputs/trend-dedektifi-turkiye-<surum>/L1_kup/ICINDEKILER.csv
+    outputs/trend-dedektifi-<ulke>-<surum>/L1_kup/<degisken>__<urun>.nc
+    outputs/trend-dedektifi-<ulke>-<surum>/L1_kup/ICINDEKILER.csv
 
 Kurallar:
 - Yalnız 0,25° (``__005`` dosyaları girmez) ve yalnız gerçek veri (SENTETIK girmez).
-- İçeride ``TURKIYE_BBOX`` kullanılır; yayında kutu ``YAYIN_BBOX`` (25,5–45,0 D, 35,5–42,5 K),
-  0,25°'de 28 enlem × 78 boylam hücre. Hücre kenarlarının kutu sınırına tam oturduğu denetlenir.
+- Kaynak ``cache/processed/<ulke>/``; yayın kutusu ``data/ulkeler.yaml`` (``yayin_kutusu``). Türkiye:
+  ``YAYIN_BBOX`` (25,5–45,0 D, 35,5–42,5 K), 0,25°'de 28 enlem × 78 boylam hücre. Hücre kenarlarının kutu
+  sınırına tam oturduğu denetlenir.
+- Türkiye dışındaki ülkelerde ``ulke``, ``ulke_adi``, ``ulke_iso3`` attr'ları yazılır ve ulkeler.yaml'daki
+  ``ek_uyarilar`` ``bilinen_sorunlar``'a eklenir. Türkiye dosyalarının biçimi değişmez (attr yoksa Türkiye).
 - Kademe 1 = ekip belgesindeki çekirdek dosyalar (``KADEME_1``); diğerleri Kademe 2 ve
   ``dogrulanmadi="evet"`` attr'ı taşır. Sabit alanlar (rakım) kademesizdir: ``kademe=0``.
 - ``kademe`` her dosyada int32'dir: 1, 2 ya da 0 (kademesiz).
@@ -31,7 +35,8 @@ import pandas as pd
 import xarray as xr
 
 from data.catalog import variables
-from data.grid import GRID_RES, REPO_ROOT, TURKIYE_DIR, check_contract, write_netcdf
+from data.grid import GRID_RES, REPO_ROOT, TURKIYE_DIR, check_contract, ulke_dir, write_netcdf
+from data import ulkeler as U
 
 # (batı, güney, doğu, kuzey), derece — yayın kutusu
 YAYIN_BBOX: tuple[float, float, float, float] = (25.5, 35.5, 45.0, 42.5)
@@ -105,8 +110,18 @@ def data_period(ds: xr.Dataset) -> str:
     return f"{t[0]:%Y-%m} … {t[-1]:%Y-%m}"
 
 
-def release_attrs(ds: xr.Dataset, degisken: str, urun: str, surum: str, bbox=YAYIN_BBOX) -> dict:
-    """Mevcut attrs'a yayın alanlarını ekler (doi = NASA kaynak DOI'si olarak kalır)."""
+def yayin_sekli(bbox, res: float = GRID_RES["025"]) -> tuple[int, int]:
+    """Yayın kutusunun (lat, lon) hücre sayısı (Türkiye: 28 × 78)."""
+    w, s, e, n = bbox
+    return int(round((n - s) / res)), int(round((e - w) / res))
+
+
+def release_attrs(ds: xr.Dataset, degisken: str, urun: str, surum: str, bbox=YAYIN_BBOX,
+                  ulke: str | None = None) -> dict:
+    """Mevcut attrs'a yayın alanlarını ekler (doi = NASA kaynak DOI'si olarak kalır).
+
+    Türkiye dışındaki ülkede ülke attr'ları ve ülkeye özgü ``ek_uyarilar`` (``bilinen_sorunlar``) eklenir.
+    """
     k = kademe(degisken, urun)
     a = dict(ds.attrs)
     # Eski harmonize çıktısında katalog bayrağı "dogrulanmadi" adıyla yazılmış olabilir: yeni ada taşı
@@ -119,6 +134,12 @@ def release_attrs(ds: xr.Dataset, degisken: str, urun: str, surum: str, bbox=YAY
              yayin_kutusu=f"{w}, {s}, {e}, {n}")
     if k == 2:
         a["dogrulanmadi"] = "evet"
+    if not U.varsayilan_mi(ulke):                 # Türkiye dosyaları eskisiyle bayt bayt aynı kalsın
+        u = U.ulke(ulke)
+        a.update(ulke=u["anahtar"], ulke_adi=u["ad"], ulke_iso3=u["iso3"])
+        ek = u["ek_uyarilar"].get(f"{degisken}__{urun}")
+        if ek:
+            a["bilinen_sorunlar"] = "; ".join(x for x in (a.get("bilinen_sorunlar"), ek) if x)
     return a
 
 
@@ -164,10 +185,27 @@ def sabit_katmanlar(out_dir: Path, yazilan: set[str]) -> list[dict]:
     return rows
 
 
-def export(surum: str, src_dir: Path = TURKIYE_DIR, out_root: Path = OUTPUTS_DIR,
-           bbox=YAYIN_BBOX) -> Path:
-    """Yayın paketini yazar; L1_kup klasörünün yolunu döndürür."""
-    out_dir = Path(out_root) / f"trend-dedektifi-turkiye-{surum}" / "L1_kup"
+def paket_adi(surum: str, ulke: str | None = None) -> str:
+    """``trend-dedektifi-<ulke>-<surum>`` (Türkiye: trend-dedektifi-turkiye-v0.1)."""
+    return f"trend-dedektifi-{U.ulke(ulke)['anahtar']}-{surum}"
+
+
+def export(surum: str, src_dir: Path | None = None, out_root: Path = OUTPUTS_DIR,
+           bbox=None, ulke: str | None = None) -> Path:
+    """Yayın paketini yazar; L1_kup klasörünün yolunu döndürür.
+
+    ``ulke`` verilmezse aktif ülke (varsayılan Türkiye); ``src_dir`` verilmezse ``cache/processed/<ulke>/``,
+    ``bbox`` verilmezse ulkeler.yaml ``yayin_kutusu``.
+    """
+    with U.ulke_baglami(ulke):
+        return _export(surum, src_dir, out_root, bbox)
+
+
+def _export(surum, src_dir, out_root, bbox) -> Path:
+    src_dir = Path(src_dir) if src_dir is not None else ulke_dir()
+    bbox = tuple(bbox) if bbox is not None else U.yayin_kutusu()
+    sekil = yayin_sekli(bbox)
+    out_dir = Path(out_root) / paket_adi(surum) / "L1_kup"
     out_dir.mkdir(parents=True, exist_ok=True)
     rows = []
     for degisken, urun, path in candidates(src_dir):
@@ -176,7 +214,7 @@ def export(surum: str, src_dir: Path = TURKIYE_DIR, out_root: Path = OUTPUTS_DIR
         if is_synthetic(ds):
             print(f"  atlandı (sentetik): {path.name}")
             continue
-        cut = crop_to_bbox(ds, bbox)
+        cut = crop_to_bbox(ds, bbox, shape=sekil)
         cut.attrs = release_attrs(ds, degisken, urun, surum, bbox)
         problems = check_contract(cut, static="time" not in cut.dims)
         if problems:
@@ -196,10 +234,11 @@ def export(surum: str, src_dir: Path = TURKIYE_DIR, out_root: Path = OUTPUTS_DIR
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Yayın paketi (L1 küpleri) üretir.")
     ap.add_argument("--surum", required=True, help="ör. v0.1")
-    ap.add_argument("--kaynak", default=str(TURKIYE_DIR), help="işlenmiş dosyaların klasörü")
+    ap.add_argument("--ulke", default=None, help="data/ulkeler.yaml anahtarı (varsayılan turkiye)")
+    ap.add_argument("--kaynak", default=None, help="işlenmiş dosyaların klasörü (varsayılan cache/processed/<ulke>/)")
     ap.add_argument("--cikti", default=str(OUTPUTS_DIR), help="çıktı kök klasörü")
     a = ap.parse_args(argv)
-    out = export(a.surum, Path(a.kaynak), Path(a.cikti))
+    out = export(a.surum, Path(a.kaynak) if a.kaynak else None, Path(a.cikti), ulke=a.ulke)
     print(f"Yayın paketi: {out}")
 
 
