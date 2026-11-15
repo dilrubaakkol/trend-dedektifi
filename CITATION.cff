@@ -1,12 +1,14 @@
 # Bu dosya GitHub'daki "Cite this repository" düğmesini besler. Biçim: https://citation-file-format.github.io
-# DOLDURULACAK: Esra dışındaki ekip üyelerinin soyadları (family-names) ve yayınlandığında veri paketi DOI'si.
+# DOI: Zenodo yayınında eklenecek. docs/sozlesmeler.md ve data/export.py'deki veri_seti_doi ile AYNI olmalı;
+# şu an her yerde "(yayında doldurulacak)". Yayınlanınca bu satırın altına şunu ekleyin:
+#   doi: "10.5281/zenodo.<NUMARA>"
 # Yazar sırası ekibin rol numarasına göredir (Kişi 1 → Kişi 5); ekip farklı bir sıra isterse değiştirilir.
 cff-version: 1.2.0
 message: >-
   Bu yazılımı ya da veri paketini kullanırsanız lütfen aşağıdaki bilgiyle atıf yapın. Kullandığınız NASA
   ürünlerine de ayrıca atıf yapın (references listesi ve her veri dosyasındaki doi alanı).
-type: software
-title: "Trend Dedektifi: Türkiye için NASA yer bilimi verilerinde trend ve ilişki analizi"
+type: dataset
+title: "Trend Dedektifi: Türkiye NASA iklim trendi veri seti"
 abstract: >-
   Türkiye'nin 81 ili, 7 coğrafi bölgesi ve ülke geneli için NASA uydu ve model ürünlerinden (MERRA-2,
   GLDAS, GPM IMERG, MODIS, OMI, GRACE/GRACE-FO) aylık 0,25° ortak ızgarada veri küpleri; hücre, il ve
@@ -16,13 +18,20 @@ abstract: >-
   "Be An Earth System Trend Detective!" için geliştirilmiştir.
 authors:
   - given-names: Dilruba      # Kişi 1 — Veri
+    family-names: Akkol
   - given-names: Halime       # Kişi 2 — İstatistik
+    family-names: Kocakurt
   - given-names: Sümeyra      # Kişi 3 — Mekân/Fizik
+    family-names: Yüce
   - given-names: Esra         # Kişi 4 — Bilgi tabanı/LLM
     family-names: Kaya
   - given-names: Merve        # Kişi 5 — Arayüz/Doğrulama
+    family-names: Biçer
 version: "v0.1"
-license: MIT
+date-released: "2026-11-15"
+license:
+  - CC-BY-4.0   # veri paketi (L1–L4, karne, büyüklük testleri)
+  - MIT         # kod
 repository-code: "https://github.com/dilrubaakkol/trend-dedektifi"
 keywords:
   - NASA Space Apps Challenge
